@@ -1,7 +1,7 @@
 {
   "name": "Claudex",
   "short_name": "Claudex",
-  "description": "CloudCLI UI web application",
+  "description": "Claudex personal assistant and agent workspace",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",

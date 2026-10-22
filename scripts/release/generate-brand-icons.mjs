@@ -14,6 +14,7 @@ const star=claude.match(/fill-rule="nonzero"\s+d="([^"]+)"/)[1];
 // The existing provider vectors form one mark: a Codex knot surrounding Claude's warm star.
 const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512"><title>Claudex — Claude × Codex</title><rect width="512" height="512" rx="112" fill="#F3F0E9"/><path d="${knot}" transform="translate(256 256) scale(.82) translate(-360.626 -360.626)" fill="#242422"/><circle cx="256" cy="256" r="66" fill="#F3F0E9"/><path d="${star}" transform="translate(194.56 194.56) scale(.24)" fill="#D77555"/></svg>\n`;
 await fs.writeFile(path.join(root,'public/logo.svg'),svg);
+await fs.writeFile(path.join(root,'public/claudex-mark.svg'),svg);
 await fs.writeFile(path.join(root,'public/favicon.svg'),svg);
 await fs.writeFile(path.join(root,'public/icons/icon-template.svg'),svg);
 const render=size=>sharp(Buffer.from(svg)).resize(size,size).png().toBuffer();
