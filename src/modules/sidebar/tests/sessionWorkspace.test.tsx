@@ -31,11 +31,10 @@ test('manual unread remains marked in the current conversation, then opening it 
   assert.equal(vi.mocked(api.sessionWorkspace.update).mock.calls.at(-1)?.[1].readThrough,initial.lastActivityAt);
 });
 
-test('the pinned and attention views navigate by stable session and project IDs',async()=>{
+test('pinned chats navigate by stable session and project IDs, with attention filtering in the inbox',async()=>{
   row={...initial,blockedCount:2};const select=vi.fn();
   render(<SessionWorkspaceProvider activeSessionId={null}><SessionWorkspacePanel onSelect={select}/></SessionWorkspaceProvider>);
   await waitFor(()=>assert.ok(screen.getByRole('link',{name:/Pinned task/})));
-  fireEvent.click(screen.getByRole('button',{name:/Attention|待处理/}));
   fireEvent.click(screen.getByRole('link',{name:/Pinned task/}));
   assert.deepEqual(select.mock.calls[0],['p1','s1','claude']);
 });

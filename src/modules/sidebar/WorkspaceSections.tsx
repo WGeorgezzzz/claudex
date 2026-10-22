@@ -62,7 +62,7 @@ export function WorkspaceSections({ projectListProps, onSelect }: { projectListP
     : (page?.sessions ?? []).map(session => ({ id: session.sessionId, title: session.title, path: session.projectPath }));
   const unassigned = projectListProps.filteredProjects.filter(project => !assignedProject(project.projectId));
   return <>
-    <div className="mx-3 mb-2 flex items-center justify-between"><span className="text-xs font-medium text-muted-foreground">{t('sections.title')}</span>
+    <div className="mx-3 mb-2 flex items-center justify-between"><span className="text-xs font-medium text-muted-foreground">{t(layout.sections.length?'sections.title':'sections.projects')}</span>
       <button type="button" aria-label={t('sections.manage')} onClick={() => setOpen(true)} className="rounded p-1.5 text-muted-foreground hover:bg-muted"><Settings2 size={14}/></button></div>
     {error && !open && <p role="alert" className="mx-3 text-xs text-destructive">{error}</p>}
     {layout.sections.map(section => {
@@ -81,7 +81,7 @@ export function WorkspaceSections({ projectListProps, onSelect }: { projectListP
         </>}
       </section>;
     })}
-    <h3 className="mx-3 mb-1 text-xs font-medium text-muted-foreground">{t('sections.unassigned')}</h3>
+    {layout.sections.length>0&&<h3 className="mx-3 mb-1 text-xs font-medium text-muted-foreground">{t('sections.unassigned')}</h3>}
     {(unassigned.length > 0 || projectListProps.projects.length === 0 || projectListProps.isLoading) && <SidebarProjectList {...listProps} filteredProjects={unassigned}/>}
     <Dialog open={open} onOpenChange={setOpen}><DialogContent aria-label={t('sections.manage')} className="flex max-h-[85dvh] max-w-2xl flex-col overflow-hidden">
       <header className="flex items-center justify-between"><h2 className="font-semibold">{t('sections.manage')}</h2><button aria-label={t('sections.close')} onClick={() => setOpen(false)}><X size={18}/></button></header>
