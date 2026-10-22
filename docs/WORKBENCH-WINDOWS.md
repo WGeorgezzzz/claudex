@@ -108,3 +108,8 @@ node node_modules/electron-builder/cli.js --projectDir .desktop-build/workbench 
 
 See [Codex source references](CODEX-SOURCE-REFERENCES.md) for the protocol and
 lifecycle designs used in this implementation.
+
+For custom background jobs that call Codex through Windows Task Scheduler, use
+the [hidden scheduled-job launcher](../scripts/windows/README.md). The outer
+PowerShell or Node task action must also start without a console; hiding only
+the inner Codex process does not hide an already-created parent window.

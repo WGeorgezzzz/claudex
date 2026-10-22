@@ -1,6 +1,6 @@
 # Claudex
 
-Claudex 是面向 Claude Code / WenClaude 的独立桌面工作台，支持跨项目会话、持久消息队列、运行中补充、分支讨论、文件预览、终端和自动监测。也保留 Codex 等提供商入口。
+Claudex 是面向 Claude Code 的独立桌面工作台，支持跨项目会话、持久消息队列、运行中补充、分支讨论、文件预览、终端和自动监测。也保留 Codex 等提供商入口。
 
 This is an independently maintained, modified version of **CloudCLI UI (https://github.com/siteboon/claudecodeui)**, based on upstream 1.37.5. Original authorship, commit history, and the AGPL-3.0-or-later license and additional notices are preserved. Claudex is not an official OpenAI or Anthropic product.
 
@@ -8,7 +8,7 @@ This is an independently maintained, modified version of **CloudCLI UI (https://
 
 Windows 安装包和校验值见 [Releases](https://github.com/WGeorgezzzz/claudex/releases)。只使用完成安装验收后发布的 `Claudex-<version>-win-x64.exe`。安装包目前未签名。
 
-首次打开创建本地账号。在桌面启动器 **Local Settings → Claude profile** 中填入现有 Claude 配置目录和可选 CLI 路径；连接 WenClaude 时使用其原有配置目录及兼容 `.js` 启动包装器，保留原代理和登录链路。凭据、个人启动脚本和聊天记录不包含在项目或安装包里。
+首次打开创建本地账号。在桌面启动器 **Local Settings → Claude profile** 中填入现有 Claude 配置目录和可选 CLI 路径。凭据、个人启动脚本和聊天记录不包含在项目或安装包里。
 
 - **Ctrl/⌘+Shift+K** 或侧栏“搜索会话”：跨项目查找和切换。
 - **Ctrl/⌘+K**：会话、文件、Git 和常用操作。
@@ -32,9 +32,9 @@ $env:HOST = '127.0.0.1'
 $env:SERVER_PORT = '3016'
 $env:CLOUDCLI_HOME = "$env:LOCALAPPDATA\Claudex-data"
 $env:DATABASE_PATH = "$env:CLOUDCLI_HOME\auth.db"
-# 可选：接入已有 WenClaude 配置；CLI 路径由本机实际安装决定。
-$env:CLAUDE_CONFIG_DIR = "$env:USERPROFILE\.claude-cc"
-# $env:CLAUDE_CLI_PATH = 'C:\path\to\wenclaude-cli.js'
+# 可选：接入已有 Claude 配置；CLI 路径由本机实际安装决定。
+$env:CLAUDE_CONFIG_DIR = "$env:USERPROFILE\.claude"
+# $env:CLAUDE_CLI_PATH = 'C:\path\to\claude.exe'
 npm run server
 ```
 

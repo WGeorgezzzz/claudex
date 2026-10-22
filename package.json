@@ -2,7 +2,7 @@
   "name": "@wgeorgezzzz/claudex",
   "version": "0.5.0",
   "productName": "Claudex",
-  "description": "Independent desktop workspace for Claude and WenClaude, with durable queues and contextual side conversations",
+  "description": "Independent desktop workspace for Claude, with durable queues and contextual side conversations",
   "type": "module",
   "main": "dist-server/server/index.js",
   "bin": {
