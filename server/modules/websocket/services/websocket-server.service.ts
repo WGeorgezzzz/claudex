@@ -1,6 +1,7 @@
 import type { Server as HttpServer } from 'node:http';
 
-import { WebSocket, WebSocketServer, type VerifyClientCallbackSync } from 'ws';
+import { WebSocket, WebSocketServer, type VerifyClientCallbackAsync } from 'ws';
+import { validateAccessBoundary, isLocalRequest, authSessionEvents } from '@/modules/auth/index.js';
 
 import { handleChatConnection } from '@/modules/websocket/services/chat-websocket.service.js';
 import { verifyWebSocketClient } from '@/modules/websocket/services/websocket-auth.service.js';
@@ -86,15 +87,32 @@ export function createWebSocketServer(
 ): WebSocketServer {
   const wss = new WebSocketServer({
     server,
-    verifyClient: ((
-      info: Parameters<VerifyClientCallbackSync<AuthenticatedWebSocketRequest>>[0]
-    ) => verifyWebSocketClient(info, dependencies.verifyClient)),
+    verifyClient: ((info, done) => {
+      void validateAccessBoundary(info.req).then(ok=>{
+        if(!ok||!verifyWebSocketClient(info,dependencies.verifyClient))return done(false,403,'Access denied');
+        const request=info.req as AuthenticatedWebSocketRequest;
+        if(process.env.CLAUDEX_PRIVATE_GATE==='1'&&!isLocalRequest(request)&&request.user?.authKind!=='remote')return done(false,403,'Remote login required');
+        done(true);
+      }).catch(()=>done(false,403,'Access denied'));
+    }) as VerifyClientCallbackAsync<AuthenticatedWebSocketRequest>,
   });
 
   wss.on('connection', (ws, request) => {
     attachWebSocketHeartbeat(ws);
 
     const incomingRequest = request as AuthenticatedWebSocketRequest;
+    const revoke=(id:string)=>{if(incomingRequest.user?.authSessionId===id)ws.close(4001,'Device session revoked');};
+    authSessionEvents.on('revoked',revoke);
+    ws.once('close',()=>authSessionEvents.off('revoked',revoke));
+    // An already-open socket must not outlive either login; reopening repeats the complete ingress check.
+    let expires=Number(incomingRequest.user?.authExpiresAt)||Infinity;
+    const accessToken=incomingRequest.headers['cf-access-jwt-assertion'];
+    if(process.env.CLAUDEX_PRIVATE_GATE==='1'&&typeof accessToken==='string'){
+      try{expires=Math.min(expires,Number(JSON.parse(Buffer.from(accessToken.split('.')[1],'base64url').toString()).exp)*1000);}catch{ws.close(4001,'Access session invalid');}
+    }
+    if(Number.isFinite(expires)){
+      const expiry=setTimeout(()=>ws.close(4001,'Login expired'),Math.max(1,Math.min(2147483647,expires-Date.now())));expiry.unref();ws.once('close',()=>clearTimeout(expiry));
+    }
     const url = incomingRequest.url ?? '/';
     const pathname = new URL(url, 'http://localhost').pathname;
 

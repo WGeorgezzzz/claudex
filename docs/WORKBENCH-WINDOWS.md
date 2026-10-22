@@ -1,4 +1,4 @@
-# Claudex 0.7.0 — Windows x64
+# Claudex 0.8.0 — Windows x64
 
 Claudex is an independently maintained Windows desktop project,
 based on upstream CloudCLI 1.37.5. It retains the upstream AGPL-3.0-or-later
@@ -6,7 +6,7 @@ license and notices.
 
 ## Install alongside an existing client
 
-Download `Claudex-0.7.0-win-x64.exe` and `SHA256SUMS.txt` from this
+Download `Claudex-0.8.0-win-x64.exe` and `SHA256SUMS.txt` from this
 release. The installer is currently **unsigned**. The package includes its own
 Node.js 22 runtime and backend dependencies; a global Node.js installation is
 not required to start the desktop app.
@@ -30,7 +30,10 @@ path does not make it attach to another client. Installing does not launch the
 app automatically, replace the existing client or migrate its live database.
 Old application data is retained when this package is uninstalled.
 
-Create a local account on first use. To use an existing CLI configuration, open
+Local mode signs in using an OS-protected capability and a one-use login ticket.
+Existing accounts and transcripts are retained; a fresh install creates a local
+owner automatically. Password login remains available for existing local accounts.
+To use an existing CLI configuration, open
 the native launcher’s **Local Settings → Claude profile** and supply absolute
 paths to its configuration directory and optional CLI executable or `.js`
 wrapper. No credentials or personal wrapper are included in the installer.
@@ -41,6 +44,26 @@ The default **Keep server running** option preserves work when the GUI exits.
 Upstream npm updates are disabled in this distribution. Install future Workbench
 releases from this repository. Finish Workbench jobs before upgrading or
 uninstalling its binaries; this installer does not migrate a running backend.
+
+## Dot and private remote access
+
+The sidebar's Dot workspace owns independent conversations in a personal directory.
+Explicitly requested memories are visible, editable and removable, with revision
+checks to prevent stale overwrites. They are included in new Dot conversations.
+Dot can delegate to existing project IDs using ordinary permission approvals;
+queue receipts and actual result text return to the original conversation. A
+short transcript-flush delay is retained as pending rather than reported as an
+empty success. Failed and interrupted receipts remain visible.
+
+Stopping a conversation, cancelling a queued delegation and stopping a monitor
+are separate controls. Existing monitor scheduling/recovery semantics remain.
+This is a local Claudex assistant, not the OpenAI-hosted Dot service.
+
+Native login tickets expire after one minute and are single-use. Browser login
+sessions are revocable from the sidebar's account control; revocation disconnects
+that device without stopping server work. Remote access requires separately
+configured Cloudflare Access plus an independent password and TOTP, as described
+in [PRIVATE-ACCESS.md](PRIVATE-ACCESS.md). The installer does not publish a tunnel.
 
 ## Side conversations
 

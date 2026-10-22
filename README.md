@@ -8,9 +8,11 @@ This is an independently maintained, modified version of **CloudCLI UI (https://
 
 Windows 安装包和校验值见 [Releases](https://github.com/WGeorgezzzz/claudex/releases)。只使用完成安装验收后发布的 `Claudex-<version>-win-x64.exe`。安装包目前未签名。
 
-首次打开创建本地账号。在桌面启动器 **Local Settings → Claude profile** 中填入现有 Claude 配置目录和可选 CLI 路径。凭据、个人启动脚本和聊天记录不包含在项目或安装包里。
+桌面端默认使用本机操作系统身份登录，无需另建用户名和密码；已有本地账号及数据继续保留。在桌面启动器 **Local Settings → Claude profile** 中填入现有 Claude 配置目录和可选 CLI 路径。凭据、个人启动脚本和聊天记录不包含在项目或安装包里。
 
 - **Ctrl/⌘+Shift+K** 或侧栏“搜索会话”：跨项目查找和切换。
+- 侧栏 **Dot**：独立个人对话、可编辑记忆、跨项目委派和活动回执。用户明确要求后才保存记忆或委派，完成结果自动回报原对话；模型回合结束不等于实际目标验收通过。
+- 侧栏底部 **账号与设备**：查看并撤销登录会话。远程完整工作台可单独配置 Cloudflare Access、独立密码及 TOTP；默认不开放公网入口，见 [远程接入说明](docs/PRIVATE-ACCESS.md)。
 - 侧栏 **会话收件箱**：集中筛选未读、待处理和置顶会话；按标题、项目路径或提供商搜索，快捷置顶、标记已读。批量已读只作用于当前筛选，处理期间新到达的结果保留未读。
 - **Ctrl/⌘+K**：会话、文件、Git 和常用操作。
 - 界面采用紧凑侧栏、单行聊天标题、居中阅读区和底部输入框；附件、命令、监测和跨会话入口在输入框的 **＋** 菜单，模型在框内，权限和上下文用量在框下。

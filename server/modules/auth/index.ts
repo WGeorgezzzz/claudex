@@ -7,3 +7,6 @@ export { authenticateToken } from './auth.middleware.js';
 export { authenticateWebSocket } from './auth.middleware.js';
 // validateApiKey: used by the server entrypoint for optional API-wide key validation.
 export { validateApiKey } from './auth.middleware.js';
+export { authSessionEvents } from '@/modules/auth/auth.middleware.js';
+export { accessBoundaryMiddleware, validateAccessBoundary, isLocalRequest } from '@/modules/auth/access-boundary.js';
+export { initializeLocalIdentity } from '@/modules/auth/local-identity.service.js';

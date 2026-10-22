@@ -33,6 +33,8 @@ type AuthSessionPayload = {
 
 type AuthStatusPayload = {
   needsSetup?: boolean;
+  remoteLogin?:boolean;
+  localIdentity?:boolean;
 };
 
 type AuthUserPayload = {
@@ -50,7 +52,9 @@ type AuthContextValue = {
   needsSetup: boolean;
   hasCompletedOnboarding: boolean;
   error: string | null;
-  login: (username: string, password: string) => Promise<AuthActionResult>;
+  login: (username: string, password: string, otp?:string) => Promise<AuthActionResult>;
+  remoteLogin:boolean;
+  localIdentity:boolean;
   register: (username: string, password: string) => Promise<AuthActionResult>;
   logout: () => void;
   refreshOnboardingStatus: () => Promise<void>;
@@ -98,6 +102,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [needsSetup, setNeedsSetup] = useState(false);
   const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // The server selects the login method from the verified entry, never from a browser assertion.
+  const [remoteLogin,setRemoteLogin]=useState(false);
+  const [localIdentity,setLocalIdentity]=useState(false);
 
   const clearSession = useCallback(() => {
     setUser(null);
@@ -200,7 +207,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setError(null);
 
       const statusResponse = await api.auth.status();
+      const fragment=new URLSearchParams(window.location.hash.slice(1));
+      const ticket=fragment.get('local-ticket');
+      if(ticket){
+        fragment.delete('local-ticket');
+        window.history.replaceState(null,'',window.location.pathname+window.location.search+(fragment.size?'#'+fragment.toString():''));
+        const response=await api.auth.exchangeLocal(ticket);
+        const loginPayload=await parseJsonSafely<AuthSessionPayload>(response);
+        if(response.ok&&loginPayload?.token){persistToken(loginPayload.token);setToken(loginPayload.token);}
+      }
       const statusPayload = await parseJsonSafely<AuthStatusPayload>(statusResponse);
+      setRemoteLogin(Boolean(statusPayload?.remoteLogin));
+      setLocalIdentity(Boolean(statusPayload?.localIdentity));
 
       if (statusPayload?.needsSetup) {
         setNeedsSetup(true);
@@ -300,10 +318,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, [checkOnboardingStatus]);
 
   const login = useCallback<AuthContextValue['login']>(
-    async (username, password) => {
+    async (username, password, otp) => {
       try {
         setError(null);
-        const response = await api.auth.login(username, password);
+        const response = await api.auth.login(username, password, otp);
         const payload = await parseJsonSafely<AuthSessionPayload>(response);
 
         if (!response.ok || !payload?.token || !payload.user) {
@@ -350,13 +368,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
   );
 
   const logout = useCallback(() => {
-    // JWT logout is client-side: the server endpoint does not maintain a
-    // revocation list, so clearing the session is the complete operation.
+    void api.auth.logout().catch(()=>undefined);
     clearSession();
   }, [clearSession]);
 
   const contextValue = useMemo<AuthContextValue>(
     () => ({
+      remoteLogin,
+      localIdentity,
       user,
       token,
       isLoading,
@@ -369,6 +388,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
       refreshOnboardingStatus,
     }),
     [
+      remoteLogin,
+      localIdentity,
       error,
       hasCompletedOnboarding,
       isLoading,

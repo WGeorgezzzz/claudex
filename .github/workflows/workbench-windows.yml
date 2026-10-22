@@ -38,6 +38,8 @@ jobs:
           server/modules/monitors/tests/monitor-recovery-compat.test.ts
           server/modules/workspace-sections/tests/workspace-sections.test.ts
           server/modules/session-bridge/tests/session-bridge.test.ts
+          server/modules/dot/tests/dot.test.ts
+          server/modules/auth/tests/private-identity.test.ts
       - run: node --test electron/tests/workbench-profile.test.mjs
       - run: npm run build
       - run: node scripts/release/prepare-workbench.mjs

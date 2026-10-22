@@ -200,11 +200,16 @@ const pluginAssetPath = (pluginName: string, assetFile: string) =>
 export const api = {
   // Auth endpoints (no token required)
   auth: {
+    exchangeLocal: (ticket:string) => fetch('/api/auth/local-exchange',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ticket})}),
+    logout: () => post('/api/auth/logout'),
+    devices: () => get('/api/auth/devices'),
+    revokeDevice: (id:string) => del('/api/auth/devices/'+encodeURIComponent(id)),
+    remoteAccount: () => get('/api/auth/remote-account'),
     status: () => fetch('/api/auth/status'),
-    login: (username: string, password: string) => fetch('/api/auth/login', {
+    login: (username: string, password: string, otp?:string) => fetch('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password }),
+      body: JSON.stringify({ username, password, ...(otp?{otp}:{}) }),
     }),
     register: (username: string, password: string) => fetch('/api/auth/register', {
       method: 'POST',
@@ -322,6 +327,13 @@ export const api = {
     read: (id: string, offset = 0) => get(`/api/session-bridge/sessions/${encodeURIComponent(id)}${query({ offset })}`),
     send: (body: { sourceSessionId: string; sessionId: string; requestId: string; content: string }) => post('/api/session-bridge/send', body),
     status: (sourceSessionId: string, id: string) => get(`/api/session-bridge/receipts/${encodeURIComponent(id)}${query({ sourceSessionId })}`),
+  },
+  dot: {
+    snapshot: () => get('/api/dot'),
+    createThread: (title: string) => post('/api/dot/threads', {title}),
+    saveMemory: (body:{content:string;id?:string;revision?:number}) => post('/api/dot/memories',body),
+    forget: (id:string,revision:number) => authenticatedFetch('/api/dot/memories/'+encodeURIComponent(id),{method:'DELETE',body:JSON.stringify({revision})}),
+    cancelTask: (id:string) => post('/api/dot/tasks/'+encodeURIComponent(id)+'/cancel',{}),
   },
   monitors: {
     capabilities: (options: ApiRequestOptions = {}) => get('/api/monitors/capabilities',options),

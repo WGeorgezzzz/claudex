@@ -66,10 +66,13 @@ try {
   const asset=html.match(/\/assets\/index-[^"]+\.js/)?.[0];
   assert.ok(asset,'installed frontend index must reference a built bundle');
   assert.equal((await fetch(base+asset)).status,200);
-  const registration=await fetch(base+'/api/auth/register',{method:'POST',headers:{'content-type':'application/json'},
-    body:JSON.stringify({username:'installer-test',password:randomUUID()+randomUUID()})});
-  assert.equal(registration.status,200);
-  const account=await registration.json();
+  const key=(await fs.readFile(path.join(profileDirectory,'server','local-identity.key'),'utf8')).trim();
+  const ticketResponse=await fetch(base+'/api/auth/local-ticket',{method:'POST',headers:{'X-Claudex-Local-Key':key}});
+  assert.equal(ticketResponse.status,200);
+  const ticket=await ticketResponse.json();
+  const exchange=await fetch(base+'/api/auth/local-exchange',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(ticket)});
+  assert.equal(exchange.status,200);
+  const account=await exchange.json();
   assert.ok(account.token);
   const authorized=await fetch(base+'/api/monitors',{headers:{Authorization:`Bearer ${account.token}`}});
   assert.equal(authorized.status,200,'business API must accept the isolated local account');
@@ -79,6 +82,7 @@ try {
     passed:true,distribution:health.distribution,workbenchVersion:health.workbenchVersion,portIsolated:marker.port!==3001,
     identityMatched:true,existingDatabaseUnchanged:true,unrelatedServerRequests:sentinelRequests,
     authenticatedApi:authorized.status,unauthenticatedQueue:forbidden.status,frontendAsset:asset,claudeVersion,
+    localPasswordless:true,
   };
   await fs.mkdir(path.dirname(reportPath),{recursive:true});
   await fs.writeFile(reportPath,JSON.stringify(record,null,2));

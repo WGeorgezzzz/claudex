@@ -21,6 +21,15 @@ async function fixture(check:(userId:number)=>Promise<void>|void) {
 }
 const create=(userId:number)=>monitorsService.create(userId,{sessionId:'monitor-session',name:'test',content:'Read status only',intervalMinutes:1,options:{permissionMode:'default'}});
 
+test('forwarded and planning turns cannot create or change schedules',()=>fixture(user=>{
+  const context={userId:user,sessionId:'monitor-session',readOnly:true};
+  const row=create(user);
+  assert.ok(executeMonitorTool(context,{action:'list'}));
+  assert.throws(()=>executeMonitorTool(context,{action:'create',name:'Unsolicited',content:'check',intervalMinutes:5}),/只能查看/);
+  for(const action of ['update','pause','resume','stop','run_now'])assert.throws(()=>executeMonitorTool(context,{action,id:row.id}),/只能查看/);
+  assert.equal(monitorsDb.get(user,row.id)?.status,'active');
+}));
+
 test('chat tool creates an idempotent persistent task and lists its real status',()=>fixture(user=>{
   const context={userId:user,sessionId:'monitor-session'};
   const args={action:'create',name:'进度检查',content:'只读查看任务进度，有变化才汇报。',intervalMinutes:30};

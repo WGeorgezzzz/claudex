@@ -3,6 +3,7 @@ import type { TFunction } from 'i18next';
 
 import type { ReleaseInfo } from '@/shared/types';
 import { toggleQuickSettingsPanel } from '@/modules/quick-settings-panel';
+import { AccountSecurity } from '@/modules/auth';
 
 type SidebarFooterProps={updateAvailable:boolean;restartRequired:boolean;releaseInfo:ReleaseInfo|null;latestVersion:string|null;currentVersion:string;onShowVersionModal:()=>void;onShowSettings:()=>void;t:TFunction};
 
@@ -14,6 +15,7 @@ export default function SidebarFooter({updateAvailable,restartRequired,releaseIn
     <div className="flex items-center gap-1">
       <button type="button" className="sidebar-nav-action flex-1" onClick={onShowSettings}><Settings size={16}/><span>{t('actions.settings')}</span></button>
       <button type="button" className="workspace-icon-button" onClick={toggleQuickSettingsPanel} aria-label={t('ui.quickSettings')} title={t('ui.quickSettings')}><SlidersHorizontal size={15}/></button>
+      <AccountSecurity/>
       <details className="relative">
         <summary className="workspace-icon-button cursor-pointer list-none" aria-label={t('ui.about')} title={t('ui.about')}><MoreHorizontal size={16}/></summary>
         <div className="absolute bottom-full right-0 z-50 mb-2 w-56 rounded-xl border border-border bg-popover p-2 text-xs shadow-lg">

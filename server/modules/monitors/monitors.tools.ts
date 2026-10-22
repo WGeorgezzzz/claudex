@@ -18,7 +18,7 @@ const shape={
     z.object({frequency:z.literal('weekly'),time:z.string(),timeZone:z.string(),weekdays:z.array(z.number().int().min(1).max(7)).min(1).max(7)}).strict(),
   ]).nullable().optional().describe('Calendar time HH:mm with explicit IANA timeZone. Weekly ISO weekdays: Monday=1, Sunday=7. Null switches back to interval scheduling.'),
 };
-type ToolContext={userId:number;sessionId:string;monitorId?:string;model?:string;effort?:string;permissionMode?:string};
+type ToolContext={userId:number;sessionId:string;monitorId?:string;model?:string;effort?:string;permissionMode?:string;readOnly?:boolean};
 
 function visible(row:ReturnType<typeof monitorsService.require>) {
   return {id:row.id,name:row.name,content:row.content,intervalMinutes:row.interval_minutes,status:row.status,
@@ -32,6 +32,7 @@ export function executeMonitorTool(context:ToolContext,input:unknown): unknown {
   const args=z.object(shape).strict().parse(input);
   const session=sessionsDb.getSessionById(context.sessionId);
   if(!session||session.provider!=='claude'||!Number.isInteger(context.userId))throw new Error('当前 Claude 会话或用户无效。');
+  if(context.readOnly&&!['list','history'].includes(args.action))throw new Error('转发、委派回报和规划回合只能查看监测；修改调度需要用户在普通回合中明确提出。');
   // Scheduled turns may inspect/stop themselves but cannot broaden their own schedule.
   if(context.monitorId && !['list','history','pause','stop'].includes(args.action))
     throw new Error('自动监测期间只能查看、暂停或停止自身任务；创建或修改请由用户在聊天中提出。');

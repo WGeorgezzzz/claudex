@@ -1,15 +1,20 @@
 // @ts-nocheck -- JWT request augmentation is narrowed by Auth route contracts.
+import { EventEmitter } from 'node:events';
 import jwt from 'jsonwebtoken';
 
-import { IS_PLATFORM } from '@/shared/utils.js';
+import { IS_PLATFORM } from '@/shared/index.js';
+import { userDb, appConfigDb, authSessionsDb } from '@/modules/database/index.js';
+import { isLocalRequest } from '@/modules/auth/access-boundary.js';
 
-import { userDb, appConfigDb } from '../database/index.js';
+/** Auth routes and websocket ingress immediately disconnect revoked device sessions. */
+export const authSessionEvents = new EventEmitter();
+authSessionEvents.setMaxListeners(0);
 
 // Use env var if set, otherwise auto-generate a unique secret per installation
 const JWT_SECRET = process.env.JWT_SECRET || appConfigDb.getOrCreateJwtSecret();
 
-// Optional API key middleware
-const validateApiKey = (req, res, next) => {
+// Server composition uses this optional API-wide key check before authenticated feature routes.
+export const validateApiKey = (req, res, next) => {
   // Skip API key validation if not configured
   if (!process.env.API_KEY) {
     return next();
@@ -22,8 +27,8 @@ const validateApiKey = (req, res, next) => {
   next();
 };
 
-// JWT authentication middleware
-const authenticateToken = async (req, res, next) => {
+// Server and Auth routes verify account and device ownership before entering feature services.
+export const authenticateToken = async (req, res, next) => {
   // Platform mode:  use single database user
   if (IS_PLATFORM) {
     try {
@@ -58,6 +63,9 @@ const authenticateToken = async (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
+    const device = decoded.sid ? authSessionsDb.get(decoded.sid) : null;
+    if (decoded.sid && (!device || device.user_id !== decoded.userId)) throw new Error('Device session revoked.');
+    if (process.env.CLAUDEX_PRIVATE_GATE === '1' && !isLocalRequest(req) && device?.kind !== 'remote') throw new Error('Remote password and MFA login required.');
 
     // Verify user still exists and is active
     const user = userDb.getUserById(decoded.userId);
@@ -74,12 +82,12 @@ const authenticateToken = async (req, res, next) => {
       const now = Math.floor(Date.now() / 1000);
       const halfLife = (decoded.exp - decoded.iat) / 2;
       if (now > decoded.iat + halfLife) {
-        const newToken = generateToken(user);
+        const newToken = generateToken({...user, authSessionId:decoded.sid, authKind:device?.kind});
         res.setHeader('X-Refreshed-Token', newToken);
       }
     }
 
-    req.user = user;
+    req.user = {...user, authSessionId:decoded.sid, authKind:device?.kind ?? 'legacy'};
     next();
   } catch (error) {
     if (error instanceof jwt.TokenExpiredError) {
@@ -102,20 +110,24 @@ const authenticateToken = async (req, res, next) => {
   }
 };
 
-// Generate JWT token
-const generateToken = (user) => {
+// Auth composition and local/remote login routes issue tokens bound to a revocable device session.
+export const generateToken = (user) => {
+  const sid=user.authSessionId || authSessionsDb.create(Number(user.id), user.authKind || 'password');
+  const device=authSessionsDb.get(sid);
+  if(!device || device.user_id!==Number(user.id))throw new Error('Device session is no longer active.');
   return jwt.sign(
     {
       userId: user.id,
-      username: user.username
+      username: user.username,
+      sid
     },
     JWT_SECRET,
-    { expiresIn: '7d' }
+    { expiresIn: Math.max(1,Math.floor((device.expires_at-Date.now())/1000)) }
   );
 };
 
-// WebSocket authentication function
-const authenticateWebSocket = (token) => {
+// WebSocket ingress reuses the same account/device lifetime validation as HTTP.
+export const authenticateWebSocket = (token) => {
   // Platform mode: bypass token validation, return first user
   if (IS_PLATFORM) {
     try {
@@ -137,12 +149,14 @@ const authenticateWebSocket = (token) => {
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
+    const device=decoded.sid?authSessionsDb.get(decoded.sid):null;
+    if(decoded.sid&&(!device||device.user_id!==decoded.userId))return null;
     // Verify user actually exists in database (matches REST authenticateToken behavior)
     const user = userDb.getUserById(decoded.userId);
     if (!user) {
       return null;
     }
-    return { userId: user.id, username: user.username };
+    return { userId: user.id, username: user.username, authSessionId:decoded.sid, authKind:device?.kind ?? 'legacy',authExpiresAt:decoded.exp*1000 };
   } catch (error) {
     if (!(error instanceof jwt.TokenExpiredError)) {
       console.warn(
@@ -152,12 +166,4 @@ const authenticateWebSocket = (token) => {
     }
     return null;
   }
-};
-
-export {
-  validateApiKey,
-  authenticateToken,
-  generateToken,
-  authenticateWebSocket,
-  JWT_SECRET
 };

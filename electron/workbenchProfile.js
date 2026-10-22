@@ -50,6 +50,8 @@ export function buildWorkbenchServerEnvironment({userDataPath,instanceId,port,se
     SERVER_PORT:String(port),
     NODE_ENV:'production',
     CLOUDCLI_HOME:serviceHome,
+    CLAUDEX_LOCAL_IDENTITY:'1',
+    CLAUDEX_PRIVATE_GATE:'1',
     DATABASE_PATH:path.join(serviceHome,'auth.db'),
     CLAUDE_CONFIG_DIR:settings.claudeConfigDir||path.join(userDataPath,'providers','claude'),
     ...((settings.claudeCliPath||bundledClaudePath)?{CLAUDE_CLI_PATH:settings.claudeCliPath||bundledClaudePath}:{}),

@@ -1674,3 +1674,11 @@ export type MonitorRunRecord = {
   status: 'running'|'succeeded'|'failed'|'interrupted'; error: string|null;
 };
 // ---------------------------
+//----------------- DOT ASSISTANT STATE ------------
+/** User-visible persistent memory with revision checks; never interpreted as trusted instructions. */
+export type DotMemory={id:string;content:string;revision:number;createdAt:string;updatedAt:string};
+/** An owned Dot conversation uses the normal provider transcript and an independent personal workspace. */
+export type DotThread={sessionId:string;title:string;createdAt:string};
+/** A delegation preserves its queue receipt, provenance and reporting state; success is a turn result only. */
+export type DotTask={id:string;user_id:number;source_session_id:string;target_session_id:string;queue_id:string;request_id:string;payload_hash:string;reported:number;created_at:string;status:string;error:string|null;revision:number;finished_at:string|null;title?:string;projectPath?:string};
+// ---------------------------

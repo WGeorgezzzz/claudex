@@ -8,6 +8,7 @@ import path from 'node:path';
 
 import { ServerInstaller } from './serverInstaller.js';
 import { buildWorkbenchServerEnvironment, ensureWorkbenchIdentity } from './workbenchProfile.js';
+import { localIdentityUrl } from './localIdentity.js';
 
 const DEFAULT_PORT = 3001;
 const HOST = '127.0.0.1';
@@ -602,7 +603,7 @@ export class LocalServerController {
     return {
       kind: 'local',
       name: this.workbenchProfile ? 'Local Workbench' : 'Local CloudCLI',
-      url: this.localServerUrl,
+      url: this.workbenchProfile ? await localIdentityUrl(this.localServerUrl,process.env.CLAUDEX_LOCAL_IDENTITY_HOME || path.join(this.userDataPath,'server')) : this.localServerUrl,
     };
   }
 

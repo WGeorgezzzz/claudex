@@ -2,6 +2,8 @@
 // Load environment variables before other imports execute.
 import './load-env.js';
 import { monitorsRoutes, initializeMonitors, closeMonitors } from '@/modules/monitors/index.js';
+import { dotRoutes, initializeDot, closeDot } from '@/modules/dot/index.js';
+import { accessBoundaryMiddleware, initializeLocalIdentity } from '@/modules/auth/index.js';
 import { sideChatsRoutes } from '@/modules/side-chats/index.js';
 import { messageQueueRoutes, initializeMessageQueue, closeMessageQueue } from '@/modules/message-queue/index.js';
 import { sessionWorkspaceRoutes } from '@/modules/session-workspace/index.js';
@@ -133,6 +135,7 @@ createWebSocketServer(server, {
     getPluginPort,
 });
 
+app.use(accessBoundaryMiddleware);
 app.use(cors({ exposedHeaders: ['X-Refreshed-Token', 'X-Auth-Error'] }));
 app.use(express.json({
     limit: '50mb',
@@ -210,6 +213,7 @@ app.use('/api/browser-use', authenticateToken, browserUseRoutes);
 app.use('/api/providers', authenticateToken, providerRoutes);
 app.use('/api/scheduled-messages', authenticateToken, scheduledMessagesRoutes);
 app.use('/api/monitors', authenticateToken, monitorsRoutes);
+app.use('/api/dot', authenticateToken, dotRoutes);
 app.use('/api/side-chats', authenticateToken, sideChatsRoutes);
 app.use('/api/message-queue', authenticateToken, messageQueueRoutes);
 app.use('/api/session-workspace', authenticateToken, sessionWorkspaceRoutes);
@@ -351,6 +355,7 @@ async function startServer() {
     try {
         // Initialize authentication database
         await initializeDatabase();
+        initializeLocalIdentity();
 
         // Configure Web Push (VAPID keys)
         configureWebPush();
@@ -391,6 +396,7 @@ async function startServer() {
             // then keeps polling.
             initializeScheduledMessageDispatcher(providerRuntimeService);
             initializeMonitors(providerRuntimeService);
+            initializeDot();
             sideChatsDb.recover();
             initializeMessageQueue(providerRuntimeService);
 
@@ -403,6 +409,7 @@ async function startServer() {
         await closeSessionsWatcher();
         closeScheduledMessageDispatcher();
         closeMonitors();
+        closeDot();
         closeMessageQueue();
         // Clean up plugin processes on shutdown
         const shutdownRuntimeServices = async () => {
