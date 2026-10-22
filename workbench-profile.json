@@ -1,9 +1,10 @@
 {
-  "productName": "CloudCLI Workbench",
-  "version": "0.1.1",
+  "productName": "Claudex",
+  "version": "0.4.0",
   "appId": "io.github.wgeorgezzzz.cloudcli-workbench",
   "protocol": "cloudcli-workbench",
   "storageFolder": "CloudCLI Workbench",
   "defaultPort": 3016,
-  "releaseRepository": "WGeorgezzzz/claudecodeui"
+  "releaseRepository": "WGeorgezzzz/claudex",
+  "upstreamBaseVersion": "1.37.5"
 }

@@ -4,6 +4,7 @@ import './load-env.js';
 import { monitorsRoutes, initializeMonitors, closeMonitors } from '@/modules/monitors/index.js';
 import { sideChatsRoutes } from '@/modules/side-chats/index.js';
 import { messageQueueRoutes, initializeMessageQueue, closeMessageQueue } from '@/modules/message-queue/index.js';
+import { sessionWorkspaceRoutes } from '@/modules/session-workspace/index.js';
 import { sideChatsDb } from '@/modules/database/index.js';
 import { getCloudCliHomeDir } from '@/shared/index.js';
 
@@ -209,6 +210,7 @@ app.use('/api/scheduled-messages', authenticateToken, scheduledMessagesRoutes);
 app.use('/api/monitors', authenticateToken, monitorsRoutes);
 app.use('/api/side-chats', authenticateToken, sideChatsRoutes);
 app.use('/api/message-queue', authenticateToken, messageQueueRoutes);
+app.use('/api/session-workspace', authenticateToken, sessionWorkspaceRoutes);
 
 // Agent API Routes (uses API key authentication)
 app.use('/api/agent', agentRoutes);

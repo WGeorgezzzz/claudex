@@ -92,6 +92,8 @@ export const DialogTrigger = React.forwardRef<HTMLButtonElement, React.ButtonHTM
 DialogTrigger.displayName = 'DialogTrigger';
 
 type DialogContentProps = {
+  /** A caller may focus its primary input instead of the first toolbar button. */
+  initialFocusRef?: React.RefObject<HTMLElement | null>;
   onEscapeKeyDown?: () => void;
   onPointerDownOutside?: () => void;
   wrapperClassName?: string;
@@ -102,7 +104,7 @@ const FOCUSABLE_SELECTOR = 'a[href], button:not([disabled]), input:not([disabled
 
 /** Focus-trapped panel of Dialog, used by the chat, command-palette, sidebar and skills modules. */
 export const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps>(
-  ({ className, children, onEscapeKeyDown, onPointerDownOutside, wrapperClassName, animationClassName, ...props }, ref) => {
+  ({ className, children, onEscapeKeyDown, onPointerDownOutside, wrapperClassName, animationClassName, initialFocusRef, ...props }, ref) => {
     const { open, onOpenChange, triggerRef } = useDialog();
     const contentRef = React.useRef<HTMLDivElement | null>(null);
     const previousFocusRef = React.useRef<HTMLElement | null>(null);
@@ -166,12 +168,13 @@ export const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps
     React.useEffect(() => {
       if (open && contentRef.current) {
         // Small delay to let the portal render
-        requestAnimationFrame(() => {
-          const first = contentRef.current?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR);
+        const frame = requestAnimationFrame(() => {
+          const first = initialFocusRef?.current ?? contentRef.current?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR);
           first?.focus();
         });
+        return () => cancelAnimationFrame(frame);
       }
-    }, [open]);
+    }, [open, initialFocusRef]);
 
     if (!open) return null;
 

@@ -34,6 +34,8 @@ export type SideChatRecord = {
 /** One durable FIFO submission. Request IDs deduplicate transport retries; revision protects
  * pending edits. Failed/interrupted heads block later submissions until an explicit retry/cancel. */
 export type QueuedTurnRecord = {
+  position: number;
+  delivery_mode: 'queued'|'live';
   sequence: number; id: string; user_id: number; session_id: string; request_id: string;
   payload_hash: string; content: string; options: string; status: 'queued'|'running'|'succeeded'|'failed'|'interrupted'|'cancelled';
   revision: number; attempt_count: number; run_id: string|null; error: string|null;
@@ -46,6 +48,14 @@ export type QueuedTurnAttempt = {
 };
 // ---------------------------
 //----------------- WEBSOCKET TRANSPORT TYPES ------------
+/** A live addition is complete only after Claude returns its supplied UUID in a result; closing first is interrupted, never success. */
+export type ProviderLiveInputResult = { status: 'succeeded'|'failed'|'interrupted'; error: string|null };
+/** Per-user navigation and dispatch state. Queue counts retain failed/interrupted receipts; activity timestamps prevent stale read acknowledgments. */
+export type SessionWorkspaceEntry = {
+  sessionId: string; title: string; provider: string; projectId: string|null; projectPath: string|null;
+  pinnedAt: number|null; unread: boolean; queuePaused: boolean; lastActivityAt: string|null;
+  queuedCount: number; runningCount: number; blockedCount: number; approvalCount: number;
+};
 /**
  * Minimal websocket client contract used by backend broadcaster services.
  *

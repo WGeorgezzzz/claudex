@@ -1603,6 +1603,20 @@ export type RecentConversationListItem = Pick<
   'sessionId' | 'provider' | 'projectId' | 'projectDisplayName' | 'sessionTitle' | 'lastActivity'
 >;
 
+//----------------- COMMAND PALETTE SESSIONS ------------
+/** A stable session identity shared by the palette's recent list, streamed search and navigation. */
+export type PaletteSessionEntry = {
+  id: string;
+  label: string;
+  provider?: string;
+  projectId?: string | null;
+  projectName?: string;
+  snippet?: string;
+  timestamp?: string | null;
+};
+
+// ---------------------------
+
 /**
  * The rename the sidebar currently has open, if any.
  *
@@ -1870,10 +1884,22 @@ export type SideConversation = {
 };
 /** A durable FIFO request displayed by the queue hook and panel; revisions reject stale edits. */
 export type QueuedConversationMessage = {
+  /** Live additions share durable receipts but are delivered to the existing turn instead of FIFO dispatch. */
+  delivery_mode?: 'queued'|'live';
   id: string; session_id: string; content: string; revision: number; attempt_count: number;
   status: 'queued'|'running'|'succeeded'|'failed'|'interrupted'|'cancelled';
   error: string|null; created_at: string; started_at: string|null; finished_at: string|null;
 };
+/** Shared by the sidebar and composer for persistent organization, queue controls, and actionable session counts. */
+export type SessionWorkspaceEntry = {
+  sessionId:string;title:string;provider:string;projectId:string|null;projectPath:string|null;
+  pinnedAt:number|null;unread:boolean;queuePaused:boolean;lastActivityAt:string|null;
+  queuedCount:number;runningCount:number;blockedCount:number;approvalCount:number;
+};
+/** Explicit user intent; marking read through a timestamp cannot acknowledge a later result by accident. */
+export type SessionWorkspaceChange = {pinned?:boolean;unread?:boolean;queuePaused?:boolean;readThrough?:string|null};
+/** Revision-checked queue actions shared by API, composer state, and its controls. */
+export type QueueMessageChange = {content?:string;action?:'cancel'|'retry'|'move-up'|'move-down'};
 /** Composer submission after attachment upload; session and request identities are added by the queue hook. */
 export type QueueSubmission = {
   content: string; options: Record<string,unknown>; attachments: unknown[];

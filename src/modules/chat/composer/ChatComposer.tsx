@@ -46,6 +46,7 @@ type MentionableFile = {
 
 type ChatComposerProps = {
   onQueue?: ()=>void;
+  onSendLive?: ()=>void;
   compact?: boolean;
   monitorSessionId?: string | null;
   pendingPermissionRequests: PendingPermissionRequest[];
@@ -129,6 +130,7 @@ type ChatComposerProps = {
  */
 export default function ChatComposer({
   onQueue,
+  onSendLive,
   compact = false,
   monitorSessionId,
   pendingPermissionRequests,
@@ -494,6 +496,9 @@ export default function ChatComposer({
           </PromptInputTools>
 
           <div className="ml-auto flex max-w-full flex-wrap items-center justify-end gap-1.5 sm:gap-2">
+            {onSendLive&&<button type="button" aria-label={t('liveInput.send')} title={t('liveInput.hint')}
+              disabled={!input.trim()||attachedFiles.length>0} onClick={onSendLive}
+              className="rounded-lg border border-border px-2 py-1 text-xs hover:bg-muted disabled:opacity-40">{t('liveInput.send')}</button>}
             {!compact&&onQueue&&<button type="button" aria-label={t('queue.add')} title={t('queue.add')}
               disabled={!input.trim()&&attachedFiles.length===0} onClick={onQueue}
               className="workspace-icon-button disabled:opacity-40"><ListPlus size={16}/></button>}

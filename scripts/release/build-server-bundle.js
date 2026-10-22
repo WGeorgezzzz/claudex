@@ -153,6 +153,7 @@ await run(electronRebuild, ['--version', electronVersion, '--module-dir', stageD
 if (await pathExists(path.join(stageDir, 'scripts', 'fix-node-pty.js'))) {
   await run(process.execPath, ['scripts/fix-node-pty.js'], { cwd: stageDir });
 }
+await run(process.execPath, ['scripts/fix-codex-windows-console.mjs'], { cwd: stageDir });
 
 await fs.writeFile(
   path.join(stageDir, '.installed.json'),

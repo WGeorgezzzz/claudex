@@ -1,4 +1,11 @@
 {
+  "workspace": {
+    "title": "Conversation workspace", "pinned": "Pinned", "unread": "Unread", "attention": "Attention",
+    "pin": "Pin conversation", "unpin": "Unpin conversation", "markRead": "Mark read", "markUnread": "Mark unread",
+    "retry": "Reload conversation state", "loadFailed": "Conversation state unavailable",
+    "waitingApproval": "{{count}} awaiting approval", "blocked": "{{count}} failed or unconfirmed messages", "paused": "Queue paused · {{count}} pending",
+    "empty": {"pinned": "Pin frequent conversations from their menu", "unread": "No unread conversations", "attention": "No conversations need attention"}
+  },
   "projects": {
     "title": "Projects",
     "newProject": "New Project",
@@ -20,7 +27,7 @@
     "runClaudeCli": "Run Claude CLI in a project directory to get started"
   },
   "app": {
-    "title": "Workbench",
+    "title": "Claudex",
     "subtitle": "AI coding assistant interface"
   },
   "sessions": {

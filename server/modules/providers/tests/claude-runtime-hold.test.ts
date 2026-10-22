@@ -6,6 +6,7 @@ import test from 'node:test';
 
 import { ClaudeSessionsProvider } from '@/modules/providers/list/claude/claude-sessions.provider.js';
 import { CLAUDE_PREDEFINED_MODELS } from '@/modules/providers/list/claude/claude-models.provider.js';
+import { submitClaudeLiveInput } from '@/modules/providers/list/claude/claude-prompt-stream.service.js';
 import {
   listClaudeSDKBackgroundWork,
   queryClaudeSDK,
@@ -145,6 +146,40 @@ const taskNotification = (taskId: string, toolUseId: string, status: string) => 
   type: 'system', subtype: 'task_notification', session_id: NATIVE_ID, task_id: taskId, tool_use_id: toolUseId, status, summary: `Task ${taskId} ${status}`, output_file: '',
 });
 const result = () => ({ type: 'result', subtype: 'success', session_id: NATIVE_ID, result: 'launched', duration_ms: 1, num_turns: 1 });
+
+test('live additions reuse the current prompt stream and unrelated results cannot finish them',async()=>{
+  await withRun(async({script,sent})=>{
+    const original=(script.prompts[0] as {uuid:string}).uuid;
+    script.emit({...toolUse('tool-live','Bash',{command:'working'}),user_message_uuid:original});
+    await settle();
+    const receipts:unknown[]=[];
+    submitClaudeLiveInput(SESSION_ID,'11111111-1111-4111-8111-111111111111','additional requirement',receipt=>receipts.push(receipt));
+    await waitFor(()=>script.prompts.length===2);
+    script.emit({...result(),user_message_uuid:original});
+    await settle();
+    assert.equal(sent.filter(message=>message.kind==='complete').length,0);
+    assert.equal(script.released(),false);
+    assert.equal(receipts.length,0);
+    script.emit({...result(),user_message_uuids:[original,'11111111-1111-4111-8111-111111111111']});
+    await waitFor(()=>receipts.length===1);
+    assert.deepEqual(receipts,[{status:'succeeded',error:null}]);
+    assert.equal(sent.filter(message=>message.kind==='complete').length,1);
+    assert.deepEqual(script.stopped,[]);
+  });
+});
+
+test('closing before the added prompt is answered preserves an interrupted receipt',async()=>{
+  await withRun(async({script,done})=>{
+    const original=(script.prompts[0] as {uuid:string}).uuid;
+    script.emit({...toolUse('tool-live','Bash',{}),user_message_uuid:original});
+    await settle();
+    const receipts:Array<{status:string}>=[];
+    submitClaudeLiveInput(SESSION_ID,'22222222-2222-4222-8222-222222222222','keep this instruction',receipt=>receipts.push(receipt));
+    script.end();await done;
+    assert.equal(receipts[0]?.status,'interrupted');
+    assert.throws(()=>submitClaudeLiveInput(SESSION_ID,'another','must not restart',()=>{}),/no longer accepting/);
+  });
+});
 
 test('an immediate follow-up waits for ordinary process teardown and then resumes', async () => {
   const first=createScriptedQuery(), second=createScriptedQuery();

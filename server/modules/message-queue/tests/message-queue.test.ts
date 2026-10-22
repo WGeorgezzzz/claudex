@@ -11,6 +11,9 @@ import { createCompleteMessage } from '@/shared/utils.js';
 import { providerModelsService } from '@/modules/providers/index.js';
 import { messageQueueService } from '@/modules/message-queue/message-queue.service.js';
 import { dispatchMessageQueue, importLegacyQueuedMessages } from '@/modules/message-queue/message-queue.dispatcher.js';
+import { createLiveInputService } from '@/modules/message-queue/live-input.service.js';
+import { providerRuntimeService } from '@/modules/providers/index.js';
+import type { ProviderLiveInputResult } from '@/shared/types.js';
 
 async function fixture(check:(userId:number)=>Promise<void>|void) {
   const previous=process.env.DATABASE_PATH;
@@ -29,6 +32,43 @@ async function fixture(check:(userId:number)=>Promise<void>|void) {
 const enqueue=(user:number,id:string,content=id)=>messageQueueService.enqueue(user,{
   sessionId:'queue-session',requestId:id,content,options:{permissionMode:'default'},
 });
+
+test('live delivery persists one receipt, bypasses queued work, and never starts another runtime',()=>fixture(user=>{
+  const queued=enqueue(user,'next-turn');
+  const running=messageQueueDb.claim(queued.id)!;
+  const run=chatRunRegistry.startRun({appSessionId:'queue-session',provider:'claude',connection:null,userId:user,providerSessionId:null})!;
+  let delivered=0;
+  let settle:((result:ProviderLiveInputResult)=>void)|undefined;
+  const live=createLiveInputService({...providerRuntimeService,submitLiveInput(_provider,_session,_id,_content,done){delivered++;settle=done;}});
+  const input={sessionId:'queue-session',requestId:'addition',content:'also do this',expectedStartedAt:run.startedAt};
+  const receipt=live.submit(user,input);
+  assert.equal(receipt.status,'running');assert.equal(receipt.delivery_mode,'live');
+  assert.equal(live.submit(user,input).id,receipt.id);assert.equal(delivered,1);
+  assert.equal(messageQueueDb.get(user,running.id)?.status,'running');
+  settle!({status:'succeeded',error:null});
+  assert.equal(messageQueueDb.get(user,receipt.id)?.status,'succeeded');
+  assert.equal(messageQueueDb.attempts(user,receipt.id).length,1);
+}));
+
+test('uncertain live input is never replayed after restart; explicit recovery creates a separate queued turn',()=>fixture(user=>{
+  const live=messageQueueService.enqueue(user,{sessionId:'queue-session',requestId:'lost',content:'preserve me'},'live');
+  const queued=enqueue(user,'next');
+  messageQueueDb.recover();
+  const uncertain=messageQueueDb.get(user,live.id)!;
+  assert.equal(uncertain.status,'interrupted');
+  assert.deepEqual(messageQueueDb.heads().map(row=>row.id),[queued.id]);
+  const retry=messageQueueService.update(user,live.id,{action:'retry',revision:uncertain.revision});
+  assert.notEqual(retry.id,live.id);assert.equal(retry.delivery_mode,'queued');
+  assert.equal(messageQueueDb.get(user,live.id)?.status,'interrupted');
+  assert.equal(messageQueueService.update(user,live.id,{action:'retry',revision:uncertain.revision}).id,retry.id);
+}));
+
+test('live input refuses a changed turn and keeps an auditable failure without calling the provider',()=>fixture(user=>{
+  chatRunRegistry.startRun({appSessionId:'queue-session',provider:'claude',connection:null,userId:user,providerSessionId:null});
+  const live=createLiveInputService({...providerRuntimeService,submitLiveInput(){throw new Error('must not be called');}});
+  const receipt=live.submit(user,{sessionId:'queue-session',requestId:'stale',content:'addition',expectedStartedAt:1});
+  assert.equal(receipt.status,'failed');assert.match(receipt.error||'',/active turn changed/);
+}));
 function runtime(run?:ProviderRuntimeGateway['run'],busy=false):ProviderRuntimeGateway {
   return {hasRuntime:()=>true,hasBackgroundWork:()=>busy,
     run:run??(async(_provider,_command,options,writer)=>{writer.send(createCompleteMessage({provider:'claude',sessionId:String(options.sessionId),exitCode:0}));}),

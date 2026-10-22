@@ -1,4 +1,22 @@
 {
+  "liveInput": {
+    "send": "发送补充",
+    "hint": "送入当前 Claude 进程，在可接收时处理；沿用当前回合设置，不中断正在执行的工具",
+    "label": "运行中补充",
+    "delivered": "已送达，等待确认",
+    "retryQueued": "作为下一轮重新排队",
+    "unconfirmed": "未确认完成，不会自动重发。检查记录后，可作为下一轮重新排队。",
+    "textOnly": "运行中补充支持正在响应的 Claude 会话中的文字；附件请加入下一轮队列。"
+  },
+  "fileLink": {
+    "menu": "文件操作",
+    "openLocally": "本地打开",
+    "preview": "在 CloudCLI 中预览",
+    "copyPath": "复制文件路径",
+    "noProject": "无法获取项目路径，请先在所属项目中打开此会话。",
+    "desktopOnly": "请在 CloudCLI 桌面版中使用本地程序打开此文件。",
+    "copyFailed": "无法复制文件路径。"
+  },
   "codeBlock": {
     "copy": "复制",
     "copied": "已复制",
@@ -372,6 +390,9 @@
     }
   },
   "queue": {
+    "pause": "暂停队列", "resume": "继续队列", "moveUp": "提前一位", "moveDown": "延后一位",
+    "pauseHint": "只控制后续排队消息，不中断当前任务",
+    "pausedHint": "后续消息已暂停，当前任务继续运行。点击“继续队列”恢复自动发送。",
     "title": "消息队列",
     "edit": "编辑排队消息",
     "save": "保存",

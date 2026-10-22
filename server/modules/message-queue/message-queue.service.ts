@@ -7,7 +7,7 @@ const conflict=()=>new AppError('The queued message changed or has already start
 
 /** Queue routes validate ownership and immutable request identity through this service. */
 export const messageQueueService = {
-  enqueue(userId: number, input: Record<string,unknown>) {
+  enqueue(userId: number, input: Record<string,unknown>, delivery: 'queued'|'live'='queued') {
     const sessionId=typeof input.sessionId==='string'?input.sessionId:'';
     const requestId=typeof input.requestId==='string'?input.requestId:'';
     const content=typeof input.content==='string'?input.content:'';
@@ -16,6 +16,9 @@ export const messageQueueService = {
       throw new AppError('Choose an active conversation and supply a request ID and a bounded message.',{code:'INVALID_QUEUE_MESSAGE',statusCode:400});
     }
     const raw=input.options && typeof input.options==='object' && !Array.isArray(input.options)?input.options as Record<string,unknown>:{};
+    if (delivery==='live' && ['images','files','attachments'].some(key=>Array.isArray(raw[key]) && (raw[key] as unknown[]).length)) {
+      throw new AppError('Live additions currently accept text. Add attachments to the next-turn queue.',{statusCode:400});
+    }
     const options: Record<string,unknown>={};
     for (const key of ['model','effort','sessionSummary']) if (typeof raw[key]==='string') options[key]=String(raw[key]).slice(0,1000);
     const mode=raw.permissionMode??'default';
@@ -31,7 +34,7 @@ export const messageQueueService = {
     }
     const serialized=JSON.stringify(options);
     if (serialized.length>1_000_000) throw new AppError('Attachment metadata is too large.',{statusCode:400});
-    const hash=createHash('sha256').update(JSON.stringify([sessionId,content,options])).digest('hex');
+    const hash=createHash('sha256').update(JSON.stringify(delivery==='live'?[sessionId,content,options,'live']:[sessionId,content,options])).digest('hex');
     const existing=messageQueueDb.byRequest(userId,requestId);
     if (existing) {
       if (existing.payload_hash!==hash) throw new AppError('Request ID was already used for different input.',{code:'REQUEST_CONFLICT',statusCode:409});
@@ -40,7 +43,7 @@ export const messageQueueService = {
     if (messageQueueDb.list(userId,sessionId).filter(row=>row.status==='queued').length>=100) {
       throw new AppError('This conversation already has 100 queued messages.',{statusCode:409});
     }
-    return messageQueueDb.create(userId,sessionId,requestId,hash,content,serialized);
+    return messageQueueDb.create(userId,sessionId,requestId,hash,content,serialized,delivery);
   },
   list(userId: number, sessionId: string) {
     if (!sessionId) throw new AppError('A session ID is required.',{statusCode:400});
@@ -50,6 +53,15 @@ export const messageQueueService = {
     const row=messageQueueDb.get(userId,id);
     if (!row) throw new AppError('Queued message was not found.',{code:'QUEUE_NOT_FOUND',statusCode:404});
     if (!Number.isSafeInteger(input.revision)) throw conflict();
+    if (input.action==='move-up'||input.action==='move-down') {
+      if(!messageQueueDb.move(userId,id,Number(input.revision),input.action==='move-up'?'up':'down'))throw conflict();
+      return messageQueueDb.get(userId,id)!;
+    }
+    if (input.action==='retry' && row.delivery_mode==='live') {
+      if (row.revision!==input.revision || !['failed','interrupted'].includes(row.status)) throw conflict();
+      // Explicit recovery creates a normal queued turn; the uncertain live receipt stays intact.
+      return this.enqueue(userId,{sessionId:row.session_id,requestId:`live-retry:${row.id}:${row.revision}`,content:row.content,options:JSON.parse(row.options)});
+    }
     if (input.action==='cancel' || input.action==='retry') {
       if (!messageQueueDb.action(userId,id,Number(input.revision),input.action)) throw conflict();
     } else {

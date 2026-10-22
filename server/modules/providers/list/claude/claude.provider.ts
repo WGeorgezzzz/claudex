@@ -2,6 +2,7 @@ import { AbstractProvider } from '@/modules/providers/shared/base/abstract.provi
 import { ClaudeProviderAuth } from '@/modules/providers/list/claude/claude-auth.provider.js';
 import { ClaudeProviderModels } from '@/modules/providers/list/claude/claude-models.provider.js';
 import { claudeRuntime } from '@/modules/providers/list/claude/claude-runtime.provider.js';
+import { submitClaudeLiveInput } from '@/modules/providers/list/claude/claude-prompt-stream.service.js';
 import { ClaudeForkProvider } from '@/modules/providers/list/claude/claude-fork.provider.js';
 import { ClaudeMcpProvider } from '@/modules/providers/list/claude/claude-mcp.provider.js';
 import { ClaudeSessionSynchronizer } from '@/modules/providers/list/claude/claude-session-synchronizer.provider.js';
@@ -18,7 +19,7 @@ import type {
 } from '@/shared/interfaces.js';
 
 export class ClaudeProvider extends AbstractProvider {
-  readonly runtime: IProviderRuntime = claudeRuntime;
+  readonly runtime: IProviderRuntime = { ...claudeRuntime, submitLiveInput: submitClaudeLiveInput };
   readonly models: IProviderModels = new ClaudeProviderModels();
   readonly mcp = new ClaudeMcpProvider();
   readonly auth: IProviderAuth = new ClaudeProviderAuth();

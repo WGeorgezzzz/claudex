@@ -9,6 +9,7 @@ import { DesktopNotificationsController } from './desktopNotifications.js';
 import { LocalServerController } from './localServer.js';
 import { TabsController } from './tabs.js';
 import { loadWorkbenchProfile } from './workbenchProfile.js';
+import { openLocalPath } from './localPath.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -758,6 +759,13 @@ function registerIpcHandlers() {
     return openEnvironmentInDesktop(environment);
   });
   ipcMain.handle('cloudcli-desktop:open-local', async () => openLocalInDesktop());
+  ipcMain.handle('cloudcli-desktop:open-local-path', async (event, filePath) => {
+    const origin=new URL(event.senderFrame?.url || 'about:blank');
+    if (origin.protocol!=='file:' && !(origin.protocol==='http:' && ['127.0.0.1','localhost'].includes(origin.hostname))) {
+      throw new Error('Open local files from a local CloudCLI window.');
+    }
+    return openLocalPath(filePath, candidate=>shell.openPath(candidate));
+  });
   ipcMain.handle('cloudcli-desktop:open-local-web-ui', async () => openLocalWebUi());
   ipcMain.handle('cloudcli-desktop:refresh-environments', async () => {
     await refreshCloudEnvironments({ showErrors: true });

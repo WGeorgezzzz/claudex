@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { Check, Edit2, GitBranch, MoreHorizontal, Trash2, X } from 'lucide-react';
+import { Check, Edit2, GitBranch, Mail, MailOpen, MoreHorizontal, Pin, PinOff, Trash2, X } from 'lucide-react';
 import type { TFunction } from 'i18next';
 
 import { ActionMenu } from '@/shared/ui';
@@ -8,6 +8,7 @@ import type { LLMProvider } from '@/shared/types';
 import { useSessionForkingProviders } from '@/shared/hooks/useProviderCapabilities';
 import { useProviderSessionIdCopy } from '@/modules/sidebar/hooks/useProviderSessionIdCopy';
 import { PROVIDER_LABELS } from '@/modules/sidebar/utils/sidebarProjectFormatting';
+import { useSessionWorkspace } from '@/modules/sidebar/context/SessionWorkspaceContext';
 
 type SessionOptionsProps = {
   sessionId: string;
@@ -63,6 +64,8 @@ export default function SessionOptions({
   t,
 }: SessionOptionsProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const workspace=useSessionWorkspace();
+  const organization=workspace?.byId.get(sessionId);
   const providerLabel = PROVIDER_LABELS[provider];
   const { copyState, copyLabel, setOptionsOpen, handleCopyAction, isCopyPending, CopyStateIcon } =
     useProviderSessionIdCopy(sessionId, providerLabel);
@@ -160,6 +163,12 @@ export default function SessionOptions({
             </div>
           )}
           items={[
+            ...(workspace?.ready?[
+              {key:'pin',label:t(organization?.pinnedAt?'workspace.unpin':'workspace.pin'),icon:organization?.pinnedAt?PinOff:Pin,
+                onSelect:()=>{void workspace.change(sessionId,{pinned:!organization?.pinnedAt}).catch(()=>{});}},
+              {key:'unread',label:t(organization?.unread?'workspace.markRead':'workspace.markUnread'),icon:organization?.unread?MailOpen:Mail,
+                onSelect:()=>{void workspace.change(sessionId,{unread:!organization?.unread}).catch(()=>{});}},
+            ]:[]),
             ...(projectId !== null ? [{
               key: 'rename',
               label: 'Rename session',

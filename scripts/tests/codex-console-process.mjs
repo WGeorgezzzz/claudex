@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+import { readFile, writeFile } from 'node:fs/promises';
+import { Codex } from '@openai/codex-sdk';
+const root=process.argv[2];
+const output=root+'/console-native.json';
+const codex=new Codex({codexPathOverride:root+'/ConsoleProbe.exe',env:{...process.env,CLOUDCLI_CONSOLE_PROBE:output}});
+const result=await codex.startThread().run('console probe');
+assert.equal(result.finalResponse,'NO_CONSOLE_OK');
+assert.equal(JSON.parse(await readFile(output,'utf8')).consoleHandle,0);
+await writeFile(root+'/console-process-result.json',JSON.stringify({passed:true,consoleHandle:0,streaming:'NO_CONSOLE_OK',sdk:'0.156.1'}));

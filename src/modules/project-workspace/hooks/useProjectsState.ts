@@ -1035,6 +1035,9 @@ export function useProjectsState({
   const handleSessionSelect = useCallback(
     (session: ProjectSession) => {
       clearSessionAttention(session.id);
+      // Cross-project picks are one navigation, preserving Back without an intermediate blank chat.
+      const owningProject = projectsRef.current.find(project => project.projectId === session.__projectId);
+      if (owningProject) setSelectedProject(owningProject);
       setSelectedSession(session);
 
       if (activeTab === 'tasks' || activeTab === 'browser') {

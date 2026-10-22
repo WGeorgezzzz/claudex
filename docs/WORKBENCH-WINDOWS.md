@@ -1,12 +1,12 @@
-# CloudCLI Workbench 0.1.1 — Windows x64
+# Claudex 0.4.0 — Windows x64
 
-An independent Windows desktop distribution of the WGeorgezzzz CloudCLI fork,
+Claudex is an independently maintained Windows desktop project,
 based on upstream CloudCLI 1.37.5. It retains the upstream AGPL-3.0-or-later
 license and notices.
 
 ## Install alongside an existing client
 
-Download `CloudCLI-Workbench-0.1.1-win-x64.exe` and `SHA256SUMS.txt` from this
+Download `Claudex-0.4.0-win-x64.exe` and `SHA256SUMS.txt` from this
 release. The installer is currently **unsigned**. The package includes its own
 Node.js 22 runtime and backend dependencies; a global Node.js installation is
 not required to start the desktop app.
@@ -14,7 +14,7 @@ not required to start the desktop app.
 The application name, installer identity, protocol, browser storage and backend
 data are separate from an existing CloudCLI installation:
 
-- Application: **CloudCLI Workbench**
+- Application: **Claudex**
 - App ID: `io.github.wgeorgezzzz.cloudcli-workbench`
 - Protocol: `cloudcli-workbench://`
 - Default profile: `%APPDATA%\CloudCLI Workbench`
@@ -73,7 +73,7 @@ cancellation, explicit retries and execution records.
 
 ## Build and verification
 
-The `Workbench Windows installer` GitHub Actions workflow builds on a separate
+The `Claudex Windows installer` GitHub Actions workflow builds on a separate
 Windows runner, installs into a disposable directory, starts the installed
 application and checks its authenticated API and frontend assets. Acceptance
 also starts a sentinel service on port 3001 and injects stale environment

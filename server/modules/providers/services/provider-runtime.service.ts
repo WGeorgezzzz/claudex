@@ -10,6 +10,7 @@ import type {
   ProviderRunFunction,
   ProviderRuntimeContext,
   ProviderRuntimeWriter,
+  ProviderLiveInputResult,
 } from '@/shared/types.js';
 
 type ProviderRuntimeServiceDependencies = {
@@ -84,6 +85,12 @@ export function createProviderRuntimeService(
 
   return {
     run,
+    /** Message Queue uses this for explicit live additions; unsupported runtimes fail without starting a new run. */
+    submitLiveInput(providerName: LLMProvider, sessionId: string, id: string, content: string, settled: (result: ProviderLiveInputResult) => void): void {
+      const submit=dependencies.resolveProvider(providerName).runtime.submitLiveInput;
+      if (!submit) throw new Error('This provider does not support live additions.');
+      submit(sessionId,id,content,settled);
+    },
 
     hasRuntime(providerName: string): boolean {
       try {

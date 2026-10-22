@@ -1,4 +1,4 @@
-import { sessionsDb } from '@/modules/database/index.js';
+import { sessionsDb, sessionWorkspaceDb } from '@/modules/database/index.js';
 import { ChatSessionWriter } from '@/modules/websocket/services/chat-session-writer.service.js';
 import { broadcastSessionUpserted } from '@/modules/websocket/services/session-upsert-broadcast.service.js';
 import type {
@@ -125,6 +125,15 @@ function decorateAndRecordEvent(run: ChatRun, message: NormalizedMessage): Norma
     run.completedAt = Date.now();
     evictRunLater(run);
   }
+  // Background agents can publish another answer after the foreground turn
+  // completed. That result is new information even though the run stays retained.
+  if(message.kind==='complete'||(run.status==='completed'&&message.kind==='text'&&message.role==='assistant'&&!message.parentToolUseId)) {
+    const userId=Number(run.writer.userId);
+    if(run.writer.userId!==null && Number.isSafeInteger(userId) && userId>0) {
+      try { sessionWorkspaceDb.noteActivity(userId,run.appSessionId); }
+      catch(error) { console.warn('[SessionWorkspace] Could not retain unread state:',error instanceof Error?error.message:String(error)); }
+    }
+  }
 
   run.events.push(outbound);
   if (run.events.length > MAX_BUFFERED_EVENTS_PER_RUN) {
@@ -235,6 +244,10 @@ export const chatRunRegistry = {
 
   getRun(appSessionId: string): ChatRun | undefined {
     return runs.get(appSessionId);
+  },
+  /** Session Workspace includes approvals from retained background runs as well as foreground turns. */
+  listOwnedSessionIds(userId:number):string[] {
+    return [...runs.values()].filter(run=>run.writer.userId!==null&&Number(run.writer.userId)===userId).map(run=>run.appSessionId);
   },
 
   isProcessing(appSessionId: string): boolean {

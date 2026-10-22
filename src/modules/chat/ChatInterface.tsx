@@ -262,6 +262,7 @@ function ChatInterface({
     cancelEditMessage,
   } = useChatComposerState({
     enqueueMessage:messageQueue.enqueue,
+    sendLiveMessage:messageQueue.sendLive,
     selectedProject,
     selectedSession,
     currentSessionId,
@@ -437,7 +438,8 @@ function ChatInterface({
   // Lets markdown image paths in the transcript resolve against this project.
   const markdownWorkspaceValue = useMemo(() => ({
     projectId: selectedProject?.projectId ?? null,
-  }), [selectedProject?.projectId]);
+    projectPath: selectedProject?.fullPath || selectedProject?.path || null,
+  }), [selectedProject?.projectId, selectedProject?.fullPath, selectedProject?.path]);
 
   // Lets a workflow card fetch its agents' timelines for this session.
   const transcriptSessionValue = useMemo(() => ({ sessionId: currentSessionId }), [currentSessionId]);
@@ -581,8 +583,10 @@ function ChatInterface({
               }}>{t('sideChat.returnReply')}</button>
           </div>}
           <MessageQueuePanel key={currentSessionId||selectedSession?.id||'new'} items={messageQueue.items}
-            error={messageQueue.error} update={messageQueue.update} attempts={messageQueue.attempts}/>
+            error={messageQueue.error} update={messageQueue.update} attempts={messageQueue.attempts}
+            paused={messageQueue.paused} setPaused={messageQueue.setPaused}/>
           <ChatComposer
+          onSendLive={provider==='claude'&&isProcessing&&!editingAnchorId?()=>{void handleSubmit({preventDefault:()=>{}} as never,undefined,{forceLive:true});}:undefined}
           onQueue={currentSessionId||selectedSession?.id?()=>{void handleSubmit({preventDefault:()=>{}} as never,undefined,{forceQueue:true});}:undefined}
           compact={isSideChat}
           pendingPermissionRequests={pendingPermissionRequests}

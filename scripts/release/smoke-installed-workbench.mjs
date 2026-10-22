@@ -11,7 +11,7 @@ import { randomUUID } from 'node:crypto';
 if (process.platform!=='win32' || process.env.CI!=='true') throw new Error('Run installer acceptance only on a disposable Windows CI runner.');
 const installDirectory=path.resolve(process.argv[2]||'');
 const reportPath=path.resolve(process.argv[3]||'release/workbench/installer-smoke.json');
-const executable=path.join(installDirectory,'CloudCLI Workbench.exe');
+const executable=path.join(installDirectory,'Claudex.exe');
 await fs.access(executable);
 const profileDirectory=await fs.mkdtemp(path.join(os.tmpdir(),'workbench-acceptance-'));
 const sentinelDatabase=path.join(profileDirectory,'existing-service.db');

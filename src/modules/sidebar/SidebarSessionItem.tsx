@@ -10,6 +10,7 @@ import { PROVIDER_LABELS, createSessionViewModel, formatCompactAge } from '@/mod
 import { useCompactSidebar } from '@/modules/sidebar/hooks/useCompactSidebar';
 import { useProviderSessionIdCopy } from '@/modules/sidebar/hooks/useProviderSessionIdCopy';
 import SessionOptions from '@/modules/sidebar/SessionOptions';
+import { SessionOrganizationBadge } from '@/modules/sidebar/SessionOrganizationBadge';
 
 type SidebarSessionItemProps = {
   project: Project;
@@ -205,7 +206,7 @@ function SidebarSessionItem({
                   className="min-w-0 flex-1 truncate text-sm font-normal text-foreground"
                   title={sessionView.sessionName}
                 >
-                  {sessionView.sessionName}
+                  <SessionOrganizationBadge sessionId={session.id}/>{sessionView.sessionName}
                 </div>
                 {isProcessing ? (
                   <span className="ml-auto flex-shrink-0">
@@ -261,7 +262,7 @@ function SidebarSessionItem({
               </div>
               <div className="min-w-0">
                 <p className="truncate text-sm font-medium text-foreground" title={sessionView.sessionName}>
-                  {sessionView.sessionName}
+                  <SessionOrganizationBadge sessionId={session.id}/>{sessionView.sessionName}
                 </p>
                 <p id="mobile-session-options-description" className="text-xs text-muted-foreground">
                   {providerLabel} session
@@ -429,7 +430,7 @@ function SidebarSessionItem({
                   className="min-w-0 flex-1 truncate text-sm font-normal text-foreground"
                   title={sessionView.sessionName}
                 >
-                  {sessionView.sessionName}
+                  <SessionOrganizationBadge sessionId={session.id}/>{sessionView.sessionName}
                 </div>
                 {isProcessing ? (
                   <span

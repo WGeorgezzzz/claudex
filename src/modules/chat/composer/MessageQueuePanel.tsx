@@ -1,18 +1,20 @@
 import { useState } from 'react';
-import { ListOrdered, RotateCcw, X, Pencil } from 'lucide-react';
+import { ArrowDown, ArrowUp, ListOrdered, Pause, Play, RotateCcw, X, Pencil } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-import type { QueuedConversationMessage, QueuedMessageAttempt } from '@/shared/types';
+import type { QueuedConversationMessage, QueuedMessageAttempt, QueueMessageChange } from '@/shared/types';
 
 type MessageQueuePanelProps = {
   items: QueuedConversationMessage[];
   error: string;
-  update: (item:QueuedConversationMessage,body:{content?:string;action?:'cancel'|'retry'})=>Promise<void>;
+  update: (item:QueuedConversationMessage,body:QueueMessageChange)=>Promise<void>;
   attempts?: (id:string)=>Promise<QueuedMessageAttempt[]>;
+  paused?: boolean|null;
+  setPaused?: (paused:boolean)=>Promise<void>;
 };
 
 /** ChatInterface displays pending FIFO work independently from editable composer drafts. */
-export function MessageQueuePanel({items,error,update,attempts}:MessageQueuePanelProps) {
+export function MessageQueuePanel({items,error,update,attempts,paused=null,setPaused}:MessageQueuePanelProps) {
   const {t}=useTranslation('chat');
   // Editing is local until the revision-checked server update is acknowledged.
   const [editing,setEditing]=useState<{id:string;text:string}|null>(null);
@@ -21,22 +23,37 @@ export function MessageQueuePanel({items,error,update,attempts}:MessageQueuePane
   // Keep the requested immutable receipts separate from the live queue summary.
   const [receipts,setReceipts]=useState<{id:string;items:QueuedMessageAttempt[];error?:string}|null>(null);
   const active=items.filter(item=>['queued','running','failed','interrupted'].includes(item.status));
-  const perform=async(item:QueuedConversationMessage,body:{content?:string;action?:'cancel'|'retry'})=>{
+  const ordinary=active.filter(item=>item.delivery_mode!=='live');
+  const canMove=(item:QueuedConversationMessage,direction:number)=>{
+    const neighbor=ordinary[ordinary.findIndex(row=>row.id===item.id)+direction];
+    return neighbor?.status==='queued';
+  };
+  const perform=async(item:QueuedConversationMessage,body:QueueMessageChange)=>{
     setPending(true);
     try {await update(item,body);setEditing(null);} catch {/* The hook retains the visible error and edit text. */}
     finally {setPending(false);}
   };
-  if (!items.length && !error) return null;
+  if (!items.length && !error && paused===null) return null;
   return <section aria-label={t('queue.title')} className="mx-4 mb-2 rounded-xl border border-border bg-muted/20 text-xs">
     <div className="flex items-center gap-2 px-3 py-2"><ListOrdered size={14}/><span className="font-medium">{t('queue.title')}</span>
-      <span className="text-muted-foreground">{active.length}</span></div>
+      <span className="text-muted-foreground">{active.length}</span>
+      {paused!==null&&setPaused&&<button type="button" disabled={pending} className="ml-auto flex items-center gap-1 rounded px-2 py-1 hover:bg-muted disabled:opacity-40"
+        title={t('queue.pauseHint')} aria-label={t(paused?'queue.resume':'queue.pause')} onClick={()=>{
+          setPending(true);void setPaused(!paused).catch(()=>{}).finally(()=>setPending(false));
+        }}>{paused?<Play size={13}/>:<Pause size={13}/>} {t(paused?'queue.resume':'queue.pause')}</button>}
+    </div>
+    {paused&&<p role="status" className="px-3 pb-2 text-amber-700 dark:text-amber-300">{t('queue.pausedHint')}</p>}
     {error&&<p role="alert" className="px-3 pb-2 text-destructive">{error}</p>}
     <div className="max-h-44 overflow-y-auto">
       {active.map(item=><div key={item.id} className="border-t border-border/50 px-3 py-2">
-        <div className="flex items-center gap-2"><span className="text-muted-foreground">{t(`queue.status.${item.status}`)}</span>
+        <div className="flex items-center gap-2"><span className="text-muted-foreground">{item.delivery_mode==='live'?`${t('liveInput.label')} · `:''}{t(item.delivery_mode==='live'&&item.status==='running'?'liveInput.delivered':`queue.status.${item.status}`)}</span>
           <span className="ml-auto flex gap-2">
+            {paused!==null&&item.status==='queued'&&item.delivery_mode!=='live'&&<>
+              <button disabled={pending||!canMove(item,-1)} aria-label={t('queue.moveUp')} title={t('queue.moveUp')} onClick={()=>void perform(item,{action:'move-up'})}><ArrowUp size={13}/></button>
+              <button disabled={pending||!canMove(item,1)} aria-label={t('queue.moveDown')} title={t('queue.moveDown')} onClick={()=>void perform(item,{action:'move-down'})}><ArrowDown size={13}/></button>
+            </>}
             {item.status==='queued'&&<button disabled={pending} aria-label={t('queue.edit')} onClick={()=>setEditing({id:item.id,text:item.content})}><Pencil size={13}/></button>}
-            {['failed','interrupted'].includes(item.status)&&<button disabled={pending} aria-label={t('queue.retry')} onClick={()=>void perform(item,{action:'retry'})}><RotateCcw size={13}/></button>}
+            {['failed','interrupted'].includes(item.status)&&<button disabled={pending} aria-label={t(item.delivery_mode==='live'?'liveInput.retryQueued':'queue.retry')} title={t(item.delivery_mode==='live'?'liveInput.retryQueued':'queue.retry')} onClick={()=>void perform(item,{action:'retry'})}><RotateCcw size={13}/></button>}
             {item.status!=='running'&&<button disabled={pending} aria-label={t('queue.cancel')} onClick={()=>void perform(item,{action:'cancel'})}><X size={13}/></button>}
           </span></div>
         {editing?.id===item.id?<form onSubmit={event=>{event.preventDefault();void perform(item,{content:editing.text});}}>
@@ -45,7 +62,7 @@ export function MessageQueuePanel({items,error,update,attempts}:MessageQueuePane
           <button type="submit" disabled={pending||!editing.text.trim()} className="mt-1 rounded border px-2 py-1">{t('queue.save')}</button>
         </form>:<p className="mt-1 line-clamp-2 whitespace-pre-wrap break-words">{item.content||t('queue.attachmentsOnly')}</p>}
         {item.error&&<p className="mt-1 text-destructive">{item.error}</p>}
-        {['failed','interrupted'].includes(item.status)&&<p className="mt-1 text-muted-foreground">{t('queue.blocked')}</p>}
+        {['failed','interrupted'].includes(item.status)&&<p className="mt-1 text-muted-foreground">{t(item.delivery_mode==='live'?'liveInput.unconfirmed':'queue.blocked')}</p>}
       </div>)}
     </div>
     {!!items.length&&<details className="border-t border-border/50 px-3 py-2"><summary className="cursor-pointer text-muted-foreground">{t('queue.history')}</summary>

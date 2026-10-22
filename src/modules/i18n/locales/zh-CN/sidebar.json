@@ -1,4 +1,11 @@
 {
+  "workspace": {
+    "title": "会话工作台", "pinned": "置顶", "unread": "未读", "attention": "待处理",
+    "pin": "置顶会话", "unpin": "取消置顶", "markRead": "标记已读", "markUnread": "标记未读",
+    "retry": "重新加载会话状态", "loadFailed": "会话状态暂不可用",
+    "waitingApproval": "{{count}} 项等待确认", "blocked": "{{count}} 条失败或未确认消息", "paused": "队列已暂停 · {{count}} 条待发",
+    "empty": {"pinned": "从会话菜单置顶常用对话", "unread": "没有未读会话", "attention": "没有需要处理的会话"}
+  },
   "projects": {
     "title": "项目",
     "newProject": "新建项目",
@@ -20,7 +27,7 @@
     "runClaudeCli": "在项目目录中运行 Claude CLI 以开始使用"
   },
   "app": {
-    "title": "Workbench",
+    "title": "Claudex",
     "subtitle": "AI 编程助手"
   },
   "sessions": {

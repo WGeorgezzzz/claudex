@@ -219,6 +219,13 @@ async function dispatchRun(
   beforeRun?: (run: NonNullable<ReturnType<typeof chatRunRegistry.startRun>>) => void | Promise<void>,
 ): Promise<{ started: boolean; error: string | null }> {
   const provider = session.provider as LLMProvider;
+  try {
+    sessionsService.assertOwnerAvailable(sessionId);
+  } catch (reason) {
+    const error=reason instanceof Error?reason.message:String(reason);
+    if (ws) sendProtocolError(ws,'SESSION_OWNED_ELSEWHERE',error,sessionId);
+    return {started:false,error};
+  }
 
   const run = chatRunRegistry.startRun({
     appSessionId: sessionId,
@@ -326,6 +333,11 @@ async function handleChatEditSend(
   }
 
   const { sessionId, session, provider } = resolved;
+  try { sessionsService.assertOwnerAvailable(sessionId); }
+  catch (reason) {
+    sendProtocolError(ws,'SESSION_OWNED_ELSEWHERE',reason instanceof Error?reason.message:String(reason),sessionId);
+    return;
+  }
   const anchorId = typeof data.anchorId === 'string' ? data.anchorId.trim() : '';
   if (provider === 'claude' && dependencies.runtime.hasBackgroundWork(sessionId)) {
     sendProtocolError(ws, 'BACKGROUND_WORK_ACTIVE', 'Wait for background work to finish before editing an earlier message. You can still send a new message.', sessionId);

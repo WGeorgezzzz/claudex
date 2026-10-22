@@ -15,6 +15,7 @@ import type {
   ProviderSkillCreateInput,
   ProviderSkillRemoveInput,
   ProviderRuntimeContext,
+  ProviderLiveInputResult,
   ProviderRuntimePermissionGateway,
   ProviderRuntimeWriter,
   UpsertProviderMcpServerInput,
@@ -30,6 +31,8 @@ import type {
  * execution context is supplied by the application service at call time.
  */
 export interface IProviderRuntime {
+  /** Delivers a prompt to the owned live process without restarting it; settlement requires a correlated native result. */
+  submitLiveInput?(sessionId: string, id: string, content: string, settled: (result: ProviderLiveInputResult) => void): void;
   run(
     command: string,
     options: AnyRecord,

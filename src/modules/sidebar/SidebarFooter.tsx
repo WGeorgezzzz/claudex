@@ -4,8 +4,8 @@ import type { TFunction } from 'i18next';
 import { IS_PLATFORM } from '@/shared/utils';
 import type { ReleaseInfo } from '@/shared/types';
 
-const GITHUB_ISSUES_URL = 'https://github.com/WGeorgezzzz/claudecodeui/issues/new';
-const GITHUB_REPO_URL = 'https://github.com/WGeorgezzzz/claudecodeui';
+const GITHUB_ISSUES_URL = 'https://github.com/WGeorgezzzz/claudex/issues/new';
+const GITHUB_REPO_URL = 'https://github.com/WGeorgezzzz/claudex';
 
 const DISCORD_INVITE_URL = 'https://discord.gg/buxwujPNRE';
 
@@ -154,7 +154,7 @@ export default function SidebarFooter({
             rel="noopener noreferrer"
             className="text-[10px] text-muted-foreground/40 transition-colors hover:text-muted-foreground"
           >
-            CloudCLI v{currentVersion} – {t('branding.openSource')}
+            Claudex v{currentVersion} – {t('branding.openSource')}
           </a>
         </div>
       )}

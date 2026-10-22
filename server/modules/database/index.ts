@@ -31,3 +31,5 @@ export { monitorsDb } from '@/modules/database/repositories/monitors.db.js';
 // Workbench lifecycle modules own side-chat relationships and durable FIFO submissions.
 export { sideChatsDb } from '@/modules/database/repositories/side-chats.db.js';
 export { messageQueueDb } from '@/modules/database/repositories/message-queue.db.js';
+// Session Workspace and websocket completion events share user-scoped navigation/queue controls.
+export { sessionWorkspaceDb } from '@/modules/database/repositories/session-workspace.db.js';

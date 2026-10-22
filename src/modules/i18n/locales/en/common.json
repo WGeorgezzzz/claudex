@@ -320,7 +320,20 @@
     "browseAllFiles": "Browse all files ({{count}})",
     "browseAllCommits": "Browse all commits ({{count}})",
     "browseAllBranches": "Browse all branches ({{count}})",
-    "switchTo": "Switch to: {{name}}"
+    "switchTo": "Switch to: {{name}}",
+    "switchSession": "Find a conversation",
+    "sessionScope": "Conversations",
+    "allProjects": "All projects",
+    "currentProject": "Current project",
+    "searching": "Searching conversations…",
+    "sessionLoadFailed": "Some conversations could not be loaded.",
+    "retry": "Retry",
+    "loadMoreSessions": "Load older conversations",
+    "loading": "Loading…",
+    "pinned": "Pinned",
+    "unread": "Unread",
+    "running": "Running",
+    "searchLimitHint": "Text search returns up to 50 global matches, then filters by project. Load older conversations to browse more titles."
   },
   "folderBrowser": {
     "title": "Select Folder",

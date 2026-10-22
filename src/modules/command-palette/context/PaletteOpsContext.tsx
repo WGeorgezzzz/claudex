@@ -13,6 +13,7 @@ export type PaletteOps = {
   // Appends text to the chat composer and focuses it (used by the quick
   // settings Commands tab to hand a picked slash command to the composer).
   insertComposerText: (text: string) => void;
+  openSessionSwitcher: () => void;
 };
 
 type Registry = MutableRefObject<Partial<PaletteOps>>;
@@ -26,6 +27,7 @@ const defaultOps: PaletteOps = {
   openSettings: () => undefined,
   refreshProjects: () => undefined,
   insertComposerText: () => undefined,
+  openSessionSwitcher: () => undefined,
 };
 
 /** Mounted by the project-workspace module so CommandPalette and the chat, code-editor and sidebar modules share one set of palette operations. */
@@ -46,6 +48,7 @@ export function usePaletteOps(): PaletteOps {
       refreshProjects: () => (ref?.current.refreshProjects ?? defaultOps.refreshProjects)(),
       insertComposerText: (text) =>
         (ref?.current.insertComposerText ?? defaultOps.insertComposerText)(text),
+      openSessionSwitcher: () => (ref?.current.openSessionSwitcher ?? defaultOps.openSessionSwitcher)(),
     }),
     [ref],
   );
@@ -60,6 +63,7 @@ export function usePaletteOpsRegister(partial: Partial<PaletteOps>) {
     openSettings,
     refreshProjects,
     insertComposerText,
+    openSessionSwitcher,
   } = partial;
 
   useEffect(() => {
@@ -75,6 +79,7 @@ export function usePaletteOpsRegister(partial: Partial<PaletteOps>) {
     if (openSettings) registry.openSettings = openSettings;
     if (refreshProjects) registry.refreshProjects = refreshProjects;
     if (insertComposerText) registry.insertComposerText = insertComposerText;
+    if (openSessionSwitcher) registry.openSessionSwitcher = openSessionSwitcher;
     return () => {
       if (openFile && registry.openFile === openFile) registry.openFile = prev.openFile;
       if (openFileInEditor && registry.openFileInEditor === openFileInEditor) registry.openFileInEditor = prev.openFileInEditor;
@@ -82,6 +87,7 @@ export function usePaletteOpsRegister(partial: Partial<PaletteOps>) {
       if (openSettings && registry.openSettings === openSettings) registry.openSettings = prev.openSettings;
       if (refreshProjects && registry.refreshProjects === refreshProjects) registry.refreshProjects = prev.refreshProjects;
       if (insertComposerText && registry.insertComposerText === insertComposerText) registry.insertComposerText = prev.insertComposerText;
+      if (openSessionSwitcher && registry.openSessionSwitcher === openSessionSwitcher) registry.openSessionSwitcher = prev.openSessionSwitcher;
     };
-  }, [ref, openFile, openFileInEditor, openDirectory, openSettings, refreshProjects, insertComposerText]);
+  }, [ref, openFile, openFileInEditor, openDirectory, openSettings, refreshProjects, insertComposerText, openSessionSwitcher]);
 }

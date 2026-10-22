@@ -1,12 +1,13 @@
 {
-  "name": "@cloudcli-ai/cloudcli",
-  "version": "1.37.5",
-  "productName": "CloudCLI",
-  "description": "CloudCLI fork with Codex-inspired Claude desktop workflows",
+  "name": "@wgeorgezzzz/claudex",
+  "version": "0.4.0",
+  "productName": "Claudex",
+  "description": "Independent desktop workspace for Claude and WenClaude, with durable queues and contextual side conversations",
   "type": "module",
   "main": "dist-server/server/index.js",
   "bin": {
-    "cloudcli": "dist-server/server/modules/cli/cli.js"
+    "cloudcli": "dist-server/server/modules/cli/cli.js",
+    "claudex": "dist-server/server/modules/cli/cli.js"
   },
   "files": [
     "electron/",
@@ -18,13 +19,13 @@
     "scripts/",
     "README.md"
   ],
-  "homepage": "https://github.com/WGeorgezzzz/claudecodeui",
+  "homepage": "https://github.com/WGeorgezzzz/claudex",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/WGeorgezzzz/claudecodeui.git"
+    "url": "https://github.com/WGeorgezzzz/claudex.git"
   },
   "bugs": {
-    "url": "https://github.com/WGeorgezzzz/claudecodeui/issues"
+    "url": "https://github.com/WGeorgezzzz/claudex/issues"
   },
   "scripts": {
     "dev": "concurrently --kill-others \"npm run server:dev\" \"npm run client\"",
@@ -57,7 +58,7 @@
     "start": "npm run build && npm run server",
     "release": "./release.sh",
     "prepublishOnly": "npm run build",
-    "postinstall": "node scripts/fix-node-pty.js",
+    "postinstall": "node scripts/fix-node-pty.js && node scripts/fix-codex-windows-console.mjs",
     "prepare": "husky",
     "update:platform": "./update-platform.sh",
     "desktop:workbench:stage": "node scripts/release/prepare-workbench.mjs",

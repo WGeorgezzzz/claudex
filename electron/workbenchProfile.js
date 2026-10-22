@@ -1,5 +1,5 @@
 import fs from 'node:fs/promises';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 
@@ -40,7 +40,7 @@ export function buildWorkbenchServerEnvironment({userDataPath,instanceId,port,se
     'CLOUDCLI_LOCAL_SERVER_URL','CLOUDCLI_DESKTOP_LOCAL_SERVER_URL','ELECTRON_LOCAL_SERVER_URL',
     'CLOUDCLI_SERVER_PORT','CLOUDCLI_DESKTOP_LOCAL_SERVER_PORT','PORT','SERVER_PORT',
     'CLAUDE_CONFIG_DIR','CLAUDE_CLI_PATH','CLOUDCLI_HOME','API_KEY','PATH','NODE_OPTIONS','NODE_PATH','NODE_ENV',
-    'CLOUDCLI_DISTRIBUTION','CLOUDCLI_INSTANCE_ID','CLOUDCLI_WORKBENCH_VERSION']
+    'CLOUDCLI_DISTRIBUTION','CLOUDCLI_INSTANCE_ID','CLOUDCLI_WORKBENCH_VERSION','CLOUDCLI_PROTECTED_SESSIONS_FILE']
     .map(key=>key.toLowerCase()));
   for (const key of Object.keys(environment)) if(discarded.has(key.toLowerCase()))delete environment[key];
   const serviceHome=path.join(userDataPath,'server');
@@ -57,5 +57,6 @@ export function buildWorkbenchServerEnvironment({userDataPath,instanceId,port,se
     CLOUDCLI_DISTRIBUTION:'workbench',
     CLOUDCLI_INSTANCE_ID:instanceId,
     CLOUDCLI_WORKBENCH_VERSION:version||'development',
+    ...(existsSync(path.join(userDataPath,'protected-sessions.json'))?{CLOUDCLI_PROTECTED_SESSIONS_FILE:path.join(userDataPath,'protected-sessions.json')}:{})
   };
 }

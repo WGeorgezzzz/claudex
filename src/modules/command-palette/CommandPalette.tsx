@@ -10,6 +10,8 @@ import {
   GitMerge,
   MessageSquare,
   MessageSquarePlus,
+  Pin,
+  Circle,
   RefreshCw,
   Settings,
   SunMoon,
@@ -28,9 +30,11 @@ import {
   DialogTitle,
 } from '@/shared/ui';
 import { useTheme } from '@/shared/context/ThemeContext';
-import { usePaletteOps } from '@/modules/command-palette/context/PaletteOpsContext';
+import { usePaletteOps, usePaletteOpsRegister } from '@/modules/command-palette/context/PaletteOpsContext';
 import { SETTINGS_MAIN_TABS } from '@/shared/constants';
-import type { AppTab, Project } from '@/shared/types';
+import type { AppTab, PaletteSessionEntry, Project } from '@/shared/types';
+import { useBusySessionIdSet } from '@/shared/context/SessionProtectionContext';
+import { usePaletteSessionStatus } from '@/modules/command-palette/hooks/usePaletteSessionStatus';
 import { useSessionsSource } from '@/modules/command-palette/hooks/useSessionsSource';
 import { useFilesSource } from '@/modules/command-palette/hooks/useFilesSource';
 import { useCommitsSource } from '@/modules/command-palette/hooks/useCommitsSource';
@@ -45,6 +49,7 @@ type CommandPaletteProps = {
   onStartNewChat: (project: Project) => void;
   onOpenSettings: (tab?: string) => void;
   onShowTab?: (tab: AppTab) => void;
+  onSelectSession?: (entry: PaletteSessionEntry) => void;
 };
 
 const NAV_TABS: Array<{ id: AppTab; labelKey: string; keywords: string }> = [
@@ -61,19 +66,33 @@ function CommandPalette({
   onStartNewChat,
   onOpenSettings,
   onShowTab,
+  onSelectSession,
 }: CommandPaletteProps) {
   const { t } = useTranslation();
+  // Dialog visibility, text and page stack preserve keyboard-driven navigation within one opening.
   const [open, setOpen] = React.useState(false);
+  // The query is shared by local title matching and cancellable transcript search.
   const [search, setSearch] = React.useState('');
+  // A page stack lets Backspace return to the previous command group.
   const [pages, setPages] = React.useState<Page[]>([]);
+  // Users can constrain session discovery without changing the project's file/git actions.
+  const [sessionScope, setSessionScope] = React.useState<'all' | 'project'>('all');
   const { toggleDarkMode } = useTheme();
   const navigate = useNavigate();
   const ops = usePaletteOps();
+  const searchInput = React.useRef<HTMLInputElement>(null);
+  const busySessionIds = useBusySessionIdSet();
+  const openSessionSwitcher = React.useCallback(() => { setSearch(''); setPages(['sessions']); setSessionScope('all'); setOpen(true); }, []);
+  usePaletteOpsRegister({openSessionSwitcher});
 
   const page = pages.at(-1);
 
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.isComposing || e.repeat) return;
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && !e.altKey && e.key.toLowerCase() === 'k') {
+        e.preventDefault(); openSessionSwitcher(); return;
+      }
       const isCmdK = (e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'k';
       if (!isCmdK) return;
       e.preventDefault();
@@ -81,7 +100,7 @@ function CommandPalette({
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [openSessionSwitcher]);
 
   React.useEffect(() => {
     if (!open) {
@@ -98,8 +117,12 @@ function CommandPalette({
   const showCommits = !page || page === 'commits';
   const showBranches = !page || page === 'branches' || page === 'actions';
 
-  const sessions = useSessionsSource(projectId, open && showSessions);
-  const messageMatches = useSessionMessageSearch(projectId, search, open && showSessions);
+  const sessionProjectId = sessionScope === 'project' ? projectId : undefined;
+  const sessionSearchEnabled = open && showSessions && (sessionScope === 'all' || !!projectId);
+  const sessions = useSessionsSource(sessionProjectId, sessionSearchEnabled);
+  const messageMatches = useSessionMessageSearch(sessionProjectId, search, sessionSearchEnabled);
+  const organization = usePaletteSessionStatus(open && showSessions);
+  const organizationById = React.useMemo(() => new Map(organization.map(row => [row.sessionId, row])), [organization]);
   const files = useFilesSource(projectId, open && showFiles);
   const commits = useCommitsSource(projectId, open && showCommits);
   const branches = useBranchesSource(projectId, open && showBranches);
@@ -107,26 +130,17 @@ function CommandPalette({
 
   const sessionRows = React.useMemo(() => {
     if (!showSessions) return [];
-    type Row = { id: string; label: string; provider?: string; snippet?: string };
-    const byId = new Map<string, Row>();
-    for (const s of sessions) {
-      byId.set(s.id, { id: s.id, label: s.label, provider: s.provider });
+    const byId = new Map<string, PaletteSessionEntry>();
+    for (const s of sessions.items) {
+      byId.set(s.id, s);
     }
-    for (const m of messageMatches) {
-      const existing = byId.get(m.sessionId);
-      if (existing) {
-        existing.snippet = m.snippet;
-      } else {
-        byId.set(m.sessionId, {
-          id: m.sessionId,
-          label: m.label,
-          provider: m.provider,
-          snippet: m.snippet,
-        });
-      }
+    for (const row of organization) {
+      if (row.pinnedAt !== null && (!sessionProjectId || row.projectId === sessionProjectId) && !byId.has(row.sessionId))
+        byId.set(row.sessionId, {id: row.sessionId, label: row.title, provider: row.provider, projectId: row.projectId, projectName: row.projectPath ?? undefined});
     }
-    return Array.from(byId.values());
-  }, [sessions, messageMatches, showSessions]);
+    for (const row of messageMatches.items) byId.set(row.id, {...byId.get(row.id), ...row});
+    return Array.from(byId.values()).sort((a, b) => (organizationById.get(b.id)?.pinnedAt ?? 0) - (organizationById.get(a.id)?.pinnedAt ?? 0));
+  }, [sessions.items, messageMatches.items, organization, organizationById, sessionProjectId, showSessions]);
 
   const run = React.useCallback((fn: () => void) => {
     setOpen(false);
@@ -154,12 +168,12 @@ function CommandPalette({
   const browseLimit = 5;
   const filesShown = page === 'files' ? files : files.slice(0, browseLimit);
   const commitsShown = page === 'commits' ? commits : commits.slice(0, browseLimit);
-  const sessionsShown = page === 'sessions' ? sessionRows : sessionRows.slice(0, browseLimit);
+  const sessionsShown = page === 'sessions' || search.trim() ? sessionRows : sessionRows.slice(0, browseLimit);
   const branchesShown = page === 'branches' ? branches : branches.slice(0, browseLimit);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent className="max-w-xl overflow-hidden p-0">
+      <DialogContent className="max-w-xl overflow-hidden p-0" initialFocusRef={searchInput}>
         <DialogTitle>{t('commandPalette.title')}</DialogTitle>
         <Command label={t('commandPalette.title')} onKeyDown={handleKeyDown}>
           {page && (
@@ -179,17 +193,30 @@ function CommandPalette({
             </div>
           )}
           <CommandInput
+            ref={searchInput}
             placeholder={page
               ? t('commandPalette.searchPage', { page: t(`commandPalette.pages.${page}`).toLowerCase() })
               : t('commandPalette.searchAnything')}
             value={search}
             onValueChange={setSearch}
           />
+          {showSessions && <div className="flex items-center gap-2 border-b px-3 py-2 text-xs">
+            <span className="text-muted-foreground">{t('commandPalette.sessionScope')}</span>
+            <button type="button" aria-pressed={sessionScope === 'all'} onClick={() => setSessionScope('all')} className={`rounded px-2 py-1 ${sessionScope === 'all' ? 'bg-accent' : ''}`}>{t('commandPalette.allProjects')}</button>
+            <button type="button" disabled={!projectId} aria-pressed={sessionScope === 'project'} onClick={() => setSessionScope('project')} className={`rounded px-2 py-1 disabled:opacity-40 ${sessionScope === 'project' ? 'bg-accent' : ''}`}>{t('commandPalette.currentProject')}</button>
+          </div>}
           <CommandList>
-            <CommandEmpty>{t('commandPalette.noResults')}</CommandEmpty>
+            <CommandEmpty>{sessions.loading || messageMatches.searching ? t('commandPalette.searching') : t('commandPalette.noResults')}</CommandEmpty>
+            {showSessions && (sessions.error || messageMatches.error) && <div role="alert" className="px-3 py-2 text-xs text-destructive">{t('commandPalette.sessionLoadFailed')}
+              <button className="ml-2 underline" onClick={() => { if (sessions.error) void sessions.retry(); if (messageMatches.error) messageMatches.retry(); }}>{t('commandPalette.retry')}</button>
+            </div>}
+            {showSessions && messageMatches.searching && <div role="status" className="px-3 py-1 text-xs text-muted-foreground">{t('commandPalette.searching')}</div>}
 
             {showActions && (
               <CommandGroup heading={t('commandPalette.groupActions')}>
+                <CommandItem value={`${t('commandPalette.switchSession')} sessions conversations`} onSelect={() => pushPage('sessions')}>
+                  <MessageSquare className="h-4 w-4"/><span className="flex-1">{t('commandPalette.switchSession')}</span><kbd className="text-xs text-muted-foreground">Ctrl/⌘ ⇧ K</kbd>
+                </CommandItem>
                 <CommandItem
                   value={`${t('commandPalette.startNewChat')} new chat`}
                   disabled={startNewChatDisabled}
@@ -270,21 +297,27 @@ function CommandPalette({
               </CommandGroup>
             )}
 
-            {showSessions && projectId && sessionsShown.length > 0 && (
+            {showSessions && sessionsShown.length > 0 && (
               <CommandGroup heading={t('commandPalette.groupSessions')}>
                 {sessionsShown.map((s) => (
                   <CommandItem
-                    key={s.id}
-                    value={`${s.label} ${s.snippet ?? ''} ${s.id}`.trim()}
-                    onSelect={() => run(() => navigate(`/session/${s.id}`))}
+                    // cmdk recalculates group visibility when items register; a later transcript
+                    // hit changes searchable text and must register again, not leave a hidden group.
+                    key={`${s.id}:${s.snippet ?? ''}`}
+                    value={`${s.label} ${s.projectName ?? ''} ${s.snippet ?? ''} ${s.id}`.trim()}
+                    onSelect={() => run(() => { onShowTab?.('chat'); if (onSelectSession) onSelectSession(s); else navigate(`/session/${encodeURIComponent(s.id)}`); })}
                   >
                     <MessageSquare className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
                     <div className="flex min-w-0 flex-1 flex-col">
-                      <span className="truncate">{s.label}</span>
+                      <span className={`truncate ${organizationById.get(s.id)?.unread ? 'font-semibold' : ''}`}>{s.label}</span>
+                      {s.projectName && <span className="truncate text-xs text-muted-foreground">{s.projectName}</span>}
                       {s.snippet && (
                         <span className="truncate text-xs text-muted-foreground">{s.snippet}</span>
                       )}
                     </div>
+                    {organizationById.get(s.id)?.pinnedAt != null && <Pin className="h-3 w-3 shrink-0" aria-label={t('commandPalette.pinned')}/>}
+                    {organizationById.get(s.id)?.unread && <Circle className="h-2 w-2 shrink-0 fill-current text-primary" aria-label={t('commandPalette.unread')}/>}
+                    {busySessionIds.has(s.id) && <span className="text-xs text-muted-foreground">{t('commandPalette.running')}</span>}
                     {s.provider && (
                       <span className="text-xs text-muted-foreground">{s.provider}</span>
                     )}
@@ -295,6 +328,9 @@ function CommandPalette({
                 )}
               </CommandGroup>
             )}
+            {showSessions && sessions.hasMore && page === 'sessions' && <div className="border-t px-3 py-2">
+              <button type="button" className="text-xs text-muted-foreground hover:text-foreground disabled:opacity-50" disabled={sessions.loading} onClick={() => void sessions.loadMore()}>{t(sessions.loading ? 'commandPalette.loading' : 'commandPalette.loadMoreSessions')}</button>
+            </div>}
 
             {showFiles && projectId && filesShown.length > 0 && (
               <CommandGroup heading={t('commandPalette.groupFiles')}>
@@ -353,6 +389,7 @@ function CommandPalette({
               </CommandGroup>
             )}
           </CommandList>
+          {showSessions && search.trim().length >= 2 && <p className="border-t px-3 py-2 text-[11px] text-muted-foreground">{t('commandPalette.searchLimitHint')}</p>}
         </Command>
       </DialogContent>
     </Dialog>

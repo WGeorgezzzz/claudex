@@ -1,6 +1,6 @@
-# Codex 桌面工作流对标
+# Claudex 工作流能力
 
-这是基于 [siteboon/claudecodeui](https://github.com/siteboon/claudecodeui) v1.37.5 的独立实验 fork，面向 Claude Code 的日常桌面工作流。保留上游 AGPL-3.0-or-later 许可证、作者信息和其他模型入口。本项目与 OpenAI、Anthropic 没有官方关联。
+这是基于 [siteboon/claudecodeui](https://github.com/siteboon/claudecodeui) v1.37.5 衍生并独立维护的 Claudex 项目，面向 Claude Code 的日常桌面工作流。保留上游 AGPL-3.0-or-later 许可证、作者信息和其他模型入口。本项目与 OpenAI、Anthropic 没有官方关联。
 
 ## 本轮实现
 
@@ -9,6 +9,8 @@
 | 侧边对话 | 右上角按钮、Ctrl/⌘+Alt+S、`/side 问题` 或 `/btw 问题`；选中文字后打开可带入选段；从最近已完成回合分支；服务端多侧聊管理、改名、归档、恢复；折叠继承历史；草稿回填；转为主对话 | 父子关系可跨浏览器读取；不自动合并消息；项目文件仍共享 |
 | 桌面视觉 | 中性明暗配色、系统无衬线字体、紧凑导航、轻量标签和输入区、移动端侧栏覆盖布局 | 保留 CloudCLI 品牌；不是 Codex 像素级复制 |
 | 项目与会话 | Claude 新建入口；其他提供商会话分组；会话草稿、模型和推理力度记忆 | 保留上游搜索、归档、重命名；跨设备同步依赖上游服务 |
+| 全局会话导航 | 侧栏“搜索会话”、Ctrl/⌘+Shift+K；全部项目/当前项目切换；分页加载更早会话；标题与正文搜索；项目和提供商标识；置顶、未读、运行中提示 | 正文检索使用现有服务的全局最多 50 条匹配后按项目筛选，当前项目没有独立检索额度；已加载标题另计且可继续分页；旧服务器无置顶/未读元数据时仍可切换；不会启动或中断模型任务 |
+| 会话组织与待处理 | 置顶、手动已读/未读、后台完成未读、审批和队列阻塞概览；状态按账号保存 | 原服务的任务不会被隔离 Workbench 接管 |
 | 输入与权限 | Enter / Ctrl+Enter 发送设置，Shift+Tab 切换权限；计划批准绑定确切工具调用；项目权限记忆 | 运行中的权限变更依赖 CLI 支持 |
 | 后台任务与续聊 | 有后台任务时复用原模型进程；按提示 UUID 关联完成消息；普通回复关闭期间的新消息等待退出后续聊 | 旧 CLI 不提供关联 UUID 时明确拒绝不可靠的后台续聊；未实现通用多代理编排 |
 | 并排工作区 | 聊天与文件、变更、终端或浏览器并排；拖动分隔条、方向键、Home/End 调宽；双击回到 50%；重开保留宽度 | 小屏使用单栏；范围限制为 30–70% |
@@ -16,6 +18,7 @@
 | 编辑与审阅 | 保存时检查原内容，冲突返回 409；diff 行评论加入下一条提示 | 评论是本地提示上下文，不是已提交的 GitHub PR 评论 |
 | 集成终端 | 项目内普通交互 shell；Windows 使用 PowerShell；切回聊天保留终端；初始化前的输入保序 | 不把终端打开动作当作新模型会话 |
 | 消息队列 | 服务端 FIFO，多条排队、编辑、取消、显式重试和尝试记录；请求去重；页面关闭后继续 | 忙和后台运行时等待；失败阻塞后续；重启后未确认执行标为中断，不自动重放 |
+| 队列控制与运行中补充 | 暂停/继续后续队列、调整未启动消息顺序；Claude 当前回合接收文字补充并通过原生 UUID 确认 | 暂停不终止当前任务；补充不是向工具 stdin 写入；失败/未确认队列头不可通过排序绕过 |
 | 自动监测 | SQLite 持久化；聊天 MCP 创建/列出/调整/暂停/恢复/停止；统一面板、立即执行、运行记录 | 本机和服务须保持运行；固定间隔，不是 cron/RRULE；不支持事件触发 |
 | 自动监测的执行 | 忙时等待；每轮结束后计时；失败暂停；重启时将未确认运行标为中断；保留最近 50 次记录 | 关闭页面不取消任务；暂停/停止不强杀已开始的一轮；不承诺系统睡眠时运行 |
 | 自动监测权限 | 保留创建时显式选择的权限，未选择时使用 default | 需要审批的任务可能等待用户；bypassPermissions 必须来自用户选择 |
@@ -23,14 +26,14 @@
 | Git 分支、worktree、命令面板 | 继承上游实现 | 本轮没有新增 Codex 式聊天迁移、快照归档与恢复 |
 | Skills、MCP、浏览器、其他提供商 | 继承上游入口；新增会话范围的监测 MCP | 插件市场、连接器生态、远程托管和模型本身不属于已对齐能力 |
 
-对标参考：[Code review](https://learn.chatgpt.com/docs/code-review)、[Git worktrees](https://learn.chatgpt.com/docs/environments/git-worktrees)、[Scheduled tasks](https://learn.chatgpt.com/docs/automations)。这些官方能力用于确定方向；上表描述本 fork 的实际实现。
+对标参考：[Code review](https://learn.chatgpt.com/docs/code-review)、[Git worktrees](https://learn.chatgpt.com/docs/environments/git-worktrees)、[Scheduled tasks](https://learn.chatgpt.com/docs/automations)。这些官方能力用于确定方向；上表描述Claudex 的实际实现。
 
 ## 从源码试用
 
 需要 Node.js 22+、npm，以及已配置的 Claude Code CLI。使用已有 CLI 登录或配置；不要把凭据放进仓库。
 
 ```powershell
-git clone https://github.com/WGeorgezzzz/claudecodeui.git
+git clone https://github.com/WGeorgezzzz/claudex.git
 cd claudecodeui
 npm ci
 $env:HOST = '127.0.0.1'
@@ -43,15 +46,15 @@ npm run build
 npm run server
 ```
 
-访问 `http://127.0.0.1:3001`，首次运行创建本地账户。若端口被现有服务占用，换一个端口和独立 `DATABASE_PATH`。源码桌面入口为 `npm run desktop -- --local`。本 fork 尚无独立更新频道；上游 npm 包或自动更新不会包含本 fork 改动。
+访问 `http://127.0.0.1:3001`，首次运行创建本地账户。若端口被现有服务占用，换一个端口和独立 `DATABASE_PATH`。源码桌面入口为 `npm run desktop -- --local`。Claudex 尚无独立更新频道；上游 npm 包或自动更新不会包含Claudex 改动。
 
-快捷键设置在右侧 **Quick Settings → Input Settings**；监测入口在聊天输入区和左侧 **自动监测**。打开文件、变更或终端后开启 **并排显示** 即可使用分隔条。
+快捷键设置在右侧 **Quick Settings → Input Settings**；监测入口在聊天输入区和左侧 **自动监测**。打开文件、变更或终端后开启 **并排显示** 即可使用分隔条。**Ctrl/⌘+K** 打开完整命令面板，**Ctrl/⌘+Shift+K** 或侧栏 **搜索会话** 直接打开跨项目会话列表；方向键选中、Enter 打开、Escape 关闭。
 
 [独立 Windows 安装与隔离说明](WORKBENCH-WINDOWS.md) · [固定版本的 Codex 源码参考](CODEX-SOURCE-REFERENCES.md)。
 
 侧边对话从右上角的侧栏图标打开，也可以在主输入区发送 `/side 你的问题`。问题会放进侧栏草稿，点击发送后独立回答。主会话运行时仍可打开；关闭侧栏不会取消其正在执行的回复。点击 **将最新回答放入主对话草稿** 后，需要用户再次发送才会影响主对话。窄屏上侧栏覆盖聊天区，关闭后返回原会话。
 
-侧边对话参考了 OpenAI 对[围绕当前任务开展独立追问](https://developers.openai.com/blog/mastering-codex-remote-for-engineering)的描述。本 fork 使用持久分支保留这些讨论，暂未实现自动清理的临时会话。
+侧边对话参考了 OpenAI 对[围绕当前任务开展独立追问](https://developers.openai.com/blog/mastering-codex-remote-for-engineering)的描述。Claudex 使用持久分支保留这些讨论，暂未实现自动清理的临时会话。
 
 自定义 `CLAUDE_CONFIG_DIR` 同时用于认证读取、会话发现、技能、MCP、运行配置和 CLI 活跃状态检测。只接受绝对路径；相对路径回退到默认目录。原有第三方 CLI 包装器继续由用户自行配置，本仓库不包含其凭据或专用启动脚本。
 

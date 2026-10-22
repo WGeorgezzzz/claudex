@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { webcrypto } from 'node:crypto';
 
 import React from 'react';
-import { act, fireEvent, render, renderHook, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, test, vi } from 'vitest';
 
 import '@/modules/i18n';
@@ -11,17 +11,45 @@ import { useMessageQueue } from '@/modules/chat/composer/useMessageQueue';
 import { MessageQueuePanel } from '@/modules/chat/composer/MessageQueuePanel';
 import type { QueuedConversationMessage } from '@/shared/types';
 
-vi.mock('@/shared/api',()=>({api:{messageQueue:{list:vi.fn(),enqueue:vi.fn(),update:vi.fn()}},
+vi.mock('@/shared/api',()=>({api:{messageQueue:{list:vi.fn(),enqueue:vi.fn(),update:vi.fn(),liveState:vi.fn(),sendLive:vi.fn()}},
   readApiErrorMessage:(body:{error?:{message?:string}})=>body.error?.message}));
 const response=(data:unknown)=>new Response(JSON.stringify({data}));
 const item:QueuedConversationMessage={id:'one',session_id:'s1',content:'First',revision:2,attempt_count:0,status:'queued',
   error:null,created_at:'2026-01-01T00:00:00Z',started_at:null,finished_at:null};
+
+test('live additions retain the same delivery ticket across unknown network outcomes and refresh',async()=>{
+  vi.mocked(api.messageQueue.liveState).mockResolvedValue(response({startedAt:123}));
+  vi.mocked(api.messageQueue.sendLive).mockRejectedValueOnce(new Error('connection lost'))
+    .mockResolvedValueOnce(response({...item,status:'running',delivery_mode:'live'}));
+  const first=renderHook(()=>useMessageQueue('s1'));
+  const submission={content:'extra requirement',options:{},attachments:[]};
+  await act(async()=>{await assert.rejects(first.result.current.sendLive(submission,'s1'),/connection lost/);});
+  const original=vi.mocked(api.messageQueue.sendLive).mock.calls[0][0];
+  first.unmount();
+  const reopened=renderHook(()=>useMessageQueue('s1'));
+  await act(async()=>reopened.result.current.sendLive(submission,'s1'));
+  assert.deepEqual(vi.mocked(api.messageQueue.sendLive).mock.calls[1][0],original);
+  assert.equal(vi.mocked(api.messageQueue.liveState).mock.calls.length,1);
+});
 beforeEach(()=>{
   localStorage.clear();vi.clearAllMocks();vi.stubGlobal('crypto',webcrypto);
   vi.mocked(api.messageQueue.list).mockReset().mockImplementation(async()=>response([]));
   vi.mocked(api.messageQueue.enqueue).mockReset().mockImplementation(async()=>response(item));
 });
 afterEach(()=>{vi.unstubAllGlobals();localStorage.clear();});
+
+test('queue controls pause future dispatch and only reorder adjacent pending entries',async()=>{
+  const update=vi.fn().mockResolvedValue(undefined),pause=vi.fn().mockResolvedValue(undefined);
+  render(<MessageQueuePanel items={[{...item,id:'running',status:'running'},item,{...item,id:'two',content:'Second'}]}
+    error="" update={update} paused={false} setPaused={pause}/>);
+  const earlier=screen.getAllByRole('button',{name:/Move earlier|提前一位/});
+  assert.equal((earlier[0] as HTMLButtonElement).disabled,true);
+  assert.equal((earlier[1] as HTMLButtonElement).disabled,false);
+  fireEvent.click(earlier[1]);await waitFor(()=>assert.equal(update.mock.calls[0][1].action,'move-up'));
+  await waitFor(()=>assert.equal((screen.getByRole('button',{name:/Pause queue|暂停队列/}) as HTMLButtonElement).disabled,false));
+  fireEvent.click(screen.getByRole('button',{name:/Pause queue|暂停队列/}));
+  await waitFor(()=>assert.deepEqual(pause.mock.calls,[[true]]));
+});
 
 test('unknown enqueue outcomes retain their request ID across a reload',async()=>{
   vi.mocked(api.messageQueue.enqueue).mockRejectedValueOnce(new Error('connection lost'));

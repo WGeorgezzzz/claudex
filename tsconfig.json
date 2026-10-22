@@ -13,6 +13,9 @@
     },
     "skipLibCheck": true,
     "moduleResolution": "Bundler",
+    // Local linked packages must share this app's React types instead of resolving
+    // through another installation's node_modules (which may contain React 19).
+    "preserveSymlinks": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,

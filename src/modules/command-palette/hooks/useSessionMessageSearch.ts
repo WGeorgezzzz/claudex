@@ -1,101 +1,63 @@
 import { useEffect, useRef, useState } from 'react';
 
 import { api } from '@/shared/api';
-import type { LLMProvider } from '@/shared/types';
+import type { ConversationProjectResult, PaletteSessionEntry, SessionTitleSearchResult } from '@/shared/types';
 
-export type SessionMessageMatch = {
-  sessionId: string;
-  label: string;
-  snippet: string;
-  provider: LLMProvider;
-};
-
-type ProjectResult = {
-  projectId: string | null;
-  projectName: string;
-  sessions: Array<{
-    sessionId: string;
-    provider: LLMProvider;
-    sessionSummary: string;
-    matches: Array<{ snippet: string }>;
-  }>;
-};
-
-const MIN_QUERY = 2;
-const DEBOUNCE_MS = 250;
-
-export function useSessionMessageSearch(
-  projectId: string | undefined,
-  query: string,
-  enabled: boolean,
-) {
-  const [items, setItems] = useState<SessionMessageMatch[]>([]);
-  const seqRef = useRef(0);
-  const esRef = useRef<EventSource | null>(null);
-
+/** CommandPalette searches titles and transcript text across the selected scope, including unloaded pages. */
+export function useSessionMessageSearch(projectId: string | undefined, query: string, enabled: boolean) {
+  const key = `${projectId ?? '*'}:${query.trim()}`;
+  // Tag results with their request so stale results cannot flash during typing or scope changes.
+  const [state, setState] = useState<{key: string; items: PaletteSessionEntry[]; searching: boolean; error: boolean}>({key: '', items: [], searching: false, error: false});
+  // Explicit retries restart the same search without changing the user's text.
+  const [retry, setRetry] = useState(0);
+  const generation = useRef(0);
   useEffect(() => {
-    const trimmed = query.trim();
-    if (!enabled || !projectId || trimmed.length < MIN_QUERY) {
-      setItems([]);
-      esRef.current?.close();
-      esRef.current = null;
-      return;
-    }
-
-    esRef.current?.close();
-    esRef.current = null;
-    seqRef.current++;
-
+    const request = ++generation.current;
+    if (!enabled || query.trim().length < 2) return;
+    let es: EventSource | null = null;
+    let finished = false;
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    const current = () => request === generation.current && !finished;
+    setState({key, items: [], searching: true, error: false});
     const handle = setTimeout(() => {
-      const seq = ++seqRef.current;
-      const url = api.searchConversationsUrl(trimmed);
-      const es = new EventSource(url);
-      esRef.current = es;
-      const accumulated: SessionMessageMatch[] = [];
-
-      es.addEventListener('result', (evt) => {
-        if (seq !== seqRef.current) {
-          es.close();
-          return;
-        }
-        try {
-          const data = JSON.parse((evt as MessageEvent).data) as { projectResult: ProjectResult };
-          const pr = data.projectResult;
-          if (pr.projectId !== projectId) return;
-          for (const s of pr.sessions) {
-            accumulated.push({
-              sessionId: s.sessionId,
-              label: s.sessionSummary || s.sessionId,
-              snippet: s.matches[0]?.snippet ?? '',
-              provider: s.provider,
-            });
-          }
-          setItems([...accumulated]);
-        } catch {
-          // ignore malformed
-        }
-      });
-
-      const finish = () => {
-        if (seq !== seqRef.current) return;
-        es.close();
-        esRef.current = null;
+      const matches = new Map<string, PaletteSessionEntry>();
+      const publish = () => { if (current()) setState({key, items: [...matches.values()], searching: true, error: false}); };
+      const finish = (error: boolean) => {
+        if (!current()) return;
+        finished = true;
+        es?.close(); clearTimeout(timeout);
+        setState({key, items: [...matches.values()], searching: false, error});
       };
-      es.addEventListener('done', finish);
-      es.addEventListener('error', finish);
-    }, DEBOUNCE_MS);
-
-    return () => {
-      clearTimeout(handle);
-    };
-  }, [projectId, query, enabled]);
-
-  useEffect(() => {
-    return () => {
-      esRef.current?.close();
-      esRef.current = null;
-    };
-  }, []);
-
-  return items;
+      es = new EventSource(api.searchConversationsUrl(query.trim()));
+      es.addEventListener('title-results', event => {
+        if (!current()) return;
+        try {
+          const {titleResults} = JSON.parse((event as MessageEvent).data) as {titleResults: SessionTitleSearchResult[]};
+          for (const row of titleResults) if (!projectId || row.projectId === projectId) {
+            matches.set(row.sessionId, {...matches.get(row.sessionId), id: row.sessionId, label: row.sessionTitle || row.sessionId,
+              provider: row.provider, projectId: row.projectId, projectName: row.projectDisplayName});
+          }
+          publish();
+        } catch { finish(true); }
+      });
+      es.addEventListener('result', event => {
+        if (!current()) return;
+        try {
+          const {projectResult: project} = JSON.parse((event as MessageEvent).data) as {projectResult: ConversationProjectResult};
+          if (projectId && project.projectId !== projectId) return;
+          for (const row of project.sessions) matches.set(row.sessionId, {id: row.sessionId, label: matches.get(row.sessionId)?.label ?? (row.sessionSummary || row.sessionId),
+            provider: row.provider, projectId: project.projectId, projectName: project.projectDisplayName || project.projectName,
+            snippet: row.matches[0]?.snippet, timestamp: row.matches[0]?.timestamp});
+          publish();
+        } catch { finish(true); }
+      });
+      es.addEventListener('done', () => finish(false));
+      es.addEventListener('error', () => finish(true));
+      timeout = setTimeout(() => finish(true), 60000);
+    }, 250);
+    return () => { generation.current++; clearTimeout(handle); clearTimeout(timeout); es?.close(); };
+  }, [projectId, query, enabled, key, retry]);
+  const active = enabled && query.trim().length >= 2;
+  const visible = active && state.key === key;
+  return {items: visible ? state.items : [], searching: active && (!visible || state.searching), error: visible && state.error, retry: () => setRetry(value => value + 1)};
 }

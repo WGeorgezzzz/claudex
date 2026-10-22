@@ -10,7 +10,7 @@ import { createContext, useContext } from 'react';
  * through the authenticated project files route instead of failing as a bare
  * `<img src>` against the web origin.
  */
-export const MarkdownWorkspaceContext = createContext<{ projectId: string | null }>({ projectId: null });
+export const MarkdownWorkspaceContext = createContext<{ projectId: string | null; projectPath?: string | null }>({ projectId: null });
 
 /** DB `projectId` of the project the transcript belongs to, or null outside a project. */
 export function useMarkdownWorkspaceProjectId(): string | null {

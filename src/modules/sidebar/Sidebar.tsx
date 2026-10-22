@@ -13,6 +13,7 @@ import type { LLMProvider, LoadingProgress, MCPServerStatus, Project, ProjectSes
 import SidebarCollapsed from '@/modules/sidebar/SidebarCollapsed';
 import SidebarContent from '@/modules/sidebar/SidebarContent';
 import SidebarModals from '@/modules/sidebar/SidebarModals';
+import { SessionWorkspaceProvider } from '@/modules/sidebar/context/SessionWorkspaceContext';
 
 type SidebarProps = {
   projects: Project[];
@@ -66,8 +67,8 @@ function Sidebar({
   const { t } = useTranslation(['sidebar', 'common']);
   const { isPWA } = useDeviceSettings({ trackMobile: false });
   const { updateAvailable, restartRequired, latestVersion, currentVersion, releaseInfo, installMode } = useVersionCheck(
-    'siteboon',
-    'claudecodeui',
+    'WGeorgezzzz',
+    'claudex',
   );
   const preferences = useUiPreferences();
   const setPreference = useSetUiPreference();
@@ -238,7 +239,7 @@ function Sidebar({
   };
 
   return (
-    <>
+    <SessionWorkspaceProvider activeSessionId={selectedSession?.id??null}>
         <SidebarModals
           projects={projects}
         showSettings={showSettings}
@@ -362,7 +363,7 @@ function Sidebar({
         </>
       )}
 
-    </>
+    </SessionWorkspaceProvider>
   );
 }
 

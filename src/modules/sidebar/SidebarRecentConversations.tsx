@@ -8,6 +8,7 @@ import { cn } from '@/shared/utils';
 import type { ProjectSession, RecentConversationListItem, SessionRowActions } from '@/shared/types';
 import { formatCompactAge } from '@/modules/sidebar/utils/sidebarProjectFormatting';
 import SessionOptions from '@/modules/sidebar/SessionOptions';
+import { SessionOrganizationBadge } from '@/modules/sidebar/SessionOrganizationBadge';
 
 type SidebarRecentConversationsProps = {
   conversations: RecentConversationListItem[];
@@ -181,7 +182,7 @@ export default function SidebarRecentConversations({
 
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[13px] font-normal leading-4">
-                    {conversation.sessionTitle}
+                    <SessionOrganizationBadge sessionId={conversation.sessionId}/>{conversation.sessionTitle}
                   </span>
                   <span className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[10px] leading-3 text-muted-foreground">
                     <span className="truncate">{conversation.projectDisplayName}</span>

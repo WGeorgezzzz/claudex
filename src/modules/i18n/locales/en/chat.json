@@ -1,4 +1,22 @@
 {
+  "liveInput": {
+    "send": "Send addition",
+    "hint": "Deliver to the current Claude process when it can accept input, using the current turn settings without interrupting tools",
+    "label": "Live addition",
+    "delivered": "Delivered, awaiting confirmation",
+    "retryQueued": "Requeue as a new turn",
+    "unconfirmed": "Completion was not confirmed. This will not resend automatically. Review the receipt before requeuing.",
+    "textOnly": "Live additions support text during an active Claude reply. Queue attachments for the next turn."
+  },
+  "fileLink": {
+    "menu": "File actions",
+    "openLocally": "Open locally",
+    "preview": "Preview in CloudCLI",
+    "copyPath": "Copy file path",
+    "noProject": "The project path is unavailable. Open this conversation in its project first.",
+    "desktopOnly": "Open this link in the CloudCLI desktop app to use a local program.",
+    "copyFailed": "Unable to copy the file path."
+  },
   "codeBlock": {
     "copy": "Copy",
     "copied": "Copied",
@@ -471,6 +489,9 @@
     }
   },
   "queue": {
+    "pause": "Pause queue", "resume": "Resume queue", "moveUp": "Move earlier", "moveDown": "Move later",
+    "pauseHint": "Control pending messages without interrupting the current task",
+    "pausedHint": "Pending messages are paused. The current task continues. Resume the queue to dispatch again.",
     "title": "Message queue",
     "edit": "Edit queued message",
     "save": "Save",

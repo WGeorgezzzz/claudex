@@ -9,6 +9,8 @@ import { useTranslation } from 'react-i18next';
 
 import { MermaidDiagram } from '@/modules/code-editor';
 import { MarkdownImage } from '@/modules/chat/transcript/MarkdownImage';
+import { LocalFileLink } from '@/modules/chat/transcript/LocalFileLink';
+import { remarkLocalFileDirectories } from '@/modules/chat/utils/remarkLocalFileDirectories';
 import { normalizeInlineCodeFences } from '@/modules/chat/utils/chatFormatting';
 import { isInlineFileReference, localFileUrlTransform, parseLocalFileLink } from '@/modules/chat/utils/localFileLink';
 import { normalizeLatexDelimiters } from '@/modules/chat/utils/latexDelimiters';
@@ -96,8 +98,10 @@ const CodeBlock = ({ node: _node, className, children, forceBlock, ...props }: C
 
   if (shouldInline) {
     if(!insideLink && isInlineFileReference(raw)) {
-      return <a href="#" title="在右侧预览本地文件" className="cursor-pointer whitespace-pre-wrap break-words rounded-md border border-primary/20 bg-primary/5 px-1.5 py-0.5 font-mono text-[0.875em] text-blue-600 underline decoration-blue-400/50 underline-offset-2 hover:bg-primary/10 dark:text-blue-400"
-        onClick={event=>{event.preventDefault();const ref=parseLocalFileLink(raw);openFileInEditor(ref.path,ref.line);}}>{children}</a>;
+      const reference = _node?.properties?.['data-local-reference'] ?? raw;
+      const directories = JSON.parse(_node?.properties?.['data-local-directories'] ?? '[]');
+      return <LocalFileLink fileReference={reference} directories={directories} href="#" title={reference} className="cursor-pointer whitespace-pre-wrap break-words rounded-md border border-primary/20 bg-primary/5 px-1.5 py-0.5 font-mono text-[0.875em] text-blue-600 underline decoration-blue-400/50 underline-offset-2 hover:bg-primary/10 dark:text-blue-400"
+        onPreview={openFileInEditor}>{children}</LocalFileLink>;
     }
     return (
       <code
@@ -276,7 +280,7 @@ function MarkdownBodyRenderer({ children, breaks = false }: Omit<MarkdownProps, 
   const hasMath = useMemo(() => MATH_DELIMITER.test(content), [content]);
   const remarkPlugins = useMemo(
     () => {
-      const plugins: unknown[] = [remarkGfm];
+      const plugins: unknown[] = [remarkGfm, remarkLocalFileDirectories];
       if (hasMath) {
         plugins.push([remarkMath, { singleDollarTextMath: false }]);
       }
@@ -301,7 +305,7 @@ function MarkdownBodyRenderer({ children, breaks = false }: Omit<MarkdownProps, 
 
         if (fileRef && !isExternalHref(href)) {
           return (
-            <a
+            <LocalFileLink fileReference={fileRef}
               href={href || fileRef}
               className="cursor-pointer text-blue-600 hover:underline dark:text-blue-400"
               onClick={(event) => {
@@ -319,7 +323,7 @@ function MarkdownBodyRenderer({ children, breaks = false }: Omit<MarkdownProps, 
               }}
             >
               <InsideMarkdownLink.Provider value={true}>{linkChildren}</InsideMarkdownLink.Provider>
-            </a>
+            </LocalFileLink>
           );
         }
 

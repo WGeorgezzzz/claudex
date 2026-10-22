@@ -6,6 +6,7 @@ import { projectsDb, sessionsDb } from '@/modules/database/index.js';
 import { broadcastSessionUpserted, chatRunRegistry } from '@/modules/websocket/index.js';
 import { providerRegistry } from '@/modules/providers/provider.registry.js';
 import { listBusyClaudeCliSessions } from '@/modules/providers/services/claude-cli-liveness.service.js';
+import { assertSessionOwnerAvailable } from '@/modules/providers/services/session-owner.service.js';
 import { sessionHistoryCache } from '@/modules/providers/services/session-history-cache.service.js';
 import type {
   BackgroundTaskSummary,
@@ -146,6 +147,8 @@ function resolveProjectDisplayName(
  * file layout.
  */
 export const sessionsService = {
+  /** Websocket dispatch and rewind use this to preserve turns owned by a parallel legacy service. */
+  assertOwnerAvailable: assertSessionOwnerAvailable,
   /**
    * Lists provider ids that can load session history and normalize live messages.
    */

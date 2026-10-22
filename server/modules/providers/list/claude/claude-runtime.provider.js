@@ -1161,7 +1161,7 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
     // The SDK's own `query`, unless the caller supplies one (tests script the
     // stream to drive the hold logic below without a CLI process).
     const createQuery = context.createQuery ?? query;
-    let heldPrompt = createHeldPromptStream(promptMessages);
+    let heldPrompt = createHeldPromptStream(promptMessages, sessionKey());
     releasePromptStream = heldPrompt.release;
     try {
       queryInstance = createQuery({
@@ -1175,7 +1175,7 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
       delete sdkOptions.hooks;
       // Discard the abandoned stream and build a fresh one for the retry.
       heldPrompt.release();
-      heldPrompt = createHeldPromptStream(promptMessages);
+      heldPrompt = createHeldPromptStream(promptMessages, sessionKey());
       releasePromptStream = heldPrompt.release;
       queryInstance = createQuery({
         prompt: heldPrompt.stream,
@@ -1256,6 +1256,7 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
     // Process streaming messages
     console.log('Starting async generator loop for session:', capturedSessionId || 'NEW');
     for await (const message of queryInstance) {
+      heldPrompt.observeMessage(message);
       // Capture session ID from first message
       if (message.session_id && !capturedSessionId) {
 
@@ -1354,6 +1355,7 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
         heldForBackgroundWork
         && turnCompleteSent
         && !pendingContinuation
+        && !heldPrompt.hasPendingInputs()
         && message.type === 'system'
         && message.subtype === 'task_notification'
         && message.status === 'stopped'
@@ -1371,7 +1373,7 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
         // The turn is done as far as the client is concerned.
         const abortPending = sessionKey() ? abortedSessionIds.has(sessionKey()) : false;
         const stillOutstanding = backgroundWork.hasOutstanding(sessionKey());
-        if (!turnCompleteSent && !abortPending && answersContinuation) {
+        if (!turnCompleteSent && !abortPending && answersContinuation && !heldPrompt.hasPendingInputs()) {
           turnCompleteSent = true;
           const completedContinuation = pendingContinuation;
           pendingContinuation = null;
@@ -1414,7 +1416,7 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
         const holdForTurn = sawTaskEventThisTurn ? stillOutstanding : backgroundWorkPending || stillOutstanding;
         backgroundWorkPending = false;
         sawTaskEventThisTurn = false;
-        if (holdForTurn || pendingContinuation) {
+        if (holdForTurn || pendingContinuation || heldPrompt.hasPendingInputs()) {
           heldForBackgroundWork = true;
           scheduleRelease();
         } else {

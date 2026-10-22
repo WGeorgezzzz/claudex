@@ -22,6 +22,7 @@ function onDesktopStateUpdated(callback) {
 
 if (isCloudCliAppOrigin(window.location)) {
   contextBridge.exposeInMainWorld('cloudcliDesktopNotifications', {
+    openLocalPath: (filePath) => ipcRenderer.invoke('cloudcli-desktop:open-local-path', filePath),
     getState: () => ipcRenderer.invoke('cloudcli-desktop:get-state'),
     update: (settings) => ipcRenderer.invoke('cloudcli-desktop:update-desktop-notifications', settings),
     onStateUpdated: onDesktopStateUpdated,
@@ -30,6 +31,7 @@ if (isCloudCliAppOrigin(window.location)) {
 
 if (window.location.protocol === 'file:') {
   contextBridge.exposeInMainWorld('cloudcliDesktop', {
+    openLocalPath: (filePath) => ipcRenderer.invoke('cloudcli-desktop:open-local-path', filePath),
     connectCloud: () => ipcRenderer.invoke('cloudcli-desktop:connect-cloud'),
     disconnectCloud: () => ipcRenderer.invoke('cloudcli-desktop:disconnect-cloud'),
     copyDiagnostics: () => ipcRenderer.invoke('cloudcli-desktop:copy-diagnostics'),

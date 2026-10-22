@@ -5,6 +5,7 @@ import {
 } from '@/shared/authToken';
 import { IS_PLATFORM } from '@/shared/utils';
 import { readVoiceConfig, voiceConfigHeaders } from '@/shared/voiceConfig';
+import type { SessionWorkspaceChange } from '@/shared/types';
 
 // Headers are a plain record rather than the full `HeadersInit` union so the
 // defaults below can be merged with a caller's headers by spreading.
@@ -276,8 +277,8 @@ export const api = {
   sessionDetails: (sessionId: string) =>
     get(`/api/providers/sessions/${encodeURIComponent(sessionId)}`),
   runningSessions: () => get('/api/providers/sessions/running'),
-  recentConversations: ({ limit = 40, offset = 0 }: { limit?: number; offset?: number } = {}) =>
-    get(`/api/providers/sessions/recent${query({ limit, offset })}`),
+  recentConversations: ({ limit = 40, offset = 0 }: { limit?: number; offset?: number } = {}, options: ApiRequestOptions = {}) =>
+    get(`/api/providers/sessions/recent${query({ limit, offset })}`, options),
   providerSessionId: (sessionId: string) =>
     get(`/api/providers/sessions/${encodeURIComponent(sessionId)}/provider-id`),
   restoreSession: (sessionId: string) => post(`/api/providers/sessions/${sessionId}/restore`),
@@ -300,10 +301,17 @@ export const api = {
     update: (id: string, body: {title?:string;action?:'archive'|'restore'|'promote'}) => patch(`/api/side-chats/${encodeURIComponent(id)}`,body),
   },
   messageQueue: {
+    liveState: (sessionId: string) => get(`/api/message-queue/live${query({sessionId})}`),
+    sendLive: (body: {sessionId:string;requestId:string;content:string;options:Record<string,unknown>;expectedStartedAt:number}) => post('/api/message-queue/live',body),
     list: (sessionId: string) => get(`/api/message-queue${query({sessionId})}`),
     enqueue: (body: {sessionId:string;requestId:string;content:string;options:Record<string,unknown>}) => post('/api/message-queue',body),
-    update: (id: string, body: {revision:number;content?:string;action?:'cancel'|'retry'}) => patch(`/api/message-queue/${encodeURIComponent(id)}`,body),
+    update: (id: string, body: {revision:number;content?:string;action?:'cancel'|'retry'|'move-up'|'move-down'}) => patch(`/api/message-queue/${encodeURIComponent(id)}`,body),
     attempts: (id: string) => get(`/api/message-queue/${encodeURIComponent(id)}/attempts`),
+  },
+  sessionWorkspace: {
+    list: () => get('/api/session-workspace'),
+    get: (id:string) => get(`/api/session-workspace/${encodeURIComponent(id)}`),
+    update: (id:string,body:SessionWorkspaceChange) => patch(`/api/session-workspace/${encodeURIComponent(id)}`,body),
   },
   monitors: {
     update: (id: string, input: {name:string;content:string;intervalMinutes:number}) => patch('/api/monitors/' + encodeURIComponent(id), input),

@@ -29,9 +29,10 @@ for (const name of ['dist-server','dist','public','server','shared']) {
 }
 await fs.mkdir(path.join(serverRoot,'scripts'),{recursive:true});
 await fs.copyFile(path.join(root,'scripts/fix-node-pty.js'),path.join(serverRoot,'scripts/fix-node-pty.js'));
+await fs.copyFile(path.join(root,'scripts/fix-codex-windows-console.mjs'),path.join(serverRoot,'scripts/fix-codex-windows-console.mjs'));
 await fs.copyFile(path.join(root,'package-lock.json'),path.join(serverRoot,'package-lock.json'));
 await fs.writeFile(path.join(serverRoot,'package.json'),JSON.stringify({
-  ...sourcePackage,scripts:{postinstall:'node scripts/fix-node-pty.js'},
+  ...sourcePackage,scripts:{postinstall:sourcePackage.scripts.postinstall},
 },null,2));
 await new Promise((resolve,reject)=>{
   const child=spawn('npm',['ci','--omit=dev','--no-audit','--no-fund'],{
@@ -50,23 +51,23 @@ await fs.mkdir(path.join(stage,'runtime'),{recursive:true});
 await fs.copyFile(process.execPath,path.join(stage,'runtime','node.exe'));
 await fs.writeFile(path.join(stage,'build-provenance.json'),JSON.stringify({
   product:profile.productName,version:profile.version,sourceCommit:process.env.GITHUB_SHA||'local',
-  node:process.version,nodeAbi:process.versions.modules,electron:electronVersion,upstreamBaseVersion:sourcePackage.version,
+  node:process.version,nodeAbi:process.versions.modules,electron:electronVersion,upstreamBaseVersion:profile.upstreamBaseVersion||'1.37.5',
 },null,2));
 await fs.writeFile(path.join(stage,'package.json'),JSON.stringify({
-  name:'cloudcli-workbench-desktop',version:profile.version,productName:profile.productName,
-  description:'Independent CloudCLI Workbench desktop distribution',
+  name:'claudex-desktop',version:profile.version,productName:profile.productName,
+  description:'Claudex independent desktop distribution',
   author:sourcePackage.author,license:sourcePackage.license,type:'module',main:'electron/main.js',
   dependencies:sourcePackage.dependencies,optionalDependencies:sourcePackage.optionalDependencies,
   build:{
     appId:profile.appId,productName:profile.productName,asar:false,electronVersion,
     npmRebuild:false,nodeGypRebuild:false,
-    artifactName:'CloudCLI-Workbench-${version}-win-${arch}.${ext}',
+    artifactName:'Claudex-${version}-win-${arch}.${ext}',
     directories:{output:'../../release/workbench'},
     files:['electron/**','public/**','dist/**','server/**','runtime/**','node_modules/**',
       'workbench-profile.json','build-provenance.json','package.json','LICENSE','NOTICE'],
     protocols:[{name:profile.productName,schemes:[profile.protocol]}],
     win:{target:[{target:'nsis',arch:['x64']}],icon:'electron/assets/logo-windows.ico',
-      executableName:'CloudCLI Workbench',signAndEditExecutable:true},
+      executableName:'Claudex',signAndEditExecutable:true},
     nsis:{oneClick:false,perMachine:false,allowToChangeInstallationDirectory:true,runAfterFinish:false,
       deleteAppDataOnUninstall:false,createDesktopShortcut:true,shortcutName:profile.productName},
   },

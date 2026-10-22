@@ -34,6 +34,7 @@ import { useSlashCommands } from '@/modules/chat/hooks/useSlashCommands';
 
 type UseChatComposerStateArgs = {
   enqueueMessage?: (submission:QueueSubmission,sessionId:string)=>Promise<void>;
+  sendLiveMessage?: (submission:QueueSubmission,sessionId:string)=>Promise<void>;
   onOpenSideChat?: (prompt?: string) => void;
   selectedProject: Project | null;
   selectedSession: ProjectSession | null;
@@ -91,6 +92,7 @@ type CommandExecutionResult = {
 
 type SubmitOptions = {
   forceQueue?: boolean;
+  forceLive?: boolean;
   /**
    * Send the text as a chat message even when it starts with "/" (or is
    * "help"). Set only for the re-submit of a custom command's expanded body:
@@ -182,6 +184,7 @@ const SAFARI_IME_RACE_WINDOW_MS = 30;
 
 export function useChatComposerState({
   enqueueMessage,
+  sendLiveMessage,
   onOpenSideChat,
   selectedProject,
   selectedSession,
@@ -720,11 +723,13 @@ export function useChatComposerState({
   // card. Used while a turn is in flight and when the user chooses to queue
   // behind background work. Attachments must already be uploaded.
   const queueMessage = useCallback(
-    async (durableDraft: QueuedDraft, queuedSessionKey: string | null) => {
-      if (enqueueMessage) {
+    async (durableDraft: QueuedDraft, queuedSessionKey: string | null, live=false) => {
+      const submit=live?sendLiveMessage:enqueueMessage;
+      if (live && !submit) return;
+      if (submit) {
         if (!queuedSessionKey) return;
         try {
-          await enqueueMessage({content:durableDraft.content,options:{...durableDraft.options},
+          await submit({content:durableDraft.content,options:{...durableDraft.options},
             attachments:durableDraft.uploadedAttachments??[]},queuedSessionKey);
         } catch (error) {
           addMessage({type:'error',content:error instanceof Error?error.message:String(error),timestamp:new Date()});
@@ -754,7 +759,7 @@ export function useChatComposerState({
         return;
       }
 
-      if (!enqueueMessage) {
+      if (!submit) {
         queuedDraftSessionRef.current = queuedSessionKey;
         setQueuedDraft(durableDraft);
       }
@@ -773,7 +778,7 @@ export function useChatComposerState({
         writeDraftText(draftScopeRef.current, '');
       }
     },
-    [recordSentMessage, resetCommandMenuState, setInput, enqueueMessage, addMessage],
+    [recordSentMessage, resetCommandMenuState, setInput, enqueueMessage, sendLiveMessage, addMessage],
   );
 
   const submitMessage = useCallback(
@@ -810,7 +815,11 @@ export function useChatComposerState({
       // A turn is already in flight: stash this message instead of sending it.
       // Upload attached files now so the queued record contains durable image
       // descriptors that can be sent even if another session is open later.
-      if (isLoading || submitOptions?.forceQueue) {
+      if (isLoading || submitOptions?.forceQueue || submitOptions?.forceLive) {
+        if (submitOptions?.forceLive && (provider!=='claude' || !isLoading || currentAttachments.length || previouslyUploadedAttachments.length)) {
+          addMessage({type:'error',content:t('liveInput.textOnly'),timestamp:new Date()});
+          return;
+        }
         // A run can restart in the tiny gap between scheduling and flushing a
         // queued submission. Put the same durable draft back without uploading
         // its files again.
@@ -841,7 +850,7 @@ export function useChatComposerState({
           attachments: currentAttachments,
           uploadedAttachments,
           options: queuedOptions,
-        }, queuedSessionKey);
+        }, queuedSessionKey,Boolean(submitOptions?.forceLive));
         return;
       }
 
