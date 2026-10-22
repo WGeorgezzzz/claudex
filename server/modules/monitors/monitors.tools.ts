@@ -23,7 +23,8 @@ type ToolContext={userId:number;sessionId:string;monitorId?:string;model?:string
 function visible(row:ReturnType<typeof monitorsService.require>) {
   return {id:row.id,name:row.name,content:row.content,intervalMinutes:row.interval_minutes,status:row.status,
     schedule:row.schedule_json?JSON.parse(row.schedule_json):null,permissionMode:JSON.parse(row.options).permissionMode??'default',
-    running:Boolean(row.running_id),nextRunAt:row.status==='active'?row.next_run_at:null,runCount:row.run_count,lastError:row.last_error};
+    running:Boolean(row.running_id),nextRunAt:row.status==='active'?row.next_run_at:null,runCount:row.run_count,lastError:row.last_error,
+    consecutiveFailures:row.consecutive_failures,autoRetry:row.status==='active'&&row.consecutive_failures>0,pauseReason:row.pause_reason};
 }
 
 /** Used by the MCP adapter and scope/lifecycle tests; does not accept credentials or session overrides. */
@@ -60,7 +61,7 @@ const instructions=`CloudCLI 的定期监测由 cloudcli_monitor MCP 工具持�
 只在用户明确要求时创建或修改。间隔或检查对象不明确时先询问。已有任务先 list，使用返回的 id；不得猜测其他会话的 id。
 只有工具返回成功才说已创建或已修改，告知名称、调度规则、状态和下次时间。nextRunAt 是 UTC，按日历规则的 timeZone 或用户本地时区描述。
 每天/每周固定时间使用 schedule，必须明确 IANA 时区，不用服务器时区猜测用户时区。间隔使用 intervalMinutes。日历规则错过后最多执行一次；恢复按下一个未来时刻，不追补多轮。夏令时不存在的时间跳过，重复时间只取第一次。
-任务保存在本机服务，关闭聊天页面仍有效；电脑和服务必须运行。忙时等待，失败暂停。聊天创建的监测沿用创建时用户选择的权限模式；不得自行提升权限。
+任务保存在本机服务，关闭聊天页面仍有效；电脑和服务必须运行。忙时等待，失败保留记录并按 1、2、4、8、16、30 分钟退避重试。服务重启后已启用的监测自动恢复；上一轮结果未确认时先核对实际状态，避免重复副作用。用户手动暂停/停止仍保持，不自行恢复。聊天创建的监测沿用创建时用户选择的权限模式；不得自行提升权限。
 监测执行中若用户设定的完成/停止条件已满足，可用 stop 停止自身任务；不要创建新的监测。`;
 
 /** Providers binds this factory to an authenticated Claude turn's actual user/session. */

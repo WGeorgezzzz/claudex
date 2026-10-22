@@ -270,3 +270,19 @@ export const getQuickSettingsTabId = (tab: QuickSettingsTab): string => `quick-s
 
 /** DOM id of the tabpanel a quick settings tab controls; pairs with `getQuickSettingsTabId`. */
 export const getQuickSettingsTabPanelId = (tab: QuickSettingsTab): string => `quick-settings-tabpanel-${tab}`;
+
+//----------------- CLAUDE FOLLOW-UP PROMPTS ------------
+/** Chat rendering and suggestion buttons share this bounded parser; invalid payloads never become actions. */
+export function readClaudeNextPrompts(text: string, streaming = false): { content: string; prompts: string[] } {
+  const marker = '<claudex_next_prompts>';
+  const index = text.lastIndexOf(marker);
+  if (index < 0 || (index > 0 && text[index - 1] !== '\n') || (text.slice(0, index).match(/^```/gm)?.length ?? 0) % 2 !== 0) return { content: text, prompts: [] };
+  const suffix = text.slice(index);
+  const match = suffix.match(/^<claudex_next_prompts>\s*(\[[\s\S]{0,5000}\])\s*<\/claudex_next_prompts>\s*$/);
+  if (!match) return { content: streaming && !suffix.includes('</claudex_next_prompts>') ? text.slice(0, index).trimEnd() : text, prompts: [] };
+  try {
+    const parsed: unknown = JSON.parse(match[1]);
+    if (!Array.isArray(parsed) || parsed.length < 1 || parsed.length > 3 || !parsed.every(value => typeof value === 'string' && value.trim() && value.length <= 1200)) return { content: text, prompts: [] };
+    return { content: text.slice(0, index).trimEnd(), prompts: [...new Set(parsed.map(value => String(value).trim()))] };
+  } catch { return { content: text, prompts: [] }; }
+}

@@ -212,5 +212,25 @@
     "markUnread": "将 {{title}} 标为未读",
     "pin": "置顶 {{title}}",
     "unpin": "取消置顶 {{title}}"
+  },
+  "sections": {
+    "title": "工作区",
+    "manage": "管理分区",
+    "close": "关闭分区管理",
+    "description": "把项目和会话整理到分区。删除分区只取消归类，不删除项目、会话，也不中断任务。",
+    "newName": "新分区名称",
+    "create": "创建",
+    "rename": "重命名 {{name}}",
+    "up": "上移 {{name}}",
+    "down": "下移 {{name}}",
+    "remove": "删除分区 {{name}}",
+    "itemKind": "条目类型",
+    "projects": "项目",
+    "sessions": "会话",
+    "search": "查找项目或会话",
+    "moveItem": "{{name}} 所在分区",
+    "unassigned": "项目 · 未分区",
+    "empty": "从“管理分区”加入项目或会话",
+    "more": "加载更多会话"
   }
 }

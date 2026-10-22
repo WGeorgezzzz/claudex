@@ -89,20 +89,42 @@ test('overlapping polls cannot launch duplicate runs; pause during execution sta
   monitorsService.action(user,row.id,'resume');assert.equal(monitorsDb.get(user,row.id)?.status,'active');
   monitorsService.action(user,row.id,'stop');assert.equal(await dispatchMonitors(runtime(),new Date(Date.now()+120000)),0);
 }));
-test('event-only failure pauses task and preserves an error receipt',()=>fixture(async user=>{
+test('event-only failure schedules automatic recovery and preserves an error receipt',()=>fixture(async user=>{
   const row=create(user);
   await dispatchMonitors(runtime(async(_p,_c,_o,writer)=>{writer.send({kind:'error',content:'provider offline'});writer.send(createCompleteMessage({provider:'claude',exitCode:1}));}),new Date(Date.now()+120000));
-  assert.equal(monitorsDb.get(user,row.id)?.status,'paused');
+  assert.equal(monitorsDb.get(user,row.id)?.status,'active');
+  assert.equal(monitorsDb.get(user,row.id)?.consecutive_failures,1);
+  assert.ok(Date.parse(monitorsDb.get(user,row.id)!.next_run_at)>Date.now());
   assert.equal(monitorsDb.history(user,row.id)[0].status,'failed');
   assert.match(monitorsDb.history(user,row.id)[0].error!,/offline/);
 }));
-test('restart persists idle schedules and pauses unconfirmed runs',()=>fixture(async user=>{
+test('restart persists idle schedules and schedules recovery of unconfirmed active runs',()=>fixture(async user=>{
   const row=create(user);const idle=create(user);
   assert.ok(monitorsDb.claim(row.id,new Date(Date.now()+120000)));
   closeConnection();await initializeDatabase();monitorsDb.recover();
   assert.equal(sessionsDb.getSessionById('monitor-session')?.provider_session_id,null);
-  assert.equal(monitorsDb.get(user,row.id)?.status,'paused');assert.equal(monitorsDb.history(user,row.id)[0].status,'interrupted');
+  assert.equal(monitorsDb.get(user,row.id)?.status,'active');assert.equal(monitorsDb.history(user,row.id)[0].status,'interrupted');
+  assert.equal(monitorsDb.get(user,row.id)?.consecutive_failures,1);
   assert.equal(monitorsDb.get(user,idle.id)?.status,'active');
+}));
+
+test('retry delay grows to 30 minutes and success resets it without losing failed attempts',()=>fixture(user=>{
+  const row=create(user);let now=new Date(Date.now()+120000);
+  for(const delay of [1,2,4,8,16,30,30]) {
+    const run=monitorsDb.claim(row.id,now)!;assert.ok(run);monitorsDb.finish(row.id,run,'temporary offline',now);
+    const after=monitorsDb.get(user,row.id)!;assert.equal(after.status,'active');assert.equal(Date.parse(after.next_run_at)-now.getTime(),delay*60000);now=new Date(after.next_run_at);
+  }
+  const run=monitorsDb.claim(row.id,now)!;monitorsDb.finish(row.id,run,null,now);
+  assert.equal(monitorsDb.get(user,row.id)?.consecutive_failures,0);
+  assert.equal(monitorsDb.history(user,row.id).filter(run=>run.status==='failed').length,7);
+}));
+
+test('restart recovery never resumes a monitor manually paused or stopped while its run was active',()=>fixture(user=>{
+  const paused=create(user);const now=new Date(Date.now()+120000);assert.ok(monitorsDb.claim(paused.id,now));
+  monitorsService.action(user,paused.id,'pause');monitorsDb.recover(now);
+  assert.equal(monitorsDb.get(user,paused.id)?.status,'paused');assert.equal(monitorsDb.get(user,paused.id)?.pause_reason,'user');
+  const stopped=create(user);assert.ok(monitorsDb.claim(stopped.id,now));monitorsService.action(user,stopped.id,'stop');monitorsDb.recover(now);
+  assert.equal(monitorsDb.get(user,stopped.id)?.status,'stopped');
 }));
 test('invalid intervals, archived/non-Claude sessions and foreign ownership are rejected',()=>fixture(user=>{
   for(const intervalMinutes of [0,-1,1.5,10081,'30'])assert.throws(()=>monitorsService.create(user,{sessionId:'monitor-session',name:'test',content:'status',intervalMinutes}));

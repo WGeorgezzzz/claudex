@@ -313,6 +313,16 @@ export const api = {
     get: (id:string) => get(`/api/session-workspace/${encodeURIComponent(id)}`),
     update: (id:string,body:SessionWorkspaceChange) => patch(`/api/session-workspace/${encodeURIComponent(id)}`,body),
   },
+  workspaceSections: {
+    list: () => get('/api/workspace-sections'),
+    update: (body: Record<string, unknown>) => patch('/api/workspace-sections', body),
+  },
+  sessionBridge: {
+    list: (search = '', offset = 0) => get(`/api/session-bridge/sessions${query({ query: search, offset })}`),
+    read: (id: string, offset = 0) => get(`/api/session-bridge/sessions/${encodeURIComponent(id)}${query({ offset })}`),
+    send: (body: { sourceSessionId: string; sessionId: string; requestId: string; content: string }) => post('/api/session-bridge/send', body),
+    status: (sourceSessionId: string, id: string) => get(`/api/session-bridge/receipts/${encodeURIComponent(id)}${query({ sourceSessionId })}`),
+  },
   monitors: {
     capabilities: (options: ApiRequestOptions = {}) => get('/api/monitors/capabilities',options),
     update: (id: string, input: {name:string;content:string;intervalMinutes:number;schedule?:MonitorCalendarSchedule|null}) => patch('/api/monitors/' + encodeURIComponent(id), input),

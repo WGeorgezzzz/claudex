@@ -489,7 +489,10 @@
     }
   },
   "queue": {
-    "pause": "Pause queue", "resume": "Resume queue", "moveUp": "Move earlier", "moveDown": "Move later",
+    "pause": "Pause queue",
+    "resume": "Resume queue",
+    "moveUp": "Move earlier",
+    "moveDown": "Move later",
     "pauseHint": "Control pending messages without interrupting the current task",
     "pausedHint": "Pending messages are paused. The current task continues. Resume the queue to dispatch again.",
     "title": "Message queue",
@@ -510,5 +513,33 @@
     "attempts": "Attempts",
     "add": "Add to message queue",
     "attachmentsOnly": "Attachment message"
+  },
+  "crossSession": {
+    "title": "Cross-session tools",
+    "close": "Close cross-session tools",
+    "description": "Read another conversation or explicitly queue a message there. Existing work is not interrupted; target actions use default approval.",
+    "search": "Find a target conversation",
+    "more": "Load more",
+    "earlier": "Load earlier context",
+    "empty": "No text history yet.",
+    "quote": "Insert context into current draft",
+    "message": "Message for the target conversation",
+    "send": "Queue in selected conversation",
+    "readOnly": "This target is read-only here (unsupported provider or another service owns it).",
+    "select": "Select a conversation to inspect its context.",
+    "receipt": "Delivery status: {{status}}",
+    "openTarget": "Open target conversation",
+    "status": {
+      "queued": "Queued",
+      "running": "Running",
+      "succeeded": "Completed",
+      "failed": "Failed",
+      "interrupted": "Interrupted",
+      "cancelled": "Cancelled"
+    }
+  },
+  "nextPrompts": {
+    "title": "Suggested next prompts",
+    "hint": "Next steps · click to add to your draft"
   }
 }

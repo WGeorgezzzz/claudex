@@ -137,6 +137,14 @@ test('routes permission decisions through provider-owned runtime capabilities', 
   ]);
 });
 
+test('queued Claude allow/deny lists reach the SDK settings without enabling bypass', async () => {
+  let actual: Record<string, unknown> | undefined;
+  const service=createService([createProvider('claude',createRuntime({async run(_command,options){actual=options;}}))]);
+  await service.run('claude','inspect',{allowedTools:['mcp__claudex_sessions__session'],disallowedTools:['Bash'],permissionMode:'default'},{send(){}});
+  assert.deepEqual(actual?.toolsSettings,{allowedTools:['mcp__claudex_sessions__session'],disallowedTools:['Bash'],skipPermissions:false});
+  assert.equal(actual?.permissionMode,'default');
+});
+
 test('only authenticated Claude sessions receive the monitor query factory', async () => {
   const seen: boolean[]=[];
   const runtime=createRuntime({async run(_command,_options,_writer,context){seen.push(typeof context.createQuery==='function');}});

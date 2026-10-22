@@ -60,6 +60,7 @@ export function MonitorDashboard(){
               <button className={button} type="submit" disabled={busy}>保存调整</button> <button className={button} type="button" onClick={()=>setEdit(null)}>取消</button>
             </form>:<p className="my-3 max-h-28 overflow-auto whitespace-pre-wrap text-sm">{task.content}</p>}
             {task.last_error&&<p className="my-2 text-sm text-amber-600">{task.last_error}</p>}
+            {task.status==='active'&&(task.consecutive_failures??0)>0&&<p className="my-2 text-sm text-amber-600">连续失败 {task.consecutive_failures} 次 · 自动恢复中，按下次执行时间重试（最长退避 30 分钟）。</p>}
             <div className="mt-3 flex flex-wrap gap-2">
               {task.status!=='stopped'&&<button className={button} disabled={busy} onClick={()=>setEdit({id:task.id,name:task.name,content:task.content,minutes:task.interval_minutes,schedule:readMonitorSchedule(task)})}><Settings2 size={13} className="mr-1 inline"/>调整</button>}
               {task.status==='active'&&<><button className={button} disabled={busy} onClick={()=>void act(()=>api.monitors.action(task.id,'pause').then(result))}>暂停</button><button className={button} disabled={busy||Boolean(task.running_id)} onClick={()=>void act(()=>api.monitors.action(task.id,'run-now').then(result))}>立即检查</button></>}

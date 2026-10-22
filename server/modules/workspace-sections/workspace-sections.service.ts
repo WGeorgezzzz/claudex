@@ -1,0 +1,57 @@
+import { randomUUID } from 'node:crypto';
+
+import { projectsDb, sessionsDb, workspaceSectionsDb } from '@/modules/database/index.js';
+import { AppError } from '@/shared/index.js';
+
+const invalid = (message: string) => new AppError(message, { statusCode: 400 });
+
+/** Sidebar routes manage section organization without changing projects, transcripts, or live runs. */
+export const workspaceSectionsService = {
+  list(userId: number) {
+    const layout = workspaceSectionsDb.read(userId);
+    const sessionItems = layout.assignments.filter(item => item.kind === 'session').flatMap(item => {
+      const session = sessionsDb.getSessionById(item.targetId);
+      if (!session || session.isArchived) return [];
+      return [{ sessionId: session.session_id, title: session.custom_name || 'New conversation', provider: session.provider,
+        projectPath: session.project_path, projectId: session.project_path ? projectsDb.getProjectPath(session.project_path)?.project_id ?? null : null }];
+    });
+    return { ...layout, sessionItems };
+  },
+  update(userId: number, input: Record<string, unknown>) {
+    if (!Number.isSafeInteger(input.revision)) throw invalid('A layout revision is required.');
+    const action = input.action;
+    const name = typeof input.name === 'string' ? input.name.trim() : '';
+    workspaceSectionsDb.update(userId, Number(input.revision), layout => {
+      if (action === 'create') {
+        if (!name || name.length > 80 || layout.sections.length >= 50) throw invalid('Use a name of 1–80 characters; at most 50 sections.');
+        layout.sections.push({ id: randomUUID(), name, collapsed: false }); return;
+      }
+      if (action === 'assign') {
+        const kind = input.kind; const targetId = typeof input.targetId === 'string' ? input.targetId : '';
+        if (!['project', 'session'].includes(String(kind))) throw invalid('Choose a project or session.');
+        const target = kind === 'project' ? projectsDb.getProjectById(targetId) : sessionsDb.getSessionById(targetId);
+        if (!target || target.isArchived) throw invalid('Choose an active project or session.');
+        if (input.sectionId !== null && !layout.sections.some(row => row.id === input.sectionId)) throw invalid('Section does not exist.');
+        layout.assignments = layout.assignments.filter(row => row.kind !== kind || row.targetId !== targetId);
+        if (input.sectionId !== null) layout.assignments.push({ kind: kind as 'project' | 'session', targetId, sectionId: String(input.sectionId) });
+        return;
+      }
+      const index = layout.sections.findIndex(row => row.id === input.id);
+      if (index < 0) throw invalid('Section does not exist.');
+      if (action === 'rename') {
+        if (!name || name.length > 80) throw invalid('Use a name of 1–80 characters.');
+        layout.sections[index].name = name;
+      } else if (action === 'collapse') {
+        if (typeof input.collapsed !== 'boolean') throw invalid('Collapsed must be a boolean.');
+        layout.sections[index].collapsed = input.collapsed;
+      } else if (action === 'delete') {
+        layout.sections.splice(index, 1); layout.assignments = layout.assignments.filter(row => row.sectionId !== input.id);
+      } else if (action === 'move') {
+        if (!['up', 'down'].includes(String(input.direction))) throw invalid('Choose up or down.');
+        const next = index + (input.direction === 'up' ? -1 : 1);
+        if (next >= 0 && next < layout.sections.length) [layout.sections[index], layout.sections[next]] = [layout.sections[next], layout.sections[index]];
+      } else throw invalid('Unknown layout action.');
+    });
+    return this.list(userId);
+  },
+};

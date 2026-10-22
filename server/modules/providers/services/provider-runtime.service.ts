@@ -2,6 +2,7 @@ import { providerRegistry } from '@/modules/providers/provider.registry.js';
 import { providerModelsService } from '@/modules/providers/services/provider-models.service.js';
 import { sessionsService } from '@/modules/providers/services/sessions.service.js';
 import { createMonitorQuery } from '@/modules/monitors/index.js';
+import { createSessionBridgeQuery } from '@/modules/session-bridge/index.js';
 import type { IProvider } from '@/shared/interfaces.js';
 import type {
   AnyRecord,
@@ -74,13 +75,20 @@ export function createProviderRuntimeService(
     const context=createRuntimeContext(provider);
     const userId=Number(writer.userId);
     if(providerName==='claude'&&writer.userId!=null&&Number.isInteger(userId)&&typeof options.sessionId==='string') {
-      context.createQuery=createMonitorQuery({userId,sessionId:options.sessionId,
+      const monitorQuery=createMonitorQuery({userId,sessionId:options.sessionId,
         monitorId:typeof options.cloudcliMonitorId==='string'?options.cloudcliMonitorId:undefined,
         model:typeof options.model==='string'?options.model:undefined,
         effort:typeof options.effort==='string'?options.effort:undefined,
         permissionMode:typeof options.permissionMode==='string'?options.permissionMode:undefined});
+      context.createQuery=createSessionBridgeQuery({userId,sessionId:options.sessionId,
+        autonomous:Boolean(options.cloudcliMonitorId||options.cloudcliBridgeSourceSessionId),planMode:options.permissionMode==='plan'},monitorQuery);
     }
-    return provider.runtime.run(command, options, writer, context);
+    // Durable queue records store explicit allow/deny lists at the top level.
+    // Claude's SDK adapter consumes toolsSettings; preserve those choices on queued turns.
+    const runtimeOptions=providerName==='claude'&&!options.toolsSettings&&(Array.isArray(options.allowedTools)||Array.isArray(options.disallowedTools))
+      ? {...options,toolsSettings:{allowedTools:options.allowedTools??[],disallowedTools:options.disallowedTools??[],skipPermissions:false}}
+      : options;
+    return provider.runtime.run(command, runtimeOptions, writer, context);
   };
 
   return {

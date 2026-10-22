@@ -1,6 +1,6 @@
 {
   "name": "@wgeorgezzzz/claudex",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "productName": "Claudex",
   "description": "Independent desktop workspace for Claude, with durable queues and contextual side conversations",
   "type": "module",

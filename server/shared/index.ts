@@ -1,5 +1,6 @@
 export { appendFilesInputTag, buildCodexInputItems, normalizeImageDescriptors } from './image-attachments.js';
 export { AppError, createCompleteMessage, createNormalizedMessage } from './utils.js';
+export { asyncHandler, createApiSuccessResponse } from './utils.js';
 export type { AnyRecord, ProviderRuntimeContext, ProviderRuntimeWriter } from './types.js';
 
 export { getClaudeConfigDir, getClaudeConfigFile } from './utils.js';

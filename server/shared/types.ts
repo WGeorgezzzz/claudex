@@ -669,6 +669,15 @@ export type ProviderRuntimePermissionGateway = {
  * Keeping these lookups outside concrete SDK/CLI adapters prevents the
  * adapters from importing services that resolve back through providerRegistry.
  */
+//----------------- WORKSPACE SECTION ORGANIZATION ------------
+/** User-scoped sidebar layout. References organize existing projects/chats without moving their files or execution. */
+export type WorkspaceSectionLayout = {
+  revision: number;
+  sections: { id: string; name: string; collapsed: boolean }[];
+  assignments: { kind: 'project' | 'session'; targetId: string; sectionId: string }[];
+};
+// ---------------------------
+
 export type ProviderRuntimeContext = {
   resolveProviderSessionId(sessionId: string | null | undefined): string | null;
   resolveResumeModel(
@@ -1656,9 +1665,10 @@ export type MonitorRecord = {
   id: string; user_id: number; session_id: string; name: string; content: string; options: string;
   interval_minutes: number; status: 'active'|'paused'|'stopped'; next_run_at: string;
   schedule_json: string|null;
+  consecutive_failures: number; pause_reason: string|null;
   running_id: string|null; run_count: number; last_error: string|null; created_at: string;
 };
-/** One attempted monitor execution; interrupted runs require manual review instead of automatic replay. */
+/** One attempted monitor execution. Failures/interruption stay recorded while active monitors retry with backoff. */
 export type MonitorRunRecord = {
   id: string; monitor_id: string; started_at: string; finished_at: string|null;
   status: 'running'|'succeeded'|'failed'|'interrupted'; error: string|null;

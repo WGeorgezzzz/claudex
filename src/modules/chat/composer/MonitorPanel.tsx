@@ -65,7 +65,7 @@ export function MonitorPanel({sessionId,draft,options}:{sessionId:string|null;dr
     {open && createPortal(<div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/40 p-4" onClick={event=>{if(event.target===event.currentTarget)setOpen(false);}}>
       <section role="dialog" aria-modal="true" aria-label="定期监测" className="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-xl border bg-background p-5 text-foreground shadow-xl">
         <div className="flex items-center justify-between"><h2 className="text-lg font-semibold">定期监测</h2><button type="button" aria-label="关闭监测面板" onClick={()=>setOpen(false)}><X size={20}/></button></div>
-        <p className="my-2 text-xs text-muted-foreground">由本机服务定时执行，关闭聊天页面仍有效。电脑需保持开机且服务运行。会话忙时等待，不打断当前任务；出错会暂停并保留记录。</p>
+        <p className="my-2 text-xs text-muted-foreground">由本机服务定时执行，关闭聊天页面仍有效。电脑需保持开机且服务运行。会话忙时等待，不打断当前任务；失败保留记录并自动退避重试，最长间隔 30 分钟。手动暂停和停止不会自动恢复。</p>
         <p className="text-xs text-muted-foreground">间隔从每轮结束后计算；日历按指定时间执行。停机错过后最多补一次，不集中补跑。暂停或停止不取消正在执行的一轮。</p>
         {!sessionId?<p className="mt-4">请先在 Claude 中发送一条消息建立会话，再添加监测。</p>:<>
           <form className="my-4 space-y-2 rounded-lg border p-3" onSubmit={event=>{event.preventDefault();if(schedule&&!calendarEnabled){setError('当前服务尚未确认支持日历调度。');return;}void perform(async()=>{await readResult(await api.monitors.create({sessionId,name,content,intervalMinutes:minutes,...(schedule?{schedule}:{}),options}));setContent('');});}}>
@@ -81,6 +81,7 @@ export function MonitorPanel({sessionId,draft,options}:{sessionId:string|null;dr
             <p className="my-1 whitespace-pre-wrap text-sm">{row.content}</p>
             <p className="text-xs text-muted-foreground">{describeMonitorSchedule(row)}{row.status==='active'&&!row.running_id?` · 下次 ${formatMonitorNextRun(row)}`:''}</p>
             {row.last_error&&<p role="status" className="mt-1 text-xs text-amber-600">{row.last_error}</p>}
+            {row.status==='active'&&(row.consecutive_failures??0)>0&&<p className="mt-1 text-xs text-amber-600">连续失败 {row.consecutive_failures} 次 · 已安排自动恢复，下一轮先核对实际状态。</p>}
             <div className="mt-2 flex flex-wrap gap-2">
               {row.status==='active'&&<><button className={button} disabled={pending} onClick={()=>void perform(async()=>{await readResult(await api.monitors.action(row.id,'pause'));})}>暂停</button><button className={button} disabled={pending||Boolean(row.running_id)} onClick={()=>void perform(async()=>{await readResult(await api.monitors.action(row.id,'run-now'));})}>立即检查</button></>}
               {row.status==='paused'&&<button className={button} disabled={pending} onClick={()=>void perform(async()=>{await readResult(await api.monitors.action(row.id,'resume'));})}>恢复</button>}

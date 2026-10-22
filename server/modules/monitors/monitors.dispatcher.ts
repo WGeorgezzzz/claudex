@@ -23,7 +23,7 @@ export async function dispatchMonitors(runtime: ProviderRuntimeGateway,now=new D
     const job=(async () => {
       try {
         const session=sessionsDb.getSessionById(row.session_id);
-        if(!session || session.isArchived) throw new Error('会话已删除或归档，监测已暂停。');
+        if(!session || session.isArchived) {monitorsDb.pauseUnavailable(row.id);throw new Error('会话已删除或归档，监测已暂停。');}
         let providerError: string|null=null;
         let completed=false;
         // SDK adapters can report failure as an event without throwing. Keep the
@@ -47,7 +47,8 @@ export async function dispatchMonitors(runtime: ProviderRuntimeGateway,now=new D
           },
         });
         const result=await runDetachedChatTurn({sessionId:row.session_id,userId:row.user_id,
-          content:row.content,options:{...JSON.parse(row.options),cloudcliMonitorId:row.id},interruptActiveRun:false},{runtime:observedRuntime});
+          content:row.consecutive_failures>0?`上次监测失败或中断，结果未确认。请先核对实际状态，避免重复执行已有副作用的操作，再继续本轮检查。此前错误：${row.last_error??'未知'}\n\n${row.content}`:row.content,
+          options:{...JSON.parse(row.options),cloudcliMonitorId:row.id},interruptActiveRun:false},{runtime:observedRuntime});
         monitorsDb.finish(row.id,runId,providerError || result.error || (!result.started ? '本轮未能启动。' : !completed ? '模型未返回完成确认。' : null));
       } catch(error) {
         monitorsDb.finish(row.id,runId,(error instanceof Error?error.message:String(error)).slice(0,1000));

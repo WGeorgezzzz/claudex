@@ -221,5 +221,25 @@
     "markUnread": "Mark {{title}} unread",
     "pin": "Pin {{title}}",
     "unpin": "Unpin {{title}}"
+  },
+  "sections": {
+    "title": "Workspaces",
+    "manage": "Manage sections",
+    "close": "Close section manager",
+    "description": "Organize projects and conversations into sections. Removing a section keeps its projects, chats and running work.",
+    "newName": "New section name",
+    "create": "Create",
+    "rename": "Rename {{name}}",
+    "up": "Move {{name}} up",
+    "down": "Move {{name}} down",
+    "remove": "Remove section {{name}}",
+    "itemKind": "Item type",
+    "projects": "Projects",
+    "sessions": "Conversations",
+    "search": "Find a project or conversation",
+    "moveItem": "Section for {{name}}",
+    "unassigned": "Projects · unassigned",
+    "empty": "Add a project or conversation from Manage sections",
+    "more": "Load more conversations"
   }
 }

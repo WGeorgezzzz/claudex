@@ -31,6 +31,8 @@ import ChatComposer from '@/modules/chat/composer/ChatComposer';
 import CommandResultModal from '@/modules/chat/modals/CommandResultModal';
 import { useMessageQueue } from '@/modules/chat/composer/useMessageQueue';
 import { MessageQueuePanel } from '@/modules/chat/composer/MessageQueuePanel';
+import { NextPromptSuggestions } from '@/modules/chat/composer/NextPromptSuggestions';
+import { CrossSessionDialog } from '@/modules/chat/modals/CrossSessionDialog';
 
 type ChatInterfaceProps = {
   isSideChat?: boolean;
@@ -585,6 +587,8 @@ function ChatInterface({
           <MessageQueuePanel key={currentSessionId||selectedSession?.id||'new'} items={messageQueue.items}
             error={messageQueue.error} update={messageQueue.update} attempts={messageQueue.attempts}
             paused={messageQueue.paused} setPaused={messageQueue.setPaused}/>
+          {provider === 'claude' && <NextPromptSuggestions messages={displayMessages} busy={isProcessing} onInsert={insertComposerText}/>}
+          {provider === 'claude' && (currentSessionId || selectedSession?.id) && <CrossSessionDialog key={`bridge-${currentSessionId || selectedSession?.id}`} sourceSessionId={(currentSessionId || selectedSession?.id)!} draft={input} onInsert={insertComposerText}/>}
           <ChatComposer
           onSendLive={provider==='claude'&&isProcessing&&!editingAnchorId?()=>{void handleSubmit({preventDefault:()=>{}} as never,undefined,{forceLive:true});}:undefined}
           onQueue={currentSessionId||selectedSession?.id?()=>{void handleSubmit({preventDefault:()=>{}} as never,undefined,{forceQueue:true});}:undefined}

@@ -10,6 +10,7 @@ import SidebarHeader from '@/modules/sidebar/SidebarHeader';
 import SidebarProjectList from '@/modules/sidebar/SidebarProjectList';
 import SidebarRecentConversations from '@/modules/sidebar/SidebarRecentConversations';
 import { SessionWorkspacePanel } from '@/modules/sidebar/SessionWorkspacePanel';
+import { WorkspaceSections } from '@/modules/sidebar/WorkspaceSections';
 import { usePaletteOps } from '@/modules/command-palette';
 
 function HighlightedSnippet({ snippet, highlights }: { snippet: string; highlights: { start: number; end: number }[] }) {
@@ -691,7 +692,7 @@ export default function SidebarContent({
             </div>
           )
         ) : (
-          <SidebarProjectList {...projectListProps} />
+          <WorkspaceSections projectListProps={projectListProps} onSelect={onConversationResultClick}/>
         )}
       </ScrollArea>
 

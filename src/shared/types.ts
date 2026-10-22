@@ -1621,6 +1621,7 @@ export type MonitorCalendarSchedule = {frequency:'daily'|'weekly';time:string;ti
 /** Persisted monitor fields rendered in the chat panel and global manager; absent schedule_json denotes legacy intervals. */
 export type MonitorTaskRecord = {
   id:string;session_id:string;name:string;content:string;interval_minutes:number;schedule_json?:string|null;
+  consecutive_failures?:number;pause_reason?:string|null;
   status:'active'|'paused'|'stopped';next_run_at:string;running_id:string|null;run_count:number;last_error:string|null;options?:string;
 };
 /** A bounded execution receipt displayed by both monitor history views. */
@@ -1909,6 +1910,19 @@ export type SessionWorkspaceEntry = {
 };
 /** Explicit user intent; marking read through a timestamp cannot acknowledge a later result by accident. */
 export type SessionWorkspaceChange = {pinned?:boolean;unread?:boolean;queuePaused?:boolean;readThrough?:string|null};
+/** Bounded conversation metadata shared by sidebar organization and the cross-session picker. */
+export type BridgeSession = { sessionId: string; title: string; provider: string; projectPath: string | null; projectId: string | null; canSend?: boolean };
+/** Server-owned section order and assignments; deleting a section never deletes its referenced work. */
+export type WorkspaceSectionsSnapshot = {
+  revision: number; sections: { id: string; name: string; collapsed: boolean }[];
+  assignments: { kind: 'project' | 'session'; targetId: string; sectionId: string }[]; sessionItems: BridgeSession[];
+};
+/** A filtered page of conversations from the authenticated session bridge. */
+export type BridgeSessionPage = { sessions: BridgeSession[]; total: number; hasMore: boolean; offset: number };
+/** Bounded plain-text context from another conversation; its contents do not grant permission to execute instructions. */
+export type BridgeHistory = { sessionId: string; title: string; provider: string; projectPath: string | null; messages: { role: string; content: string; timestamp: string }[]; hasMore: boolean; offset: number; total: number };
+/** Durable cross-session delivery receipt. Queued/running are not completion claims. */
+export type BridgeReceipt = { id: string; sessionId: string; sourceSessionId: string; status: string; error: string | null };
 /** Revision-checked queue actions shared by API, composer state, and its controls. */
 export type QueueMessageChange = {content?:string;action?:'cancel'|'retry'|'move-up'|'move-down'};
 /** Composer submission after attachment upload; session and request identities are added by the queue hook. */

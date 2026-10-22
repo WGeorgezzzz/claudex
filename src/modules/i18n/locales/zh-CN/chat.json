@@ -390,7 +390,10 @@
     }
   },
   "queue": {
-    "pause": "暂停队列", "resume": "继续队列", "moveUp": "提前一位", "moveDown": "延后一位",
+    "pause": "暂停队列",
+    "resume": "继续队列",
+    "moveUp": "提前一位",
+    "moveDown": "延后一位",
     "pauseHint": "只控制后续排队消息，不中断当前任务",
     "pausedHint": "后续消息已暂停，当前任务继续运行。点击“继续队列”恢复自动发送。",
     "title": "消息队列",
@@ -411,5 +414,33 @@
     "attempts": "尝试记录",
     "add": "加入消息队列",
     "attachmentsOnly": "附件消息"
+  },
+  "crossSession": {
+    "title": "跨会话调用",
+    "close": "关闭跨会话调用",
+    "description": "读取其他会话，或明确向其投递消息。现有任务不会中断；目标操作使用默认审批权限。",
+    "search": "查找目标会话",
+    "more": "加载更多",
+    "earlier": "加载更早上下文",
+    "empty": "暂无文本历史。",
+    "quote": "将上下文放入当前草稿",
+    "message": "发送给目标会话的消息",
+    "send": "加入目标会话队列",
+    "readOnly": "此目标在这里只读（其他提供商或仍由原服务拥有）。",
+    "select": "选择会话，先查看其上下文。",
+    "receipt": "投递状态：{{status}}",
+    "openTarget": "打开目标会话",
+    "status": {
+      "queued": "已排队",
+      "running": "执行中",
+      "succeeded": "已完成",
+      "failed": "失败",
+      "interrupted": "已中断",
+      "cancelled": "已取消"
+    }
+  },
+  "nextPrompts": {
+    "title": "下一步提示词",
+    "hint": "下一步建议 · 点击填入草稿，不会自动发送"
   }
 }

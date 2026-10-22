@@ -5,7 +5,7 @@ import { messageQueueService } from '@/modules/message-queue/message-queue.servi
 import { AppError } from '@/shared/index.js';
 
 /** Authenticated queue routes use this service to persist delivery before writing to an owned Claude process. */
-export function createLiveInputService(runtime=providerRuntimeService) {
+export function createLiveInputService(runtime?: Pick<typeof providerRuntimeService, 'submitLiveInput'>) {
   return {
     current(sessionId: string) {
       const run=chatRunRegistry.getRun(sessionId);
@@ -21,7 +21,8 @@ export function createLiveInputService(runtime=providerRuntimeService) {
       try {
         const run=this.current(row.session_id);
         if (!Number.isFinite(input.expectedStartedAt) || run.startedAt!==input.expectedStartedAt) throw new Error('The active turn changed. Your addition was not sent; review and queue it instead.');
-        runtime.submitLiveInput('claude',row.session_id,claimed.run_id!,row.content,result=>{
+        // Resolve the default lazily: provider tools themselves can enqueue work.
+        (runtime??providerRuntimeService).submitLiveInput('claude',row.session_id,claimed.run_id!,row.content,result=>{
           messageQueueDb.finish(claimed,result.status,result.error);
         });
       } catch (reason) {

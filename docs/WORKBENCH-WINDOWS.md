@@ -1,4 +1,4 @@
-# Claudex 0.5.0 — Windows x64
+# Claudex 0.6.0 — Windows x64
 
 Claudex is an independently maintained Windows desktop project,
 based on upstream CloudCLI 1.37.5. It retains the upstream AGPL-3.0-or-later
@@ -6,7 +6,7 @@ license and notices.
 
 ## Install alongside an existing client
 
-Download `Claudex-0.5.0-win-x64.exe` and `SHA256SUMS.txt` from this
+Download `Claudex-0.6.0-win-x64.exe` and `SHA256SUMS.txt` from this
 release. The installer is currently **unsigned**. The package includes its own
 Node.js 22 runtime and backend dependencies; a global Node.js installation is
 not required to start the desktop app.
@@ -72,6 +72,21 @@ cancellation, explicit retries and execution records.
 - Old single-slot queued drafts are imported transactionally before dispatch.
 
 ## Build and verification
+
+Version 0.6 adds persistent sidebar sections for projects and individual sessions,
+cross-session search/read/quote/send with durable delivery receipts, and model-generated
+next prompts that only fill the composer when clicked. Sending to another Claude
+session requires explicit user authorization; forwarded messages and automatic monitor
+turns cannot authorize another forwarding chain. Imported sessions owned by the older
+service remain protected from sends.
+
+Monitor failures retain their failed receipts and retry after 1, 2, 4, 8, 16,
+then 30 minutes, capped at 30 minutes for subsequent failures. A successful run resets
+the backoff. Restart recovery records interrupted work and schedules another attempt;
+persisted retry times survive an idle restart. Manual pause/stop is preserved, and
+archived sessions pause with a reason. Recovery prompts ask the model to inspect
+existing effects before repeating work; this is not an exactly-once guarantee for
+external actions. Message-queue failures still require explicit retries.
 
 Version 0.5 adds daily and weekly calendar monitors with explicit IANA timezones,
 alongside existing completion-relative intervals. Configure them from the chat's

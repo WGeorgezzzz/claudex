@@ -6,6 +6,7 @@ import type { ChatMessage, ClaudePermissionSuggestion, PermissionGrantResult, LL
 import { formatUsageLimitText, stripProposedPlanEnvelope } from '@/modules/chat/utils/chatFormatting';
 import { ToolRenderer, ToolErrorDisplay, SubagentPanel, WorkflowPanel, shouldHideToolResult } from '@/modules/chat/tools';
 import { LLMProviderLogo } from '@/shared/ui';
+import { readClaudeNextPrompts } from '@/shared/utils';
 import { Reasoning, ReasoningContent, ReasoningTrigger } from '@/modules/chat/transcript/Reasoning';
 import ChatMessageImages from '@/modules/chat/transcript/ChatMessageImages';
 import ChatMessageFiles from '@/modules/chat/transcript/ChatMessageFiles';
@@ -58,12 +59,13 @@ const MessageComponent = memo(({ message, prevMessage, createDiff, onFileOpen, s
   const userCopyContent = String(message.content || '');
   const formattedMessageContent = useMemo(
     () => {
-      const content = formatUsageLimitText(String(message.content || ''));
+      const raw = formatUsageLimitText(String(message.content || ''));
+      const content = provider === 'claude' && message.type === 'assistant' && !message.isThinking && !message.isToolUse ? readClaudeNextPrompts(raw, Boolean(message.isStreaming)).content : raw;
       return provider === 'codex' && message.type === 'assistant' && !message.isThinking
         ? stripProposedPlanEnvelope(content)
         : content;
     },
-    [message.content, message.isThinking, message.type, provider]
+    [message.content, message.isThinking, message.isToolUse, message.isStreaming, message.type, provider]
   );
   const assistantCopyContent = message.isToolUse
     ? String(message.displayText || message.content || '')
