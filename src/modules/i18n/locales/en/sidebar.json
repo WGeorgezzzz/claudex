@@ -1,10 +1,23 @@
 {
   "workspace": {
-    "title": "Conversation workspace", "pinned": "Pinned", "unread": "Unread", "attention": "Attention",
-    "pin": "Pin conversation", "unpin": "Unpin conversation", "markRead": "Mark read", "markUnread": "Mark unread",
-    "retry": "Reload conversation state", "loadFailed": "Conversation state unavailable",
-    "waitingApproval": "{{count}} awaiting approval", "blocked": "{{count}} failed or unconfirmed messages", "paused": "Queue paused · {{count}} pending",
-    "empty": {"pinned": "Pin frequent conversations from their menu", "unread": "No unread conversations", "attention": "No conversations need attention"}
+    "title": "Conversation workspace",
+    "pinned": "Pinned",
+    "unread": "Unread",
+    "attention": "Attention",
+    "pin": "Pin conversation",
+    "unpin": "Unpin conversation",
+    "markRead": "Mark read",
+    "markUnread": "Mark unread",
+    "retry": "Reload conversation state",
+    "loadFailed": "Conversation state unavailable",
+    "waitingApproval": "{{count}} awaiting approval",
+    "blocked": "{{count}} failed or unconfirmed messages",
+    "paused": "Queue paused · {{count}} pending",
+    "empty": {
+      "pinned": "Pin frequent conversations from their menu",
+      "unread": "No unread conversations",
+      "attention": "No conversations need attention"
+    }
   },
   "projects": {
     "title": "Projects",
@@ -185,5 +198,28 @@
     "archiveSessions_other": "Archive {{count}} sessions",
     "archiveSessionsNotice_one": "Archive keeps the session out of the active list while preserving its history.",
     "archiveSessionsNotice_other": "Archive keeps the sessions out of the active list while preserving their history."
+  },
+  "inbox": {
+    "title": "Session inbox",
+    "description": "Unread, pinned and queued conversations across projects. Open a conversation to handle approvals or blocked work.",
+    "close": "Close inbox",
+    "filters": {
+      "all": "All inbox items",
+      "unread": "Unread",
+      "attention": "Needs attention",
+      "pinned": "Pinned"
+    },
+    "search": "Search title, project or provider",
+    "count": "{{count}} conversations",
+    "markVisibleRead": "Mark shown read ({{count}})",
+    "writeFailed": "Could not update {{count}} conversations. Failed items were kept; retry them.",
+    "empty": "No conversations match this view.",
+    "noProject": "No project",
+    "queued": "{{count}} queued",
+    "running": "{{count}} queue entries running",
+    "markRead": "Mark {{title}} read",
+    "markUnread": "Mark {{title}} unread",
+    "pin": "Pin {{title}}",
+    "unpin": "Unpin {{title}}"
   }
 }

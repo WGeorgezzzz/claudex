@@ -1,10 +1,23 @@
 {
   "workspace": {
-    "title": "会话工作台", "pinned": "置顶", "unread": "未读", "attention": "待处理",
-    "pin": "置顶会话", "unpin": "取消置顶", "markRead": "标记已读", "markUnread": "标记未读",
-    "retry": "重新加载会话状态", "loadFailed": "会话状态暂不可用",
-    "waitingApproval": "{{count}} 项等待确认", "blocked": "{{count}} 条失败或未确认消息", "paused": "队列已暂停 · {{count}} 条待发",
-    "empty": {"pinned": "从会话菜单置顶常用对话", "unread": "没有未读会话", "attention": "没有需要处理的会话"}
+    "title": "会话工作台",
+    "pinned": "置顶",
+    "unread": "未读",
+    "attention": "待处理",
+    "pin": "置顶会话",
+    "unpin": "取消置顶",
+    "markRead": "标记已读",
+    "markUnread": "标记未读",
+    "retry": "重新加载会话状态",
+    "loadFailed": "会话状态暂不可用",
+    "waitingApproval": "{{count}} 项等待确认",
+    "blocked": "{{count}} 条失败或未确认消息",
+    "paused": "队列已暂停 · {{count}} 条待发",
+    "empty": {
+      "pinned": "从会话菜单置顶常用对话",
+      "unread": "没有未读会话",
+      "attention": "没有需要处理的会话"
+    }
   },
   "projects": {
     "title": "项目",
@@ -176,5 +189,28 @@
     "archiveSessions_other": "归档 {{count}} 个会话",
     "archiveSessionsNotice_one": "归档会将所选会话移出活动列表，但保留其历史记录。",
     "archiveSessionsNotice_other": "归档会将所选会话移出活动列表，但保留其历史记录。"
+  },
+  "inbox": {
+    "title": "会话收件箱",
+    "description": "集中查看跨项目的未读、置顶和排队会话。打开会话后处理审批或阻塞任务。",
+    "close": "关闭收件箱",
+    "filters": {
+      "all": "全部收件项",
+      "unread": "未读",
+      "attention": "待处理",
+      "pinned": "置顶"
+    },
+    "search": "搜索标题、项目或提供商",
+    "count": "{{count}} 个会话",
+    "markVisibleRead": "将筛选结果标为已读（{{count}}）",
+    "writeFailed": "{{count}} 个会话更新失败，已保留原状态，请重试。",
+    "empty": "当前筛选下没有会话。",
+    "noProject": "无项目",
+    "queued": "{{count}} 条排队中",
+    "running": "{{count}} 条队列消息执行中",
+    "markRead": "将 {{title}} 标为已读",
+    "markUnread": "将 {{title}} 标为未读",
+    "pin": "置顶 {{title}}",
+    "unpin": "取消置顶 {{title}}"
   }
 }

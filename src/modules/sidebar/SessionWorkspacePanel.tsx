@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Bell, Mail, Pin, RefreshCw } from 'lucide-react';
 import { useSessionWorkspace } from '@/modules/sidebar/context/SessionWorkspaceContext';
+import { SessionInbox } from '@/modules/sidebar/modals/SessionInbox';
 
 /** SidebarContent places pinned, unread and actionable conversations above its existing project/search views. */
 export function SessionWorkspacePanel({onSelect}:{onSelect:(projectId:string|null,id:string,provider:string)=>void}) {
@@ -30,5 +31,6 @@ export function SessionWorkspacePanel({onSelect}:{onSelect:(projectId:string|nul
       <span className={`block truncate ${row.unread?'font-semibold':'font-normal'}`}>{row.unread?'● ':''}{row.title}</span>
       <span className="block truncate text-[10px] text-muted-foreground">{row.approvalCount>0?t('workspace.waitingApproval',{count:row.approvalCount}):row.blockedCount>0?t('workspace.blocked',{count:row.blockedCount}):row.queuePaused&&row.queuedCount>0?t('workspace.paused',{count:row.queuedCount}):row.projectPath||row.provider}</span>
     </a>)}</div>
+    <SessionInbox onSelect={onSelect}/>
   </section>;
 }
