@@ -15,6 +15,7 @@ Windows 安装包和校验值见 [Releases](https://github.com/WGeorgezzzz/claud
 - 运行中选择普通排队或发送文字补充；暂停队列只阻止下一条，不中断当前任务。
 - 从完整回复开启独立分支；回填主会话只写草稿，不自动发送。
 - 聊天文件链接支持预览、本地打开和绝对路径复制。
+- 自动监测支持间隔、每天或每周指定时间及 IANA 时区；忙时等待，失败暂停，不集中补跑停机期间错过的次数。
 
 [Windows 安装及升级](docs/WORKBENCH-WINDOWS.md) · [功能与边界](docs/CODEX-PARITY.zh-CN.md) · [历史验证记录](docs/FORK-VALIDATION.md)
 

@@ -5,3 +5,5 @@ export type { AnyRecord, ProviderRuntimeContext, ProviderRuntimeWriter } from '.
 export { getClaudeConfigDir, getClaudeConfigFile } from './utils.js';
 export { requireAuthenticatedUserId } from './utils.js';
 export { getCloudCliHomeDir } from './utils.js';
+export { parseMonitorCalendarSchedule, nextMonitorCalendarRun } from './utils.js';
+export type { MonitorCalendarSchedule } from './types.js';

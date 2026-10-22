@@ -35,3 +35,48 @@ test('pause action is bound to the displayed task and server errors stay visible
   assert.deepEqual(action.mock.calls[0],['task','pause']);
   await waitFor(()=>assert.ok(screen.getByRole('alert').textContent?.includes('服务不可用')));
 });
+
+test('creates a daily wall-clock task with explicit timezone and unchanged permissions',async()=>{
+  vi.spyOn(api.monitors,'list').mockResolvedValue(response([]));
+  vi.spyOn(api.monitors,'capabilities').mockResolvedValue(response({calendar:true,scheduleVersion:1}));
+  const create=vi.spyOn(api.monitors,'create').mockResolvedValue(response({id:'daily'}));
+  render(<MonitorPanel sessionId="session" draft="只读检查" options={{permissionMode:'default'}}/>);
+  fireEvent.click(screen.getByRole('button',{name:'定期监测'}));
+  await waitFor(()=>assert.equal((screen.getByRole('option',{name:'每天'}) as HTMLOptionElement).disabled,false));
+  fireEvent.change(screen.getByLabelText('重复方式'),{target:{value:'daily'}});
+  fireEvent.change(screen.getByLabelText('执行时间'),{target:{value:'09:30'}});
+  fireEvent.change(screen.getByLabelText('执行时区'),{target:{value:'Asia/Shanghai'}});
+  fireEvent.click(screen.getByRole('button',{name:'添加监测'}));
+  await waitFor(()=>assert.equal(create.mock.calls.length,1));
+  assert.deepEqual(create.mock.calls[0][0].schedule,{frequency:'daily',time:'09:30',timeZone:'Asia/Shanghai'});
+  assert.deepEqual(create.mock.calls[0][0].options,{permissionMode:'default'});
+});
+
+test('legacy server never receives a silently downgraded calendar task',async()=>{
+  vi.spyOn(api.monitors,'list').mockResolvedValue(response([]));
+  vi.spyOn(api.monitors,'capabilities').mockResolvedValue({ok:false,status:404,json:async()=>({})} as Response);
+  const create=vi.spyOn(api.monitors,'create');
+  render(<MonitorPanel sessionId="session" draft="检查" options={{}}/>);
+  fireEvent.click(screen.getByRole('button',{name:'定期监测'}));
+  assert.equal((screen.getByRole('option',{name:'每天'}) as HTMLOptionElement).disabled,true);
+  fireEvent.change(screen.getByLabelText('重复方式'),{target:{value:'daily'}});
+  fireEvent.click(screen.getByRole('button',{name:'添加监测'}));
+  await waitFor(()=>assert.match(screen.getByRole('alert').textContent||'',/尚未确认/));
+  assert.equal(create.mock.calls.length,0);
+});
+
+test('native time input remains selected after changing a weekly checkbox',async()=>{
+  vi.spyOn(api.monitors,'list').mockResolvedValue(response([]));
+  vi.spyOn(api.monitors,'capabilities').mockResolvedValue(response({calendar:true,scheduleVersion:1}));
+  const create=vi.spyOn(api.monitors,'create').mockResolvedValue(response({id:'weekly'}));
+  render(<MonitorPanel sessionId="session" draft="检查" options={{}}/>);
+  fireEvent.click(screen.getByRole('button',{name:'定期监测'}));
+  await waitFor(()=>assert.equal((screen.getByRole('option',{name:'每周'}) as HTMLOptionElement).disabled,false));
+  fireEvent.change(screen.getByLabelText('重复方式'),{target:{value:'weekly'}});
+  fireEvent.input(screen.getByLabelText('执行时间'),{target:{value:'09:15'}});
+  fireEvent.click(screen.getByRole('checkbox',{name:'周二'}));
+  assert.equal((screen.getByLabelText('执行时间') as HTMLInputElement).value,'09:15');
+  fireEvent.click(screen.getByRole('button',{name:'添加监测'}));
+  await waitFor(()=>assert.equal(create.mock.calls.length,1));
+  assert.equal((create.mock.calls[0][0].schedule as {time:string}).time,'09:15');
+});

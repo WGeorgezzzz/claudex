@@ -1647,10 +1647,15 @@ export type SandboxCommandService = {
 };
 
 //----------------- PERSISTENT MONITORS ------------
+/** Wall-clock recurrence used by the monitor service/repository. ISO weekdays are 1 (Monday) to 7 (Sunday). */
+export type MonitorCalendarSchedule = {
+  frequency: 'daily'|'weekly'; time: string; timeZone: string; weekdays?: number[];
+};
 /** Persisted monitor, shared by its repository, dispatcher and HTTP service. Times are ISO UTC instants. */
 export type MonitorRecord = {
   id: string; user_id: number; session_id: string; name: string; content: string; options: string;
   interval_minutes: number; status: 'active'|'paused'|'stopped'; next_run_at: string;
+  schedule_json: string|null;
   running_id: string|null; run_count: number; last_error: string|null; created_at: string;
 };
 /** One attempted monitor execution; interrupted runs require manual review instead of automatic replay. */

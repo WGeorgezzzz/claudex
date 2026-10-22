@@ -20,6 +20,7 @@ import type { NextFunction, Request, RequestHandler, Response } from 'express';
 
 import { parseFrontMatter } from '@/shared/frontmatter.js';
 import type {
+  MonitorCalendarSchedule,
   AnyRecord,
   ApiSuccessShape,
   AppErrorOptions,
@@ -1389,3 +1390,54 @@ export function getCloudCliHomeDir(): string {
   const override=process.env.CLOUDCLI_HOME?.trim();
   return override && path.isAbsolute(override)?override:path.join(os.homedir(),'.cloudcli');
 }
+
+//----------------- MONITOR CALENDAR SCHEDULING ------------
+/** Validates and canonicalizes HTTP/MCP calendar rules before the monitor repository persists them.
+ * Undefined/null retains interval scheduling. Weekly days are unique ISO weekdays; no server-timezone guess is made. */
+export function parseMonitorCalendarSchedule(input: unknown): MonitorCalendarSchedule|null {
+  if (input == null) return null;
+  const invalid = () => new AppError('日历调度需要每天/每周、HH:mm 时间、有效 IANA 时区，以及每周的执行日期。', {code:'INVALID_MONITOR_SCHEDULE',statusCode:400});
+  if (typeof input !== 'object' || Array.isArray(input)) throw invalid();
+  const row = input as Record<string, unknown>;
+  if (Object.keys(row).some(key => !['frequency','time','timeZone','weekdays'].includes(key)) ||
+    !['daily','weekly'].includes(String(row.frequency)) || typeof row.time !== 'string' || !/^([01]\d|2[0-3]):[0-5]\d$/.test(row.time) ||
+    typeof row.timeZone !== 'string' || !row.timeZone || row.timeZone.length > 100) throw invalid();
+  try { new Intl.DateTimeFormat('en', {timeZone:row.timeZone}).format(); } catch { throw invalid(); }
+  if (row.frequency === 'daily') {
+    if (row.weekdays !== undefined) throw invalid();
+    return {frequency:'daily',time:row.time,timeZone:row.timeZone};
+  }
+  if (!Array.isArray(row.weekdays) || !row.weekdays.length || row.weekdays.length > 7 ||
+      row.weekdays.some(day => !Number.isInteger(day) || day < 1 || day > 7)) throw invalid();
+  return {frequency:'weekly',time:row.time,timeZone:row.timeZone,weekdays:[...new Set(row.weekdays as number[])].sort((a,b)=>a-b)};
+}
+
+/** Returns the next strictly-future UTC instant for a monitor's local calendar rule.
+ * Nonexistent DST times are skipped. A repeated wall time runs only at its first occurrence.
+ * Call after completion/resume to avoid replaying missed days. No process-global timezone is changed. */
+export function nextMonitorCalendarRun(schedule: MonitorCalendarSchedule, after: Date): Date {
+  if (!Number.isFinite(after.getTime())) throw new Error('Invalid scheduling clock');
+  const formatter = new Intl.DateTimeFormat('en-GB', {timeZone:schedule.timeZone,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'});
+  const parts = (date: Date) => Object.fromEntries(formatter.formatToParts(date).filter(part=>part.type!=='literal').map(part=>[part.type,Number(part.value)]));
+  const today = parts(after);
+  const [hour,minute] = schedule.time.split(':').map(Number);
+  for (let day = 0; day <= 15; day++) {
+    const date = new Date(Date.UTC(today.year,today.month-1,today.day+day));
+    if (schedule.frequency==='weekly' && !schedule.weekdays?.includes(date.getUTCDay() || 7)) continue;
+    const wall = Date.UTC(date.getUTCFullYear(),date.getUTCMonth(),date.getUTCDate(),hour,minute);
+    const offsets = new Set<number>();
+    // Observe both offsets around any nearby DST transition, including half-hour changes.
+    for (let hours=-36; hours<=36; hours+=6) {
+      const probe = wall + hours*3600000, p = parts(new Date(probe));
+      offsets.add(Date.UTC(p.year,p.month-1,p.day,p.hour,p.minute,p.second)-probe);
+    }
+    const candidates = [...offsets].map(offset=>wall-offset).filter(instant=>{
+      const p=parts(new Date(instant));
+      return p.year===date.getUTCFullYear() && p.month===date.getUTCMonth()+1 && p.day===date.getUTCDate() && p.hour===hour && p.minute===minute;
+    }).sort((a,b)=>a-b);
+    // Never take the second occurrence after the first has already elapsed that day.
+    if (candidates[0] > after.getTime()) return new Date(candidates[0]);
+  }
+  throw new Error('No calendar occurrence found within the next fifteen days');
+}
+// ---------------------------

@@ -12,6 +12,9 @@ function userId(req: Request): number {
 
 /** Used by the server entrypoint behind its existing authentication middleware. */
 export const monitorsRoutes=express.Router();
+monitorsRoutes.get('/capabilities',asyncHandler(async(req,res)=>{
+  userId(req);res.json(createApiSuccessResponse({calendar:true,scheduleVersion:1}));
+}));
 monitorsRoutes.get('/',asyncHandler(async(req,res)=>{
   res.json(createApiSuccessResponse(monitorsService.list(userId(req),typeof req.query.sessionId==='string'?req.query.sessionId:undefined)));
 }));
@@ -26,9 +29,7 @@ monitorsRoutes.post('/:id/action',asyncHandler(async(req,res)=>{
 }));
 monitorsRoutes.patch('/:id',asyncHandler(async(req,res)=>{
   const body=req.body??{};
-  if(typeof body.name!=='string'||typeof body.content!=='string'||typeof body.intervalMinutes!=='number')
-    throw new AppError('请填写名称、检查内容和数字间隔。',{code:'INVALID_MONITOR',statusCode:400});
   res.json(createApiSuccessResponse(monitorsService.update(userId(req),String(req.params.id),{
-    name:body.name,content:body.content,intervalMinutes:body.intervalMinutes,
+    name:body.name,content:body.content,intervalMinutes:body.intervalMinutes,schedule:body.schedule,
   })));
 }));

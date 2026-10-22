@@ -5,7 +5,7 @@ import {
 } from '@/shared/authToken';
 import { IS_PLATFORM } from '@/shared/utils';
 import { readVoiceConfig, voiceConfigHeaders } from '@/shared/voiceConfig';
-import type { SessionWorkspaceChange } from '@/shared/types';
+import type { MonitorCalendarSchedule, SessionWorkspaceChange } from '@/shared/types';
 
 // Headers are a plain record rather than the full `HeadersInit` union so the
 // defaults below can be merged with a caller's headers by spreading.
@@ -314,7 +314,8 @@ export const api = {
     update: (id:string,body:SessionWorkspaceChange) => patch(`/api/session-workspace/${encodeURIComponent(id)}`,body),
   },
   monitors: {
-    update: (id: string, input: {name:string;content:string;intervalMinutes:number}) => patch('/api/monitors/' + encodeURIComponent(id), input),
+    capabilities: (options: ApiRequestOptions = {}) => get('/api/monitors/capabilities',options),
+    update: (id: string, input: {name:string;content:string;intervalMinutes:number;schedule?:MonitorCalendarSchedule|null}) => patch('/api/monitors/' + encodeURIComponent(id), input),
     list: (sessionId?: string) => get('/api/monitors' + (sessionId ? '?sessionId=' + encodeURIComponent(sessionId) : '')),
     create: (input: Record<string, unknown>) => post('/api/monitors', input),
     action: (id: string, action: string) => post('/api/monitors/' + encodeURIComponent(id) + '/action', {action}),

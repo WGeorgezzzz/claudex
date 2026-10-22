@@ -1,4 +1,4 @@
-# Claudex 0.4.0 — Windows x64
+# Claudex 0.5.0 — Windows x64
 
 Claudex is an independently maintained Windows desktop project,
 based on upstream CloudCLI 1.37.5. It retains the upstream AGPL-3.0-or-later
@@ -6,7 +6,7 @@ license and notices.
 
 ## Install alongside an existing client
 
-Download `Claudex-0.4.0-win-x64.exe` and `SHA256SUMS.txt` from this
+Download `Claudex-0.5.0-win-x64.exe` and `SHA256SUMS.txt` from this
 release. The installer is currently **unsigned**. The package includes its own
 Node.js 22 runtime and backend dependencies; a global Node.js installation is
 not required to start the desktop app.
@@ -72,6 +72,18 @@ cancellation, explicit retries and execution records.
 - Old single-slot queued drafts are imported transactionally before dispatch.
 
 ## Build and verification
+
+Version 0.5 adds daily and weekly calendar monitors with explicit IANA timezones,
+alongside existing completion-relative intervals. Configure them from the chat's
+monitor panel, the global monitor manager, or the session-scoped Claude monitor tool.
+The next execution is shown in the configured timezone. Nonexistent daylight-saving
+times are skipped; repeated times run at their first occurrence only. Resuming a
+calendar monitor schedules the next future slot. An overdue idle monitor catches up
+at most once when the service returns, rather than replaying every missed day.
+
+Tasks sharing one conversation are serialized before provider startup. Existing
+interval schedules retain their original timestamps during migration. Permissions
+are read from each task's stored settings, never assumed to be bypass mode.
 
 The `Claudex Windows installer` GitHub Actions workflow builds on a separate
 Windows runner, installs into a disposable directory, starts the installed

@@ -4,7 +4,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
-import { closeConnection, initializeDatabase, monitorsDb, sessionsDb, userDb } from '@/modules/database/index.js';
+import { closeConnection, getConnection, initializeDatabase, monitorsDb, sessionsDb, userDb } from '@/modules/database/index.js';
 import { monitorsService } from '@/modules/monitors/monitors.service.js';
 import { dispatchMonitors } from '@/modules/monitors/monitors.dispatcher.js';
 import { executeMonitorTool } from '@/modules/monitors/monitors.tools.js';
@@ -108,4 +108,58 @@ test('invalid intervals, archived/non-Claude sessions and foreign ownership are 
   for(const intervalMinutes of [0,-1,1.5,10081,'30'])assert.throws(()=>monitorsService.create(user,{sessionId:'monitor-session',name:'test',content:'status',intervalMinutes}));
   const row=create(user);assert.throws(()=>monitorsService.action(user+1,row.id,'stop'));assert.throws(()=>monitorsService.history(user+1,row.id));
   sessionsDb.createAppSession('other','codex',tmpdir(),'Other');assert.throws(()=>monitorsService.create(user,{sessionId:'other',name:'test',content:'status',intervalMinutes:1}));
+}));
+
+test('calendar monitor survives restart and completion moves to the next future slot without catch-up',()=>fixture(async user=>{
+  const schedule={frequency:'daily',time:'09:00',timeZone:'Asia/Shanghai'};
+  const row=monitorsService.create(user,{sessionId:'monitor-session',name:'Daily',content:'Read only',schedule});
+  assert.equal(row.schedule_json,JSON.stringify(schedule));
+  assert.ok(Date.parse(row.next_run_at)>Date.now());
+  closeConnection();await initializeDatabase();monitorsDb.recover();
+  assert.equal(monitorsDb.get(user,row.id)?.next_run_at,row.next_run_at);
+  const future=new Date(Date.parse(row.next_run_at)+3*86400000+3600000);
+  const runId=monitorsDb.claim(row.id,future)!;assert.ok(runId);
+  assert.equal(monitorsDb.claim(row.id,future),null);
+  monitorsDb.finish(row.id,runId,null,future);
+  const after=monitorsDb.get(user,row.id)!;
+  assert.equal(after.run_count,1);assert.ok(Date.parse(after.next_run_at)>future.getTime());
+  assert.equal(new Date(after.next_run_at).getUTCHours(),1);
+  assert.equal(monitorsDb.due(future).some(task=>task.id===row.id),false);
+}));
+
+test('calendar pause/resume skips missed times; update preserves cadence unless explicitly changed',()=>fixture(user=>{
+  const row=monitorsService.create(user,{sessionId:'monitor-session',name:'Daily',content:'Read',schedule:{frequency:'daily',time:'09:00',timeZone:'Asia/Shanghai'}});
+  const same=monitorsService.update(user,row.id,{name:'Renamed'});assert.equal(same.next_run_at,row.next_run_at);assert.equal(same.schedule_json,row.schedule_json);
+  monitorsService.action(user,row.id,'pause');monitorsService.action(user,row.id,'resume');
+  assert.ok(Date.parse(monitorsDb.get(user,row.id)!.next_run_at)>Date.now());
+  const interval=monitorsService.update(user,row.id,{schedule:null,intervalMinutes:10});
+  assert.equal(interval.schedule_json,null);assert.equal(interval.interval_minutes,10);
+  assert.ok(Math.abs(Date.parse(interval.next_run_at)-Date.now()-600000)<1000);
+}));
+
+test('adding calendar column does not rewrite legacy interval tasks or their next execution',()=>fixture(async user=>{
+  const row=create(user);getConnection().exec('ALTER TABLE monitors DROP COLUMN schedule_json');
+  closeConnection();await initializeDatabase();
+  const after=monitorsDb.get(user,row.id)!;
+  assert.equal(after.next_run_at,row.next_run_at);assert.equal(after.interval_minutes,row.interval_minutes);assert.equal(after.status,row.status);assert.equal(after.schedule_json,null);
+}));
+
+test('calendar MCP creation is idempotent and reports the actual permission mode',()=>fixture(user=>{
+  const context={userId:user,sessionId:'monitor-session'};
+  const args={action:'create',name:'Calendar',content:'Read',schedule:{frequency:'weekly',time:'09:00',timeZone:'Asia/Shanghai',weekdays:[5,1]}};
+  const first=executeMonitorTool(context,args) as {permissionMode:string};
+  executeMonitorTool(context,{...args,schedule:{...args.schedule,weekdays:[1,5]}});
+  assert.equal(monitorsDb.list(user).length,1);assert.equal(first.permissionMode,'default');
+}));
+
+test('simultaneous monitors cannot claim the same session before provider startup',()=>fixture(user=>{
+  const first=create(user),second=create(user),now=new Date(Date.now()+120000);
+  const run=monitorsDb.claim(first.id,now);assert.ok(run);
+  assert.equal(monitorsDb.claim(second.id,now),null);
+  assert.equal(monitorsDb.history(user,second.id).length,0);
+  sessionsDb.createAppSession('parallel-monitor','claude',tmpdir(),'Parallel');
+  const parallel=monitorsService.create(user,{sessionId:'parallel-monitor',name:'Parallel',content:'Read',intervalMinutes:1});
+  assert.ok(monitorsDb.claim(parallel.id,now));
+  monitorsDb.finish(first.id,run!,null,now);
+  assert.ok(monitorsDb.claim(second.id,now));
 }));

@@ -1615,6 +1615,17 @@ export type PaletteSessionEntry = {
   timestamp?: string | null;
 };
 
+//----------------- MONITOR CALENDAR CONTROLS ------------
+/** Wall-clock schedule shared by chat creation, dashboard editing and the monitor API. Weekdays use ISO 1–7. */
+export type MonitorCalendarSchedule = {frequency:'daily'|'weekly';time:string;timeZone:string;weekdays?:number[]};
+/** Persisted monitor fields rendered in the chat panel and global manager; absent schedule_json denotes legacy intervals. */
+export type MonitorTaskRecord = {
+  id:string;session_id:string;name:string;content:string;interval_minutes:number;schedule_json?:string|null;
+  status:'active'|'paused'|'stopped';next_run_at:string;running_id:string|null;run_count:number;last_error:string|null;options?:string;
+};
+/** A bounded execution receipt displayed by both monitor history views. */
+export type MonitorRunReceipt = {id:string;started_at:string;finished_at?:string|null;status:string;error:string|null};
+
 // ---------------------------
 
 /**

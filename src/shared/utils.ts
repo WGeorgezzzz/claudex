@@ -1,7 +1,27 @@
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
-import type { Project, ProjectSession, QuickSettingsTab, SlashCommand } from '@/shared/types';
+import type { MonitorCalendarSchedule, MonitorTaskRecord, Project, ProjectSession, QuickSettingsTab, SlashCommand } from '@/shared/types';
+
+//----------------- MONITOR PRESENTATION ------------
+/** Reads the persisted calendar rule for both monitor editors; legacy rows retain interval mode. */
+export function readMonitorSchedule(task:Pick<MonitorTaskRecord,'schedule_json'>):MonitorCalendarSchedule|null {
+  if(!task.schedule_json)return null;
+  try {return JSON.parse(task.schedule_json) as MonitorCalendarSchedule;}catch{return null;}
+}
+/** Names the recurrence and timezone used by chat and sidebar monitor summaries. */
+export function describeMonitorSchedule(task:Pick<MonitorTaskRecord,'schedule_json'|'interval_minutes'>):string {
+  const schedule=readMonitorSchedule(task);
+  if(!schedule)return `每 ${task.interval_minutes} 分钟`;
+  const days=['','周一','周二','周三','周四','周五','周六','周日'];
+  return `${schedule.frequency==='daily'?'每天':`每周 ${(schedule.weekdays??[]).map(day=>days[day]).join('、')}`} ${schedule.time} · ${schedule.timeZone}`;
+}
+/** Shows calendar executions in the configured timezone, while legacy intervals keep the viewer's local timezone. */
+export function formatMonitorNextRun(task:Pick<MonitorTaskRecord,'schedule_json'|'next_run_at'>):string {
+  const schedule=readMonitorSchedule(task);
+  try{return new Date(task.next_run_at).toLocaleString('zh-CN',schedule?{timeZone:schedule.timeZone}:undefined);}catch{return task.next_run_at;}
+}
+// ---------------------------
 
 //----------------- DEPLOYMENT MODE ------------
 

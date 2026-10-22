@@ -19,6 +19,7 @@ export async function dispatchMonitors(runtime: ProviderRuntimeGateway,now=new D
     }
     const runId=monitorsDb.claim(row.id,now);
     if(!runId) continue;
+    busySessions.add(row.session_id);
     const job=(async () => {
       try {
         const session=sessionsDb.getSessionById(row.session_id);

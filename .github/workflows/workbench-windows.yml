@@ -32,6 +32,8 @@ jobs:
           server/modules/side-chats/tests/side-chats.test.ts
           server/modules/message-queue/tests/message-queue.test.ts
           server/modules/providers/tests/claude-fork-boundary.test.ts
+          server/modules/monitors/tests/monitors.test.ts
+          server/modules/monitors/tests/calendar.test.ts
       - run: node --test electron/tests/workbench-profile.test.mjs
       - run: npm run build
       - run: node scripts/release/prepare-workbench.mjs
