@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { SendHorizonalIcon, SquareIcon } from 'lucide-react';
+import { ArrowUpIcon, SquareIcon } from 'lucide-react';
 
 import { cn } from '@/shared/utils';
 import { Button, Tooltip } from '@/shared/ui';
@@ -40,7 +40,7 @@ export const PromptInput = React.forwardRef<HTMLFormElement, PromptInputProps>(
           ref={ref}
           data-slot="prompt-input"
           className={cn(
-            'relative overflow-hidden rounded-xl border border-border/50 bg-card/80 shadow-sm backdrop-blur-sm transition-all duration-200 focus-within:border-primary/30 focus-within:shadow-md focus-within:ring-1 focus-within:ring-primary/15',
+            'relative rounded-2xl border border-border/70 bg-background shadow-sm transition-colors duration-150 focus-within:border-foreground/25',
             className
           )}
           {...props}
@@ -96,7 +96,7 @@ export const PromptInputTextarea = React.forwardRef<
     ref={ref}
     data-slot="prompt-input-textarea"
     className={cn(
-      'chat-input-placeholder block max-h-[40vh] w-full resize-none overflow-y-auto bg-transparent px-4 py-2 text-sm leading-6 text-foreground placeholder-muted-foreground/50 focus:outline-none sm:max-h-[300px]',
+      'chat-input-placeholder block min-h-[60px] max-h-[40vh] w-full resize-none overflow-y-auto rounded-t-2xl bg-transparent px-4 py-3 text-sm leading-6 text-foreground placeholder-muted-foreground/60 focus:outline-none sm:max-h-[300px]',
       className
     )}
     {...props}
@@ -114,7 +114,7 @@ export const PromptInputFooter = React.forwardRef<
   <div
     ref={ref}
     data-slot="prompt-input-footer"
-    className={cn('flex items-center justify-between border-t border-border/30 px-3 py-2', className)}
+    className={cn('flex items-center justify-between px-2.5 pb-2 pt-1', className)}
     {...props}
   />
 ));
@@ -212,11 +212,10 @@ export const PromptInputSubmit = React.forwardRef<HTMLButtonElement, PromptInput
         {children ?? (isActive ? (
           <SquareIcon className="h-3.5 w-3.5 fill-current" />
         ) : (
-          <SendHorizonalIcon className="h-4 w-4" />
+          <ArrowUpIcon className="h-4 w-4" />
         ))}
       </Button>
     );
   }
 );
 PromptInputSubmit.displayName = 'PromptInputSubmit';
-

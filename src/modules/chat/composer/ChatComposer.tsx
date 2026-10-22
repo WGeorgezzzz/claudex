@@ -10,7 +10,7 @@ import type {
   RefObject,
   TouchEvent,
 } from 'react';
-import { ListPlus, PaperclipIcon, MessageSquareIcon, XIcon, Loader2, ArrowUpIcon, PencilIcon } from 'lucide-react';
+import { ListPlus, PaperclipIcon, MessageSquareIcon, XIcon, Loader2, ArrowUpIcon, PencilIcon, Monitor } from 'lucide-react';
 
 import { useVoiceInput } from '@/modules/chat/hooks/useVoiceInput';
 import { useVoiceAvailable } from '@/modules/chat/hooks/useVoiceAvailable';
@@ -38,6 +38,7 @@ import { ScheduleMessagePopover } from '@/modules/chat/composer/ScheduleMessageP
 import { ScheduledMessageList } from '@/modules/chat/composer/ScheduledMessageList';
 import ComposerModelMenu from '@/modules/chat/composer/ComposerModelMenu';
 import ComposerPermissionMenu from '@/modules/chat/composer/ComposerPermissionMenu';
+import { ComposerActions } from '@/modules/chat/composer/ComposerActions';
 
 type MentionableFile = {
   name: string;
@@ -45,6 +46,7 @@ type MentionableFile = {
 };
 
 type ChatComposerProps = {
+  extraActions?: ReactNode;
   onQueue?: ()=>void;
   onSendLive?: ()=>void;
   compact?: boolean;
@@ -129,6 +131,7 @@ type ChatComposerProps = {
  * model/permission popovers that drive the next turn.
  */
 export default function ChatComposer({
+  extraActions,
   onQueue,
   onSendLive,
   compact = false,
@@ -152,7 +155,6 @@ export default function ChatComposer({
   modelsLoading,
   tokenBudget,
   onShowTokenUsage,
-  slashCommandsCount,
   onToggleCommandMenu,
   hasInput,
   onClearInput,
@@ -290,7 +292,7 @@ export default function ChatComposer({
     <div className="chat-composer-shell relative flex-shrink-0 px-2 pb-2 pt-0 sm:px-4 sm:pb-4 md:px-4 md:pb-6">
       {!hasPendingPermissions && (
         <div className="pointer-events-none absolute bottom-full left-1/2 z-10 w-[calc(100%-1rem)] max-w-[54.25rem] -translate-x-1/2 translate-y-px bg-transparent sm:w-[calc(100%-2rem)]">
-          <ActivityIndicator activity={activity} onAbort={onAbortSession} isInputFocused={isInputFocused} />
+          <ActivityIndicator activity={activity} onAbort={canQueueDraft ? onAbortSession : undefined} isInputFocused={isInputFocused} />
         </div>
       )}
 
@@ -390,7 +392,6 @@ export default function ChatComposer({
           status={isLoading ? 'streaming' : 'ready'}
           className={[
             isTextareaExpanded ? 'chat-input-expanded' : '',
-            hasActivityIndicator ? 'rounded-t-none' : '',
           ].filter(Boolean).join(' ')}
           {...getRootProps()}
         >
@@ -452,62 +453,45 @@ export default function ChatComposer({
             />
         </PromptInputBody>
 
-        <PromptInputFooter className="flex-wrap gap-y-1">
+        <PromptInputFooter className="gap-2">
           <PromptInputTools className="min-w-0">
+            <ComposerActions>
             <PromptInputButton
               tooltip={{ content: t('input.attachFiles') }}
               onClick={openAttachmentPicker}
               aria-label={t('input.attachFiles')}
             >
-              <PaperclipIcon />
+              <PaperclipIcon /><span>{t('input.attachFiles')}</span>
             </PromptInputButton>
-
-            {onVoiceTranscript && voiceAvailable && (
-              <VoiceInputButton state={voiceState} onToggle={voiceToggle} errorMsg={voiceError} />
-            )}
-
-            <TokenUsageSummary usage={tokenBudget} onClick={onShowTokenUsage} />
 
             <PromptInputButton
               tooltip={{ content: t('input.showAllCommands') }}
               onClick={onToggleCommandMenu}
-              className="relative"
+              aria-label={t('input.showAllCommands')}
             >
-              <MessageSquareIcon />
-              {slashCommandsCount > 0 && (
-                <span
-                  className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground"
-                >
-                  {slashCommandsCount}
-                </span>
-              )}
+              <MessageSquareIcon /><span>{t('input.showAllCommands')}</span>
             </PromptInputButton>
 
             {hasInput && (
               <PromptInputButton
                 tooltip={{ content: t('input.clearInput', { defaultValue: 'Clear input' }) }}
                 onClick={onClearInput}
-                className="hidden sm:flex"
+                aria-label={t('input.clearInput', { defaultValue: 'Clear input' })}
               >
-                <XIcon />
+                <XIcon /><span>{t('input.clearInput', { defaultValue: 'Clear input' })}</span>
               </PromptInputButton>
             )}
 
-          </PromptInputTools>
-
-          <div className="ml-auto flex max-w-full flex-wrap items-center justify-end gap-1.5 sm:gap-2">
-            {onSendLive&&<button type="button" aria-label={t('liveInput.send')} title={t('liveInput.hint')}
-              disabled={!input.trim()||attachedFiles.length>0} onClick={onSendLive}
-              className="rounded-lg border border-border px-2 py-1 text-xs hover:bg-muted disabled:opacity-40">{t('liveInput.send')}</button>}
             {!compact&&onQueue&&<button type="button" aria-label={t('queue.add')} title={t('queue.add')}
               disabled={!input.trim()&&attachedFiles.length===0} onClick={onQueue}
-              className="workspace-icon-button disabled:opacity-40"><ListPlus size={16}/></button>}
+              className="disabled:opacity-40"><ListPlus size={16}/><span>{t('queue.add')}</span></button>}
             {!compact && providerLabel.toLowerCase().includes('claude') && <MonitorPanel sessionId={monitorSessionId ?? null} draft={input} options={{model,effort,permissionMode}} />}
             {!compact && <ScheduleMessagePopover
               disabled={!input.trim()}
               onSchedule={onScheduleMessage}
             />}
-
+            {extraActions}
+            </ComposerActions>
             <ComposerModelMenu
               providerLabel={providerLabel}
               effort={effort}
@@ -518,14 +502,12 @@ export default function ChatComposer({
               onSelectModel={onSelectModel}
               modelsLoading={modelsLoading}
             />
-
-            <ComposerPermissionMenu
-              permissionMode={permissionMode}
-              permissionModes={availablePermissionModes}
-              onSelectPermissionMode={onSelectPermissionMode}
-              providerLabel={providerLabel}
-            />
-
+          </PromptInputTools>
+          <div className="ml-auto flex shrink-0 items-center gap-2">
+            {onSendLive&&<button type="button" aria-label={t('liveInput.send')} title={t('liveInput.hint')}
+              disabled={!input.trim()||attachedFiles.length>0} onClick={onSendLive}
+              className="rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-muted disabled:opacity-40">{t('liveInput.send')}</button>}
+            {onVoiceTranscript && voiceAvailable && <VoiceInputButton state={voiceState} onToggle={voiceToggle} errorMsg={voiceError} />}
             <PromptInputSubmit
               onClick={
                 canQueueDraft
@@ -553,7 +535,7 @@ export default function ChatComposer({
               }
               aria-label={submitAriaLabel}
               title={submitAriaLabel}
-              className="h-10 w-10 sm:h-10 sm:w-10"
+              className="h-8 w-8 rounded-full sm:h-8 sm:w-8"
             >
               {isTranscribing ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -563,15 +545,14 @@ export default function ChatComposer({
             </PromptInputSubmit>
           </div>
 
-          <div
-            className={`order-last hidden basis-full px-2 text-center text-xs leading-4 text-muted-foreground/50 transition-opacity duration-200 lg:block ${
-              input.trim() && !canQueueDraft ? 'opacity-0' : 'opacity-100'
-            }`}
-          >
-            {submitHint}
-          </div>
         </PromptInputFooter>
       </PromptInput>
+      <div className="composer-statusbar mt-1.5 flex min-w-0 items-center gap-2 px-1 text-[11px] text-muted-foreground">
+        <span className="flex shrink-0 items-center gap-1.5"><Monitor size={12}/>{t('ui.local')}</span>
+        <ComposerPermissionMenu permissionMode={permissionMode} permissionModes={availablePermissionModes} onSelectPermissionMode={onSelectPermissionMode} providerLabel={providerLabel}/>
+        <span className="ml-auto hidden truncate opacity-60 xl:block">{submitHint}</span>
+        <TokenUsageSummary usage={tokenBudget} onClick={onShowTokenUsage}/>
+      </div>
       </div>}
     </div>
   );

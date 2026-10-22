@@ -166,16 +166,19 @@ export default function ChangesView({
 
   return (
     <>
-      <CommitComposer
+      <details className="shrink-0 border-b border-border/60">
+        <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2 text-xs text-muted-foreground hover:bg-muted"><GitCommit size={14}/>{t('git:composer.title')}<span className="ml-auto">{t('git:composer.filesSelected',{count:selectedFiles.size})}</span></summary>
+        <CommitComposer
         isMobile={isMobile}
         projectPath={projectPath}
         selectedFileCount={selectedFiles.size}
-        isHidden={hasExpandedFiles}
+        isHidden={false}
         onCommit={commitSelectedFiles}
         onRequestConfirmation={onRequestConfirmation}
       />
 
-      {!gitStatus?.error && <FileStatusLegend isMobile={isMobile} />}
+        {!gitStatus?.error && <FileStatusLegend isMobile={isMobile} />}
+      </details>
 
       <div className="flex-1 overflow-y-auto">
         {isLoading ? (
@@ -217,7 +220,7 @@ export default function ChangesView({
         ) : (
           <div className={isMobile ? 'pb-4' : ''}>
             {/* STAGED section */}
-            <div className="flex items-center justify-between border-b border-border/60 bg-muted/30 px-3 py-1.5">
+            <div className={`${selectedFiles.size===0?'hidden':'flex'} items-center justify-between border-b border-border/60 bg-muted/30 px-3 py-1.5`}>
               <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 {t('git:changes.stagedCount', { n: selectedFiles.size })}
               </span>
@@ -234,9 +237,7 @@ export default function ChangesView({
                 </button>
               )}
             </div>
-            {selectedFiles.size === 0 ? (
-              <div className="px-3 py-2 text-xs italic text-muted-foreground">{t('git:changes.noStagedFiles')}</div>
-            ) : (
+            {selectedFiles.size > 0 && (
               <FileChangeList
                 gitStatus={gitStatus}
                 gitDiff={gitDiff}

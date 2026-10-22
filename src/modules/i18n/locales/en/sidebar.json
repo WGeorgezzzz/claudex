@@ -241,5 +241,20 @@
     "unassigned": "Projects · unassigned",
     "empty": "Add a project or conversation from Manage sections",
     "more": "Load more conversations"
+  },
+  "ui": {
+    "navigation": "Navigation",
+    "newChat": "New chat",
+    "searchChats": "Search chats",
+    "chats": "Chats",
+    "filterChats": "Filter chats",
+    "about": "About Claudex",
+    "view": {
+      "projects": "Projects",
+      "conversations": "Recent chats",
+      "running": "Running",
+      "archived": "Archived"
+    },
+    "quickSettings": "Quick settings"
   }
 }

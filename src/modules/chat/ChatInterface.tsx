@@ -588,8 +588,8 @@ function ChatInterface({
             error={messageQueue.error} update={messageQueue.update} attempts={messageQueue.attempts}
             paused={messageQueue.paused} setPaused={messageQueue.setPaused}/>
           {provider === 'claude' && <NextPromptSuggestions messages={displayMessages} busy={isProcessing} onInsert={insertComposerText}/>}
-          {provider === 'claude' && (currentSessionId || selectedSession?.id) && <CrossSessionDialog key={`bridge-${currentSessionId || selectedSession?.id}`} sourceSessionId={(currentSessionId || selectedSession?.id)!} draft={input} onInsert={insertComposerText}/>}
           <ChatComposer
+          extraActions={provider === 'claude' && (currentSessionId || selectedSession?.id) ? <CrossSessionDialog key={`bridge-${currentSessionId || selectedSession?.id}`} sourceSessionId={(currentSessionId || selectedSession?.id)!} draft={input} onInsert={insertComposerText}/> : undefined}
           onSendLive={provider==='claude'&&isProcessing&&!editingAnchorId?()=>{void handleSubmit({preventDefault:()=>{}} as never,undefined,{forceLive:true});}:undefined}
           onQueue={currentSessionId||selectedSession?.id?()=>{void handleSubmit({preventDefault:()=>{}} as never,undefined,{forceQueue:true});}:undefined}
           compact={isSideChat}

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, type Dispatch, type SetStateAction, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { SlidersHorizontal, X } from 'lucide-react';
 
 import { ChatInterface } from '@/modules/chat';
 import { FileTree } from '@/modules/file-tree';
@@ -131,8 +132,9 @@ function WorkspaceMain({
   });
   const splitPane = isClaude && !sideChatOpen && !isMobile && splitEnabled && !editingFile && !editorExpanded
     && ['shell', 'files', 'git', 'browser'].includes(activeTab);
-  const panelClass = splitPane ? 'h-full min-w-0 shrink-0 overflow-hidden border-l border-border' : 'h-full w-full overflow-hidden';
+  const panelClass = splitPane ? 'workspace-pane flex h-full min-w-0 shrink-0 flex-col overflow-hidden border-l border-border' : 'h-full w-full overflow-hidden';
   const panelStyle = splitPane ? { width: `${workspaceSplit.percent}%` } : undefined;
+  const paneHeader=splitPane?<div className="flex h-9 shrink-0 items-center justify-between border-b border-border/60 px-3 text-xs text-muted-foreground"><span>{t(`ui.panes.${activeTab}`)}</span><button type="button" className="workspace-icon-button" aria-label={t('desktop.closePane')} onClick={()=>setActiveTab('chat')}><X size={14}/></button></div>:null;
   const openWorkspaceFile = useCallback((filePath: string) => {
     if (handleFileOpen(filePath) && isClaude) setActiveTab('chat');
   }, [handleFileOpen, isClaude, setActiveTab]);
@@ -204,10 +206,9 @@ function WorkspaceMain({
         claudeLayout={isClaude}
         onOpenSideChat={isClaude && selectedSession ? openSelectedSideChat : undefined}
         sideChatOpen={sideChatOpen}
-      />
-
-      {isClaude && (
-        <div className="workspace-view-options flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2 border-b border-border/50 px-5 py-2 text-xs text-muted-foreground" data-testid="claude-workspace-controls">
+        displayOptions={isClaude&&<details className="workspace-display-menu relative shrink-0 self-end sm:self-center">
+          <summary aria-label={t('ui.displayOptions')} title={t('ui.displayOptions')} className="workspace-icon-button cursor-pointer list-none"><SlidersHorizontal size={16}/></summary>
+          <div className="workspace-view-options absolute right-0 top-full z-50 mt-2 flex w-56 flex-col gap-3 rounded-xl border border-border bg-popover p-3 text-xs text-muted-foreground shadow-lg" data-testid="claude-workspace-controls">
           {!isMobile && <label className="flex items-center gap-1.5"><input type="checkbox" checked={splitEnabled} onChange={event => {
             setSplitEnabled(event.target.checked);
             localStorage.setItem('claude-workspace-split', String(event.target.checked));
@@ -218,8 +219,9 @@ function WorkspaceMain({
             if (editingFile) handleCloseEditor();
             else setActiveTab('chat');
           }}>{t('desktop.closePane', 'Close pane')}</button>}
-        </div>
-      )}
+          </div>
+        </details>}
+      />
 
       <div className="relative flex min-h-0 flex-1 overflow-hidden">
         <div ref={workspaceSplit.containerRef} className={`flex min-h-0 min-w-[200px] ${splitPane ? 'flex-row' : 'flex-col'} overflow-hidden ${editorExpanded && !sideChatOpen ? 'hidden' : ''} flex-1`}>
@@ -251,6 +253,7 @@ function WorkspaceMain({
             className="w-1 shrink-0 cursor-col-resize touch-none bg-border hover:bg-primary focus-visible:bg-primary focus-visible:outline-none" />}
           {activeTab === 'files' && (
             <div className={panelClass} style={panelStyle} data-claude-side-pane={isClaude || undefined}>
+              {paneHeader}
               <FileTree
                 selectedProject={selectedProject}
                 onFileOpen={openWorkspaceFile}
@@ -261,6 +264,7 @@ function WorkspaceMain({
 
           {(activeTab === 'shell' || (isClaude && terminalProjectId === selectedProject.projectId)) && (
             <div className={activeTab === 'shell' ? panelClass : 'hidden'} style={panelStyle} data-claude-side-pane={isClaude || undefined}>
+              {paneHeader}
               <StandaloneShell
                 key={selectedProject.projectId}
                 project={selectedProject}
@@ -274,6 +278,7 @@ function WorkspaceMain({
 
           {activeTab === 'git' && (
             <div className={panelClass} style={panelStyle} data-claude-side-pane={isClaude || undefined}>
+              {paneHeader}
               <GitPanel
                 selectedProject={selectedProject}
                 isMobile={isMobile}
@@ -288,6 +293,7 @@ function WorkspaceMain({
 
           {shouldShowBrowserTab && activeTab === 'browser' && (
             <div className={panelClass} style={panelStyle} data-claude-side-pane={isClaude || undefined}>
+              {paneHeader}
               <BrowserUsePanel isVisible={activeTab === 'browser'} onShowSettings={onShowSettings} />
             </div>
           )}

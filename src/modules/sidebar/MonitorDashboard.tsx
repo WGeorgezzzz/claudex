@@ -37,8 +37,8 @@ export function MonitorDashboard(){
   const button='rounded-md border px-3 py-1.5 text-sm hover:bg-muted disabled:opacity-40';
   const statuses:Record<string,string>={active:'已启用',paused:'已暂停',stopped:'已停止',succeeded:'完成',failed:'失败',interrupted:'中断',running:'运行中'};
   return <>
-    <button type="button" onClick={()=>setOpen(true)} aria-label={`自动监测，${active} 个已启用`} className="mt-2 flex w-full items-center gap-2 rounded-xl border border-primary/30 bg-primary/5 px-3 py-2.5 text-left text-sm font-medium text-foreground hover:bg-primary/10">
-      <Repeat className="h-4 w-4 text-primary"/><span>自动监测</span><span className="ml-auto rounded-full bg-primary/15 px-2 text-xs text-primary">{error?'连接异常':`${active} 个已启用`}</span>
+    <button type="button" onClick={()=>setOpen(true)} aria-label={`自动监测，${active} 个已启用`} className="sidebar-nav-action">
+      <Repeat className="h-4 w-4"/><span>自动监测</span>{(error||active>0)&&<span className="ml-auto text-[11px] text-muted-foreground">{error?'连接异常':active}</span>}
     </button>
     {open&&createPortal(<div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/40 p-4" onClick={e=>{if(e.target===e.currentTarget)setOpen(false);}}>
       <section role="dialog" aria-modal="true" aria-label="自动监测管理" className="flex max-h-[90vh] w-full max-w-3xl flex-col rounded-xl border bg-background text-foreground shadow-xl">

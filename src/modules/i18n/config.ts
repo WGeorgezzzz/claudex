@@ -56,6 +56,7 @@ import zhSettings from '@/modules/i18n/locales/zh-CN/settings.json';
 import zhAuth from '@/modules/i18n/locales/zh-CN/auth.json';
 import zhSidebar from '@/modules/i18n/locales/zh-CN/sidebar.json';
 import zhChat from '@/modules/i18n/locales/zh-CN/chat.json';
+import zhGit from '@/modules/i18n/locales/zh-CN/git.json';
 import zhCodeEditor from '@/modules/i18n/locales/zh-CN/codeEditor.json';
 import zhTasks from '@/modules/i18n/locales/zh-CN/tasks.json';
 import jaCommon from '@/modules/i18n/locales/ja/common.json';
@@ -223,6 +224,7 @@ git: enGit,
         auth: zhAuth,
         sidebar: zhSidebar,
         chat: zhChat,
+        git: zhGit,
         codeEditor: zhCodeEditor,
         tasks: zhTasks,
       },

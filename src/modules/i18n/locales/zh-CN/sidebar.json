@@ -232,5 +232,20 @@
     "unassigned": "项目 · 未分区",
     "empty": "从“管理分区”加入项目或会话",
     "more": "加载更多会话"
+  },
+  "ui": {
+    "navigation": "导航",
+    "newChat": "新建对话",
+    "searchChats": "搜索对话",
+    "chats": "对话",
+    "filterChats": "筛选对话",
+    "about": "关于 Claudex",
+    "view": {
+      "projects": "项目",
+      "conversations": "最近对话",
+      "running": "运行中",
+      "archived": "已归档"
+    },
+    "quickSettings": "快捷设置"
   }
 }

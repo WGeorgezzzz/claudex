@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Bell, Mail, Pin, RefreshCw } from 'lucide-react';
+
 import { useSessionWorkspace } from '@/modules/sidebar/context/SessionWorkspaceContext';
 import { SessionInbox } from '@/modules/sidebar/modals/SessionInbox';
 
@@ -13,7 +14,7 @@ export function SessionWorkspacePanel({onSelect}:{onSelect:(projectId:string|nul
   const filters={pinned:state.entries.filter(row=>row.pinnedAt!==null),unread:state.entries.filter(row=>row.unread),
     attention:state.entries.filter(row=>row.blockedCount>0||row.approvalCount>0||(row.queuePaused&&row.queuedCount>0))};
   const rows=[...filters[mode]].sort((a,b)=>mode==='pinned'?(b.pinnedAt??0)-(a.pinnedAt??0):String(b.lastActivityAt??'').localeCompare(String(a.lastActivityAt??'')));
-  return <section className="mx-2 mb-2 rounded-lg border border-border/60 p-1" aria-label={t('workspace.title')}>
+  return <section className="sidebar-session-workspace mx-2 mb-3 p-1" aria-label={t('workspace.title')}>
     <div className="flex gap-1">{(['pinned','unread','attention'] as const).map(key=>{
       const Icon=key==='pinned'?Pin:key==='unread'?Mail:Bell;
       return <button key={key} type="button" aria-pressed={mode===key} aria-label={t(`workspace.${key}`)}
@@ -22,7 +23,7 @@ export function SessionWorkspacePanel({onSelect}:{onSelect:(projectId:string|nul
     })}</div>
     {state.error&&<div role="alert" className="flex items-center gap-1 px-2 py-1 text-xs text-destructive"><span>{t('workspace.loadFailed')}</span>
       <button aria-label={t('workspace.retry')} onClick={()=>void state.refresh()}><RefreshCw size={12}/></button></div>}
-    {state.ready&&rows.length===0&&<p className="px-2 py-2 text-[11px] text-muted-foreground">{t(`workspace.empty.${mode}`)}</p>}
+    {state.ready&&rows.length===0&&mode!=='pinned'&&<p className="px-2 py-2 text-[11px] text-muted-foreground">{t(`workspace.empty.${mode}`)}</p>}
     <div className="max-h-52 overflow-y-auto">{rows.map(row=><a key={row.sessionId} href={`/session/${encodeURIComponent(row.sessionId)}`}
       className="block rounded px-2 py-1.5 text-xs hover:bg-muted" onClick={event=>{
         if(event.button!==0||event.ctrlKey||event.metaKey||event.shiftKey||event.altKey)return;

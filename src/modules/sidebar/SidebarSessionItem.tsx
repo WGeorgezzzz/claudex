@@ -387,9 +387,9 @@ function SidebarSessionItem({
           aria-disabled={isSelecting && !isSelectable ? true : undefined}
           className={cn(
             buttonVariants({ variant: 'ghost' }),
-            'h-auto w-full justify-start rounded-md border bg-card p-2 text-left font-normal transition-all duration-150',
+            'h-8 w-full justify-start rounded-md border-0 bg-transparent px-2 py-1 text-left font-normal transition-colors duration-150',
             isSelecting ? 'pr-2' : 'pr-11',
-            isSelected ? 'border-primary/20 bg-primary/5' : 'border-border/30',
+            isSelected ? 'bg-foreground/[0.06]' : '',
             !isSelected && isProcessing
               ? 'border-border/60 bg-muted/20 hover:bg-muted/25'
               : !isSelected && sessionView.isActive
@@ -416,14 +416,9 @@ function SidebarSessionItem({
         >
           <div className="flex w-full min-w-0 items-center gap-2">
             {selectionIcon}
-            <div
-              className={cn(
-                'flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md',
-                isSelected ? 'bg-primary/10' : 'bg-muted/50',
-              )}
-            >
+            {session.__provider!=='claude'&&<div className="flex h-4 w-4 flex-shrink-0 items-center justify-center">
               <LLMProviderLogo provider={session.__provider} className="h-3 w-3" />
-            </div>
+            </div>}
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
                 <div
@@ -455,9 +450,6 @@ function SidebarSessionItem({
                     {compactSessionAge}
                   </span>
                 )}
-              </div>
-              <div className="mt-0.5 flex items-center">
-                {sessionView.messageCount > 0 && <Badge variant="secondary" className="px-1 py-0 text-xs">{sessionView.messageCount}</Badge>}
               </div>
             </div>
           </div>

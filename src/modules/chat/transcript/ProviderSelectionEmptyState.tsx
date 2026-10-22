@@ -187,7 +187,7 @@ export default function ProviderSelectionEmptyState({
       <div className="flex h-full items-center justify-center px-4">
         <div className="w-full max-w-[34.25rem]">
           <div className="mb-8 text-center">
-            <h2 className="text-lg font-semibold tracking-tight text-foreground sm:text-xl">
+            <h2 className="text-2xl font-semibold tracking-tight text-foreground sm:text-[28px]">
               {provider === 'claude' ? t('providerSelection.claudeTitle', 'What would you like to work on?') : t("providerSelection.title")}
             </h2>
             <p className="mt-1 text-[13px] text-muted-foreground">
@@ -198,7 +198,7 @@ export default function ProviderSelectionEmptyState({
           <Dialog open={dialogOpen} onOpenChange={setPickerOpen}>
             <DialogTrigger asChild>
               <Card
-                className="group mx-auto max-w-xs cursor-pointer border-border/60 transition-all duration-150 hover:border-border hover:shadow-md active:scale-[0.99]"
+                className="group mx-auto max-w-xs cursor-pointer border-0 bg-transparent shadow-none transition-colors hover:bg-muted/50"
                 role="button"
                 tabIndex={0}
               >

@@ -442,5 +442,17 @@
   "nextPrompts": {
     "title": "下一步提示词",
     "hint": "下一步建议 · 点击填入草稿，不会自动发送"
+  },
+  "ui": {
+    "addContext": "添加上下文和操作",
+    "moreActions": "对话操作",
+    "local": "本地",
+    "displayOptions": "显示选项",
+    "panes": {
+      "git": "变更审阅",
+      "files": "文件",
+      "shell": "终端",
+      "browser": "浏览器"
+    }
   }
 }

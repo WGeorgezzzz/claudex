@@ -73,10 +73,10 @@ export function WorkspaceSections({ projectListProps, onSelect }: { projectListP
           {section.collapsed ? <ChevronRight size={13}/> : <ChevronDown size={13}/>}<span className="min-w-0 flex-1 truncate text-left">{section.name}</span><span className="text-muted-foreground">{projects.length + sessions.length}</span>
         </button>
         {!section.collapsed && <>{projects.length > 0 && <SidebarProjectList {...listProps} projects={projects} filteredProjects={projects}/>}
-          {sessions.map(session => <a key={session.sessionId} href={`/session/${encodeURIComponent(session.sessionId)}`} className={`mx-3 block rounded px-2 py-2 text-xs hover:bg-muted ${projectListProps.selectedSession?.id === session.sessionId ? 'bg-muted' : ''}`} onClick={event => {
+          {sessions.map(session => <a key={session.sessionId} title={session.projectPath||session.provider} href={`/session/${encodeURIComponent(session.sessionId)}`} className={`mx-3 block rounded px-2 py-2 text-[13px] hover:bg-muted ${projectListProps.selectedSession?.id === session.sessionId ? 'bg-muted' : ''}`} onClick={event => {
             if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
             event.preventDefault(); onSelect(session.projectId, session.sessionId, session.provider);
-          }}><span className="block truncate">{projectListProps.activeSessions.has(session.sessionId) ? '◌ ' : workspace?.byId.get(session.sessionId)?.unread ? '● ' : ''}{session.title}</span><span className="block truncate text-[10px] text-muted-foreground">{session.projectPath || session.provider}</span></a>)}
+          }}><span className="block truncate">{projectListProps.activeSessions.has(session.sessionId) ? '◌ ' : workspace?.byId.get(session.sessionId)?.unread ? '● ' : ''}{session.title}</span></a>)}
           {projects.length + sessions.length === 0 && <p className="mx-5 py-2 text-[11px] text-muted-foreground">{t('sections.empty')}</p>}
         </>}
       </section>;

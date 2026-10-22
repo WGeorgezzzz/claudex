@@ -541,5 +541,17 @@
   "nextPrompts": {
     "title": "Suggested next prompts",
     "hint": "Next steps · click to add to your draft"
+  },
+  "ui": {
+    "addContext": "Add context and actions",
+    "moreActions": "Chat actions",
+    "local": "Local",
+    "displayOptions": "Display options",
+    "panes": {
+      "git": "Changes",
+      "files": "Files",
+      "shell": "Terminal",
+      "browser": "Browser"
+    }
   }
 }

@@ -39,7 +39,7 @@ export default function GitViewTabs({ activeView, isHidden, changeCount, onChang
             role="tab"
             aria-selected={activeView === id}
             onClick={() => onChange(id)}
-            className={`min-w-max flex-none snap-start px-4 py-2 text-sm font-medium transition-colors sm:min-w-0 sm:flex-1 ${
+            className={`min-w-max flex-none snap-start whitespace-nowrap px-3 py-2 text-xs font-medium transition-colors ${
               activeView === id
                 ? 'border-b-2 border-primary text-primary'
                 : 'text-muted-foreground hover:text-foreground'

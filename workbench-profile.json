@@ -1,6 +1,6 @@
 {
   "productName": "Claudex",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "appId": "io.github.wgeorgezzzz.cloudcli-workbench",
   "protocol": "cloudcli-workbench",
   "storageFolder": "CloudCLI Workbench",

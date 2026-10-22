@@ -1,4 +1,4 @@
-# Claudex 0.6.0 — Windows x64
+# Claudex 0.7.0 — Windows x64
 
 Claudex is an independently maintained Windows desktop project,
 based on upstream CloudCLI 1.37.5. It retains the upstream AGPL-3.0-or-later
@@ -6,7 +6,7 @@ license and notices.
 
 ## Install alongside an existing client
 
-Download `Claudex-0.6.0-win-x64.exe` and `SHA256SUMS.txt` from this
+Download `Claudex-0.7.0-win-x64.exe` and `SHA256SUMS.txt` from this
 release. The installer is currently **unsigned**. The package includes its own
 Node.js 22 runtime and backend dependencies; a global Node.js installation is
 not required to start the desktop app.
@@ -72,6 +72,18 @@ cancellation, explicit retries and execution records.
 - Old single-slot queued drafts are imported transactionally before dispatch.
 
 ## Build and verification
+
+Version 0.7 reorganizes the core desktop interface around a compact navigation
+sidebar, a single conversation header, centered transcript and composer, and
+independently closable side panels. Secondary composer actions are under **+**;
+model selection stays inside the composer, with permissions and context usage
+below it. Display options move to the header, and quick settings to the sidebar
+footer. Empty queues no longer occupy a panel, while pending, failed and paused
+states remain visible. Completed queue records stay available in a disclosure.
+The changes panel prioritizes file review, with commit controls available on
+demand. Chinese source-control labels and responsive light/dark layouts are included.
+These are interface changes; existing provider ownership, queues, monitor scheduling
+and approval behavior remain in place.
 
 Version 0.6 adds persistent sidebar sections for projects and individual sessions,
 cross-session search/read/quote/send with durable delivery receipts, and model-generated

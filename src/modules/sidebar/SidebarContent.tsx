@@ -11,7 +11,6 @@ import SidebarProjectList from '@/modules/sidebar/SidebarProjectList';
 import SidebarRecentConversations from '@/modules/sidebar/SidebarRecentConversations';
 import { SessionWorkspacePanel } from '@/modules/sidebar/SessionWorkspacePanel';
 import { WorkspaceSections } from '@/modules/sidebar/WorkspaceSections';
-import { usePaletteOps } from '@/modules/command-palette';
 
 function HighlightedSnippet({ snippet, highlights }: { snippet: string; highlights: { start: number; end: number }[] }) {
   const parts: ReactNode[] = [];
@@ -180,7 +179,6 @@ export default function SidebarContent({
   projectListProps,
   t,
 }: SidebarContentProps) {
-  const {openSessionSwitcher} = usePaletteOps();
   const showConversationSearch = searchMode === 'conversations' && searchFilter.trim().length >= 2;
   const hasSearchResults = Boolean(
     conversationResults
@@ -216,9 +214,6 @@ export default function SidebarContent({
         t={t}
       />
 
-      <button type="button" className="mx-3 mb-2 flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-xs text-muted-foreground hover:bg-muted" onClick={openSessionSwitcher}>
-        <Search size={14}/><span className="flex-1 text-left">{t('commandPalette.switchSession', {ns: 'common'})}</span><kbd>Ctrl/⌘ ⇧ K</kbd>
-      </button>
       <ScrollArea className="flex-1 overflow-y-auto overscroll-contain md:px-1.5 md:py-2">
         {!searchFilter.trim()&&<SessionWorkspacePanel onSelect={onConversationResultClick}/>}
         {showConversationSearch ? (

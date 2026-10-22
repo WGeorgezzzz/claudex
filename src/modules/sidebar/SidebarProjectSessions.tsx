@@ -127,7 +127,7 @@ export default function SidebarProjectSessions({
       : t('sessions.selectAll');
 
   return (
-    <div className="ml-3 space-y-1 border-l border-border pl-3">
+    <div className="sidebar-project-sessions ml-3 space-y-0.5 pl-2">
       {isCompact ? (
         <div className="px-3 pb-1 pt-1">
           <button
@@ -145,7 +145,7 @@ export default function SidebarProjectSessions({
         <Button
           variant="default"
           size="sm"
-          className="flex h-8 w-full justify-start gap-2 bg-primary text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+          className="flex h-7 w-full justify-start gap-2 bg-transparent text-xs font-normal text-muted-foreground shadow-none transition-colors hover:bg-muted hover:text-foreground"
           onClick={() => onNewSession(project)}
         >
           <Plus className="h-3 w-3" />

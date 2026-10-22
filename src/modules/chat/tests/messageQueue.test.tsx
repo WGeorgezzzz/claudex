@@ -38,6 +38,13 @@ beforeEach(()=>{
 });
 afterEach(()=>{vi.unstubAllGlobals();localStorage.clear();});
 
+test('empty idle queues take no composer space while paused queues remain actionable',()=>{
+  const view=render(<MessageQueuePanel items={[]} error="" update={vi.fn()} paused={false}/>);
+  assert.equal(view.container.textContent,'');
+  view.rerender(<MessageQueuePanel items={[]} error="" update={vi.fn()} paused setPaused={vi.fn()}/>);
+  assert.ok(screen.getByRole('button',{name:/Resume queue|继续队列/}));
+});
+
 test('queue controls pause future dispatch and only reorder adjacent pending entries',async()=>{
   const update=vi.fn().mockResolvedValue(undefined),pause=vi.fn().mockResolvedValue(undefined);
   render(<MessageQueuePanel items={[{...item,id:'running',status:'running'},item,{...item,id:'two',content:'Second'}]}

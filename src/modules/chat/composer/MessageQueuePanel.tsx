@@ -33,15 +33,16 @@ export function MessageQueuePanel({items,error,update,attempts,paused=null,setPa
     try {await update(item,body);setEditing(null);} catch {/* The hook retains the visible error and edit text. */}
     finally {setPending(false);}
   };
-  if (!items.length && !error && paused===null) return null;
-  return <section aria-label={t('queue.title')} className="mx-4 mb-2 rounded-xl border border-border bg-muted/20 text-xs">
-    <div className="flex items-center gap-2 px-3 py-2"><ListOrdered size={14}/><span className="font-medium">{t('queue.title')}</span>
+  if (!items.length && !error && !paused) return null;
+  const needsAttention=active.length>0||Boolean(error)||Boolean(paused);
+  return <section aria-label={t('queue.title')} className={`queue-panel mx-auto mb-2 w-[calc(100%-2rem)] max-w-[52.25rem] rounded-xl text-xs ${needsAttention?'border border-border bg-muted/20':'text-muted-foreground'}`}>
+    {needsAttention&&<div className="flex items-center gap-2 px-3 py-2"><ListOrdered size={14}/><span className="font-medium">{t('queue.title')}</span>
       <span className="text-muted-foreground">{active.length}</span>
       {paused!==null&&setPaused&&<button type="button" disabled={pending} className="ml-auto flex items-center gap-1 rounded px-2 py-1 hover:bg-muted disabled:opacity-40"
         title={t('queue.pauseHint')} aria-label={t(paused?'queue.resume':'queue.pause')} onClick={()=>{
           setPending(true);void setPaused(!paused).catch(()=>{}).finally(()=>setPending(false));
         }}>{paused?<Play size={13}/>:<Pause size={13}/>} {t(paused?'queue.resume':'queue.pause')}</button>}
-    </div>
+    </div>}
     {paused&&<p role="status" className="px-3 pb-2 text-amber-700 dark:text-amber-300">{t('queue.pausedHint')}</p>}
     {error&&<p role="alert" className="px-3 pb-2 text-destructive">{error}</p>}
     <div className="max-h-44 overflow-y-auto">
@@ -65,7 +66,7 @@ export function MessageQueuePanel({items,error,update,attempts,paused=null,setPa
         {['failed','interrupted'].includes(item.status)&&<p className="mt-1 text-muted-foreground">{t(item.delivery_mode==='live'?'liveInput.unconfirmed':'queue.blocked')}</p>}
       </div>)}
     </div>
-    {!!items.length&&<details className="border-t border-border/50 px-3 py-2"><summary className="cursor-pointer text-muted-foreground">{t('queue.history')}</summary>
+    {!!items.length&&<details className={`px-3 py-1.5 ${needsAttention?'border-t border-border/50':''}`}><summary className="cursor-pointer text-muted-foreground">{t('queue.history')} · {items.length}</summary>
       <div className="max-h-32 overflow-y-auto">{items.map(item=><div key={item.id} className="mt-2 flex gap-2">
         <span className="shrink-0">{t(`queue.status.${item.status}`)}</span><span className="truncate">{item.content||t('queue.attachmentsOnly')}</span>
         <span className="ml-auto shrink-0">×{item.attempt_count}</span>

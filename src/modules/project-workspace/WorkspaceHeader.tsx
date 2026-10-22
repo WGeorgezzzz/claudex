@@ -1,5 +1,5 @@
 import { ChevronLeft, ChevronRight, PanelRightOpen } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { AppTab, Project, ProjectSession } from '@/shared/types';
@@ -10,6 +10,7 @@ import WorkspaceTabs from '@/modules/project-workspace/WorkspaceTabs';
 import WorkspaceTitle from '@/modules/project-workspace/WorkspaceTitle';
 
 type WorkspaceHeaderProps = {
+  displayOptions?: ReactNode;
   onOpenSideChat?: () => void;
   sideChatOpen?: boolean;
   claudeLayout?: boolean;
@@ -27,6 +28,7 @@ type WorkspaceHeaderProps = {
 
 /** Rendered by WorkspaceMain to show the workspace title and chat connection status alongside the scrollable tab bar. */
 export default function WorkspaceHeader({
+  displayOptions,
   onOpenSideChat,
   sideChatOpen,
   claudeLayout = false,
@@ -102,12 +104,12 @@ export default function WorkspaceHeader({
   };
 
   return (
-    <header className="pwa-header-safe flex-shrink-0 border-b border-border/60 bg-background/95 px-3 py-1.5 backdrop-blur-sm sm:px-4 sm:py-2">
-      <div className="flex min-w-0 flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-3">
-        <div className="flex min-w-0 items-center gap-2 sm:max-w-[min(34%,24rem)] sm:flex-[1_1_18rem]">
+    <header className="workspace-header pwa-header-safe z-30 flex-shrink-0 bg-background px-3 py-2 sm:px-5 sm:py-2.5">
+      <div className="flex min-w-0 flex-wrap items-center gap-1.5 sm:flex-nowrap sm:gap-3">
+        <div className="flex w-full min-w-0 items-center gap-2 sm:w-auto sm:flex-1">
           {isMobile && <MobileMenuButton onMenuClick={onMenuClick} />}
           <WorkspaceTitle
-            activeTab={activeTab}
+            activeTab={claudeLayout ? 'chat' : activeTab}
             selectedProject={selectedProject}
             selectedSession={selectedSession}
             shouldShowTasksTab={shouldShowTasksTab}
@@ -122,7 +124,7 @@ export default function WorkspaceHeader({
           </button>}
         </div>
 
-        <div className="-mx-3 min-w-0 sm:mx-0 sm:flex-1">
+        <div className="min-w-0 flex-1 sm:flex-none sm:shrink-0">
           <div className="relative ml-auto w-fit max-w-full">
             {canScrollLeft && (
               <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-12 bg-gradient-to-r from-background via-background/90 to-transparent" />
@@ -169,6 +171,7 @@ export default function WorkspaceHeader({
             )}
           </div>
         </div>
+        {displayOptions}
       </div>
     </header>
   );
