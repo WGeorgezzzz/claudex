@@ -5,6 +5,7 @@ const os = require('node:os');
 const { spawn, execFile } = require('node:child_process');
 const { promisify } = require('node:util');
 const readline = require('node:readline');
+const { readChromeQuota } = require('./chrome-bridge.cjs');
 const execute = promisify(execFile);
 const root = path.resolve(__dirname, '../..');
 const state = process.env.CLAUDEX_USAGE_HOME || path.join(os.homedir(), '.cloudcli', 'provider-usage');
@@ -97,6 +98,9 @@ function parseClaude(text) {
 }
 
 async function browserUsage(provider, login = false) {
+  if (provider === 'claude' && !login && fs.existsSync(path.join(state, 'chrome-bridge.json'))) {
+    return readChromeQuota(state) || failure('claude', 'unavailable', '等待当前 Chrome 的 wenClaude 页面同步；请保持已登录的仪表盘标签页开启。');
+  }
   const profile = path.join(state, 'browser-profile');
   if (!login && !fs.existsSync(path.join(profile, 'Default'))) return failure(provider, 'login_required', '请在专用浏览器登录一次，之后自动更新。');
   const { chromium } = require('playwright');
