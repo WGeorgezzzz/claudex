@@ -4,6 +4,7 @@ export { asyncHandler, createApiSuccessResponse } from './utils.js';
 export type { AnyRecord, ProviderRuntimeContext, ProviderRuntimeWriter } from './types.js';
 
 export { getClaudeConfigDir, getClaudeConfigFile } from './utils.js';
+export { createClaudeLaunchEnvironment } from './utils.js';
 export { requireAuthenticatedUserId } from './utils.js';
 export { getCloudCliHomeDir } from './utils.js';
 export { parseMonitorCalendarSchedule, nextMonitorCalendarRun } from './utils.js';

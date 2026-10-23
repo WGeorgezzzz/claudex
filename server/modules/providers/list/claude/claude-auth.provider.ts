@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 
 import spawn from 'cross-spawn';
-import { getClaudeConfigDir } from '@/shared/index.js';
+import { createClaudeLaunchEnvironment, getClaudeConfigDir } from '@/shared/index.js';
 
 import { resolveClaudeCodeExecutablePath } from '@/shared/claude-cli-path.js';
 import type { IProviderAuth } from '@/shared/interfaces.js';
@@ -40,7 +40,10 @@ export class ClaudeProviderAuth implements IProviderAuth {
     // usable fallback here even where the SDK's raw spawn could not use it.
     const cliPath = resolveClaudeCodeExecutablePath(process.env.CLAUDE_CLI_PATH) ?? 'claude';
     try {
-      spawn.sync(cliPath, ['--version'], { stdio: 'ignore', timeout: 5000 });
+      spawn.sync(cliPath, ['--version'], {
+        stdio: 'ignore', timeout: 5000,
+        env: createClaudeLaunchEnvironment(process.env, cliPath),
+      });
       return true;
     } catch {
       return false;

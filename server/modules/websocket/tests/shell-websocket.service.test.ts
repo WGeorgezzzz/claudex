@@ -805,3 +805,28 @@ test('Claude login and resumed shells use the configured wrapper rather than a g
     if(previous===undefined)delete process.env.CLAUDE_CLI_PATH;else process.env.CLAUDE_CLI_PATH=previous;
   }
 });
+
+test('Claude terminals filter inherited lane self-proxies while other terminals retain them', { skip: process.platform !== 'win32' }, () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'claude-terminal-lane-'));
+  const previous = { ...process.env };
+  try {
+    fs.writeFileSync(path.join(root, 'lane-manifest.json'), JSON.stringify({ port: 42314 }));
+    process.env.CLAUDE_CONFIG_DIR = root;
+    process.env.CLAUDE_CLI_PATH = path.join(root, 'wrapper.js');
+    process.env.HTTPS_PROXY = 'http://lane:test@localhost:42314';
+    process.env.HTTP_PROXY = 'http://127.0.0.1:7900';
+    const { calls, dependencies, ptys } = spawnRecorder('native-session');
+    launch(dependencies, { provider: 'claude', initialCommand: 'claude /login' });
+    launch(dependencies, { provider: 'claude', hasSession: true, sessionId: 'app-proxy-session' });
+    launch(dependencies, { provider: 'plain-shell', isPlainShell: true, initialCommand: 'echo test' });
+    assert.equal(calls[0].env.HTTPS_PROXY, undefined);
+    assert.equal(calls[1].env.HTTPS_PROXY, undefined);
+    assert.equal(calls[0].env.HTTP_PROXY, 'http://127.0.0.1:7900');
+    assert.equal(calls[2].env.HTTPS_PROXY, process.env.HTTPS_PROXY);
+    ptys.forEach(terminal => terminal.emitExit());
+  } finally {
+    for (const key of Object.keys(process.env)) if (!(key in previous)) delete process.env[key];
+    Object.assign(process.env, previous);
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});

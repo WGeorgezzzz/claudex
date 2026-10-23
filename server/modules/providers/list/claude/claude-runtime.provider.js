@@ -19,7 +19,7 @@ import os from 'os';
 import path from 'path';
 
 import { query } from '@anthropic-ai/claude-agent-sdk';
-import { getClaudeConfigFile } from '@/shared/index.js';
+import { createClaudeLaunchEnvironment, getClaudeConfigFile } from '@/shared/index.js';
 
 import { createHeldPromptStream } from '@/modules/providers/list/claude/claude-prompt-stream.service.js';
 import { applyLiveClaudeSettings } from '@/modules/providers/list/claude/claude-live-settings.service.js';
@@ -237,7 +237,11 @@ function mapCliOptionsToSDK(options = {}) {
 
   // Forward all host env vars (e.g. ANTHROPIC_BASE_URL) to the subprocess.
   // Since SDK 0.2.113, options.env replaces process.env instead of overlaying it.
-  sdkOptions.env = { ...(getCurrentUserContext()?.env ?? process.env), CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS: String(BG_WAIT_CEILING_MS) };
+  const launchEnvironment = getCurrentUserContext()?.env ?? process.env;
+  sdkOptions.env = {
+    ...createClaudeLaunchEnvironment(launchEnvironment, process.env.CLAUDE_CLI_PATH),
+    CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS: String(BG_WAIT_CEILING_MS),
+  };
 
   // Resolve the executable eagerly on Windows because the SDK uses raw child_process.spawn,
   // which does not reliably follow npm's shell wrappers like cross-spawn does.
