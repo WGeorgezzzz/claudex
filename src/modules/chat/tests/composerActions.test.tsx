@@ -15,18 +15,20 @@ function DialogAction(){
 }
 
 test('closing the action disclosure does not unmount a dialog or lose its draft',()=>{
-  const view=render(<ComposerActions><DialogAction/></ComposerActions>);
-  const details=view.container.querySelector('details')!;details.open=true;
+  render(<ComposerActions><DialogAction/></ComposerActions>);
+  const trigger=screen.getByRole('button',{name:'Add context and actions'});
+  fireEvent.click(trigger);
   fireEvent.click(screen.getByRole('button',{name:'Open action'}));
   fireEvent.change(screen.getByRole('textbox',{name:'Action draft'}),{target:{value:'retain'}});
   fireEvent.pointerDown(screen.getByRole('dialog'));
-  assert.equal(details.open,false);
+  assert.equal(trigger.getAttribute('aria-expanded'),'false');
   assert.equal((screen.getByRole('textbox',{name:'Action draft'}) as HTMLInputElement).value,'retain');
 });
 
 test('Escape closes the disclosure and restores keyboard focus to the trigger',()=>{
-  const view=render(<ComposerActions><button>Action</button></ComposerActions>);
-  const details=view.container.querySelector('details')!;details.open=true;
+  render(<ComposerActions><button>Action</button></ComposerActions>);
+  const trigger=screen.getByRole('button',{name:'Add context and actions'});
+  fireEvent.click(trigger);
   fireEvent.keyDown(screen.getByRole('button',{name:'Action'}),{key:'Escape'});
-  assert.equal(details.open,false);assert.equal(document.activeElement,details.querySelector('summary'));
+  assert.equal(trigger.getAttribute('aria-expanded'),'false');assert.equal(document.activeElement,trigger);
 });

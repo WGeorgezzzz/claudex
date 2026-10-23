@@ -22,3 +22,13 @@ test('invalid, quoted and incomplete suggestion data never becomes an action',()
   assert.equal(readClaudeNextPrompts('```xml\n'+content+'\n```').prompts.length,0);
   assert.equal(readClaudeNextPrompts('Answer\n<claudex_next_prompts>["unfinished',true).content,'Answer');
 });
+
+test('an untagged completed reply still offers draft-only quick replies',()=>{
+  const insert=vi.fn();
+  const view=render(<NextPromptSuggestions messages={[{...message,content:'The result is ready.'}]} busy={false} onInsert={insert}/>);
+  assert.ok(screen.getByRole('region',{name:'Quick replies'}));
+  fireEvent.click(screen.getByRole('button',{name:'Explain in more detail'}));
+  assert.deepEqual(insert.mock.calls,[['Explain in more detail']]);
+  view.rerender(<NextPromptSuggestions messages={[{...message,isStreaming:true}]} busy={false} onInsert={insert}/>);
+  assert.equal(screen.queryAllByRole('button').length,0);
+});

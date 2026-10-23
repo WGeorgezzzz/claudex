@@ -4,6 +4,7 @@ import { ChevronDown, Loader2, type LucideIcon } from 'lucide-react';
 
 import { cn } from '@/shared/utils';
 import { Button } from '@/shared/ui/Button';
+import { useViewportMenuAnchor } from '@/shared/hooks/useViewportMenuAnchor';
 
 type ButtonVariant = 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link';
 type ButtonSize = 'default' | 'sm' | 'lg' | 'icon';
@@ -39,7 +40,7 @@ type ActionMenuProps = {
   onOpenChange?: (open: boolean) => void;
 };
 
-/** Used by the mcp and sidebar modules for the "…" overflow menu on a server or session row. */
+/** Used by mcp, sidebar and chat for viewport-bounded overflow and export menus. */
 export function ActionMenu({
   label,
   items,
@@ -53,15 +54,11 @@ export function ActionMenu({
   menuClassName,
   disabled,
   iconOnly = false,
-  portal = false,
+  portal = true,
   header,
   onOpenChange,
 }: ActionMenuProps) {
   const [isOpen, setIsOpen] = React.useState(false);
-  const [portalPosition, setPortalPosition] = React.useState<{ top: number; left: number } | null>(null);
-  const rootRef = React.useRef<HTMLDivElement | null>(null);
-  const triggerRef = React.useRef<HTMLButtonElement | null>(null);
-  const menuRef = React.useRef<HTMLDivElement | null>(null);
   // Whether closing should move focus back to the trigger. Set for keyboard
   // (Escape) and item selection, but left false for outside pointer clicks so
   // focus is not stolen from wherever the user clicked.
@@ -72,56 +69,10 @@ export function ActionMenu({
 
   const setMenuOpen = React.useCallback((open: boolean) => {
     setIsOpen(open);
-    if (!open) {
-      setPortalPosition(null);
-    }
     onOpenChange?.(open);
   }, [onOpenChange]);
-
-  React.useEffect(() => {
-    if (!isOpen) {
-      return;
-    }
-
-    const closeOnOutsideClick = (event: MouseEvent) => {
-      const target = event.target as Node;
-      if (
-        rootRef.current
-        && !rootRef.current.contains(target)
-        && !menuRef.current?.contains(target)
-      ) {
-        setMenuOpen(false);
-      }
-    };
-
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        restoreFocusRef.current = true;
-        setMenuOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', closeOnOutsideClick);
-    document.addEventListener('keydown', closeOnEscape);
-    return () => {
-      document.removeEventListener('mousedown', closeOnOutsideClick);
-      document.removeEventListener('keydown', closeOnEscape);
-    };
-  }, [isOpen, setMenuOpen]);
-
-  React.useEffect(() => {
-    if (!isOpen || !portal) {
-      return;
-    }
-
-    const closeOnViewportChange = () => setMenuOpen(false);
-    window.addEventListener('resize', closeOnViewportChange);
-    window.addEventListener('scroll', closeOnViewportChange, true);
-    return () => {
-      window.removeEventListener('resize', closeOnViewportChange);
-      window.removeEventListener('scroll', closeOnViewportChange, true);
-    };
-  }, [isOpen, portal, setMenuOpen]);
+  const close = React.useCallback(() => setMenuOpen(false), [setMenuOpen]);
+  const { triggerRef, menuRef, anchor, updateAnchor } = useViewportMenuAnchor(isOpen, close, 260, 'below', align);
 
   // Move focus into the menu on open and back to the trigger on a keyboard or
   // selection close, so keyboard and screen-reader navigation match the menu role.
@@ -143,7 +94,7 @@ export function ActionMenu({
       }
       restoreFocusRef.current = false;
     }
-  }, [isOpen]);
+  }, [isOpen, menuRef, triggerRef]);
 
   const runItem = (item: ActionMenuItem) => {
     if (item.disabled || item.loading) {
@@ -163,36 +114,26 @@ export function ActionMenu({
       return;
     }
 
-    if (portal && triggerRef.current) {
-      const rect = triggerRef.current.getBoundingClientRect();
-      const menuWidth = 260;
-      const estimatedHeight = (header ? 52 : 0)
-        + items.reduce((height, item) => height + (item.description ? 58 : 40) + (item.showDividerBefore ? 9 : 0), 12);
-      setPortalPosition({
-        top: rect.bottom + 6 + estimatedHeight <= window.innerHeight - 8
-          ? rect.bottom + 6
-          : Math.max(8, rect.top - estimatedHeight - 6),
-        left: Math.max(8, Math.min(rect.right - menuWidth, window.innerWidth - menuWidth - 8)),
-      });
-    }
+    updateAnchor();
     setMenuOpen(true);
   };
 
-  const menu = isOpen && (!portal || portalPosition) && (
+  const menu = isOpen && (!portal || anchor) && (
     <div
       ref={menuRef}
       id={menuId}
       role="menu"
+      aria-label={ariaLabel || label}
       tabIndex={-1}
       data-escape-layer
       className={cn(
         portal ? 'fixed z-[70]' : 'absolute top-full z-50 mt-2',
-        'min-w-[220px] rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-lg',
+        'min-w-0 overflow-y-auto overflow-x-hidden overscroll-contain rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-lg',
         'animate-in fade-in-0 zoom-in-95',
         !portal && (align === 'right' ? 'right-0' : 'left-0'),
         menuClassName,
       )}
-      style={portal && portalPosition ? portalPosition : undefined}
+      style={portal && anchor ? { ...anchor, width: anchor.maxWidth } : undefined}
     >
       {header}
       {items.map((item) => {
@@ -236,7 +177,7 @@ export function ActionMenu({
   );
 
   return (
-    <div ref={rootRef} className={cn('relative inline-flex', className)}>
+    <div className={cn('relative inline-flex', className)}>
       <Button
         ref={triggerRef}
         type="button"

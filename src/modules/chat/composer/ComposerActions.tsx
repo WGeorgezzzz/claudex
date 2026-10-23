@@ -1,21 +1,28 @@
-import { useEffect, useRef } from 'react';
+import { useCallback, useState } from 'react';
 import type { ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { Plus } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-/** ChatComposer keeps secondary actions in one disclosure without unmounting their dialogs. */
+import { useViewportMenuAnchor } from '@/shared/hooks/useViewportMenuAnchor';
+
+/** ChatComposer keeps secondary actions inside the viewport without unmounting their dialogs. */
 export function ComposerActions({children}:{children:ReactNode}) {
   const {t}=useTranslation('chat');
-  const disclosure=useRef<HTMLDetailsElement>(null);
-  useEffect(()=>{
-    const close=(event:PointerEvent)=>{if(disclosure.current&&!disclosure.current.contains(event.target as Node))disclosure.current.open=false;};
-    document.addEventListener('pointerdown',close);
-    return()=>document.removeEventListener('pointerdown',close);
-  },[]);
-  return <details ref={disclosure} className="composer-actions relative" onKeyDown={event=>{
-    if(event.key==='Escape'&&disclosure.current?.open){event.stopPropagation();disclosure.current.open=false;disclosure.current.querySelector('summary')?.focus();}
-  }}>
-    <summary aria-label={t('ui.addContext')} title={t('ui.addContext')} className="workspace-icon-button cursor-pointer list-none"><Plus size={18}/></summary>
-    <div role="group" aria-label={t('ui.moreActions')} className="composer-actions-menu absolute bottom-full left-0 z-50 mb-3 w-64 max-w-[calc(100vw-3rem)] rounded-xl border border-border bg-popover p-1.5 text-popover-foreground shadow-lg">{children}</div>
-  </details>;
+  // Only the menu surface is hidden; child-owned dialogs and drafts stay mounted.
+  const [isOpen, setIsOpen] = useState(false);
+  const close = useCallback(() => setIsOpen(false), []);
+  const { triggerRef, menuRef, anchor, updateAnchor } = useViewportMenuAnchor(isOpen, close, 256, 'above', 'left');
+  return <div className="composer-actions">
+    <button ref={triggerRef} type="button" aria-label={t('ui.addContext')} title={t('ui.addContext')}
+      aria-expanded={isOpen} className="workspace-icon-button" onClick={() => {
+        updateAnchor();
+        setIsOpen(open => !open);
+      }}><Plus size={18}/></button>
+    {createPortal(<div ref={menuRef} role="group" aria-label={t('ui.moreActions')}
+      className="composer-actions-menu fixed z-[100] overflow-y-auto overflow-x-hidden overscroll-contain rounded-xl border border-border bg-popover p-1.5 text-popover-foreground shadow-lg"
+      style={{ ...anchor, width: anchor?.maxWidth, visibility: isOpen && anchor ? 'visible' : 'hidden', pointerEvents: isOpen ? 'auto' : 'none' }}>
+      {children}
+    </div>, document.body)}
+  </div>;
 }

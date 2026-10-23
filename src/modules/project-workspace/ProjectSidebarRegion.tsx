@@ -3,7 +3,6 @@ import type {
   KeyboardEvent as ReactKeyboardEvent,
   MouseEvent as ReactMouseEvent,
   PointerEvent as ReactPointerEvent,
-  TouchEvent as ReactTouchEvent,
 } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -33,17 +32,22 @@ function ProjectSidebarRegion({
   const resizeOriginRef = useRef<{ pointerX: number; width: number } | null>(null);
   const resizeFrameRef = useRef<number | null>(null);
   const pendingWidthRef = useRef<number>(sidebarWidth);
+  // A browser back-swipe can finish with a click after this backdrop appears.
+  // Dismiss only taps that actually began on it, not that trailing gesture.
+  const backdropPointerRef = useRef<{ x: number; y: number } | null>(null);
 
   const handleBackdropClick = useCallback((event: ReactMouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();
+    const origin = backdropPointerRef.current;
+    backdropPointerRef.current = null;
+    if (event.detail !== 0 && (!origin || Math.hypot(event.clientX - origin.x, event.clientY - origin.y) > 12)) return;
     setSidebarOpen(false);
   }, [setSidebarOpen]);
 
-  const handleBackdropTouch = useCallback((event: ReactTouchEvent<HTMLButtonElement>) => {
-    event.preventDefault();
+  const handleBackdropPointerDown = useCallback((event: ReactPointerEvent<HTMLButtonElement>) => {
     event.stopPropagation();
-    setSidebarOpen(false);
-  }, [setSidebarOpen]);
+    backdropPointerRef.current = { x: event.clientX, y: event.clientY };
+  }, []);
 
   // Sidebar resizing (desktop only). Pointer capture keeps the drag alive when
   // the cursor leaves the 4px handle, and the width is only written to storage
@@ -149,11 +153,13 @@ function ProjectSidebarRegion({
       className={`fixed inset-0 z-50 flex transition-all duration-150 ease-out ${
         sidebarOpen ? 'visible opacity-100' : 'invisible opacity-0'
       }`}
+      style={{ top: 'var(--visual-viewport-top, 0px)', bottom: 'var(--keyboard-height, 0px)' }}
     >
       <button
         className="fixed inset-0 bg-background/60 backdrop-blur-sm transition-opacity duration-150 ease-out"
         onClick={handleBackdropClick}
-        onTouchStart={handleBackdropTouch}
+        onPointerDown={handleBackdropPointerDown}
+        onPointerCancel={() => { backdropPointerRef.current = null; }}
         aria-label={t('versionUpdate.ariaLabels.closeSidebar')}
       />
       <div

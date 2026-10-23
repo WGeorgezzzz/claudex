@@ -460,6 +460,10 @@
   },
   "nextPrompts": {
     "title": "下一步提示词",
+    "quickTitle": "快捷回复",
+    "continue": "请继续下一步",
+    "explain": "请详细解释一下",
+    "review": "请检查是否还有遗漏",
     "hint": "下一步建议 · 点击填入草稿，不会自动发送"
   },
   "ui": {

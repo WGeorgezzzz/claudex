@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { useLocation, useNavigationType, useParams } from 'react-router-dom';
 
 import { usePaletteOpsRegister } from '@/modules/command-palette';
 import { writeSelectedProvider } from '@/shared/selectedProvider';
@@ -8,13 +9,25 @@ import type { LLMProvider, ProjectWorkspaceShellProps } from '@/shared/types';
 /** Headless controller rendered by ProjectWorkspaceShell to register palette operations and handle service-worker navigation messages. */
 export default function ProjectEffects({
   navigate,
-}: Pick<ProjectWorkspaceShellProps, 'navigate'>) {
+  isMobile,
+}: Pick<ProjectWorkspaceShellProps, 'navigate' | 'isMobile'>) {
+  const location = useLocation();
+  const navigationType = useNavigationType();
+  const { sessionId } = useParams();
   const {
     openSettings,
     refreshProjectsSilently,
     setActiveTab,
     setSidebarOpen,
   } = useProjectEffectsState();
+
+  useEffect(() => {
+    if (isMobile) {
+      // A browser edge-swipe back to the list should land on the drawer, not
+      // leave the previous conversation visible underneath a closed sidebar.
+      setSidebarOpen(navigationType === 'POP' && !sessionId);
+    }
+  }, [isMobile, location.key, navigationType, sessionId, setSidebarOpen]);
 
   usePaletteOpsRegister({
     openSettings,

@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import type { CSSProperties } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 
 import { copyTextToClipboard } from '@/shared/utils';
+import { useViewportMenuAnchor } from '@/shared/hooks/useViewportMenuAnchor';
 
 const COPY_SUCCESS_TIMEOUT_MS = 2000;
 
@@ -56,29 +56,15 @@ const MessageCopyControl = ({
   const [selectedFormat, setSelectedFormat] = useState<CopyFormat>(defaultFormat);
   const [copied, setCopied] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [menuStyle, setMenuStyle] = useState<CSSProperties>({});
-  const dropdownRef = useRef<HTMLDivElement | null>(null);
-  const triggerRef = useRef<HTMLButtonElement | null>(null);
-  const menuRef = useRef<HTMLDivElement | null>(null);
+  const closeDropdown = useCallback(() => setIsDropdownOpen(false), []);
+  const { triggerRef, menuRef, anchor, updateAnchor } = useViewportMenuAnchor(isDropdownOpen, closeDropdown, 200, 'below', 'left');
   const copyFeedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // The dropdown is rendered in a portal so it escapes the chat message's
   // `contain: paint` box (which would otherwise clip it). Anchor it to the
   // trigger, flipping above when there isn't room below.
   const openDropdown = () => {
-    const rect = triggerRef.current?.getBoundingClientRect();
-    if (rect) {
-      const ESTIMATED_MENU_HEIGHT = 84;
-      const openUp = rect.bottom + ESTIMATED_MENU_HEIGHT + 8 > window.innerHeight;
-      setMenuStyle({
-        position: 'fixed',
-        right: Math.max(8, window.innerWidth - rect.right),
-        zIndex: 1000,
-        ...(openUp
-          ? { bottom: window.innerHeight - rect.top + 4 }
-          : { top: rect.bottom + 4 }),
-      });
-    }
+    updateAnchor();
     setIsDropdownOpen(true);
   };
 
@@ -111,32 +97,6 @@ const MessageCopyControl = ({
     setSelectedFormat(defaultFormat);
     setIsDropdownOpen(false);
   }, [defaultFormat]);
-
-  useEffect(() => {
-    if (!isDropdownOpen) return;
-
-    // Close when clicking outside both the control and the portaled menu.
-    const closeOnOutsideClick = (event: MouseEvent) => {
-      const target = event.target as Node;
-      if (dropdownRef.current?.contains(target) || menuRef.current?.contains(target)) {
-        return;
-      }
-      setIsDropdownOpen(false);
-    };
-
-    // The menu is fixed-positioned; close it if the page scrolls so it can't
-    // detach from the trigger.
-    const closeOnScroll = () => setIsDropdownOpen(false);
-
-    window.addEventListener('mousedown', closeOnOutsideClick);
-    window.addEventListener('scroll', closeOnScroll, true);
-    window.addEventListener('resize', closeOnScroll);
-    return () => {
-      window.removeEventListener('mousedown', closeOnOutsideClick);
-      window.removeEventListener('scroll', closeOnScroll, true);
-      window.removeEventListener('resize', closeOnScroll);
-    };
-  }, [isDropdownOpen]);
 
   useEffect(() => {
     return () => {
@@ -174,7 +134,7 @@ const MessageCopyControl = ({
     : 'relative flex items-center gap-0.5';
 
   return (
-    <div ref={dropdownRef} className={rootClassName}>
+    <div className={rootClassName}>
       <button
         type="button"
         onClick={handleCopyClick}
@@ -227,11 +187,13 @@ const MessageCopyControl = ({
             </svg>
           </button>
 
-          {isDropdownOpen && createPortal(
+          {isDropdownOpen && anchor && createPortal(
             <div
               ref={menuRef}
-              style={menuStyle}
-              className="min-w-36 rounded-md border border-border bg-popover p-1 shadow-lg"
+              role="menu"
+              aria-label={t('copyMessage.selectFormat')}
+              style={{ ...anchor, width: anchor.maxWidth }}
+              className="fixed z-[1000] min-w-0 overflow-y-auto overflow-x-hidden overscroll-contain rounded-md border border-border bg-popover p-1 shadow-lg"
             >
               {copyFormatOptions.map((option) => {
                 const isSelected = option.format === selectedFormat;

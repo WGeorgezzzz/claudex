@@ -22,7 +22,7 @@ export function LocalFileLink({ fileReference, directories = [], onPreview, chil
   const linkRef = useRef<HTMLAnchorElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   // The pointer position anchors the one open menu independently of transcript scrolling.
-  const [position, setPosition] = useState<{ x: number; y: number } | null>(null);
+  const [position, setPosition] = useState<{ x: number; y: number; width: number; maxHeight: number } | null>(null);
   // Surface OS launch failures beside the link instead of reporting success prematurely.
   const [error, setError] = useState<string | null>(null);
   // Prevent duplicate OS launches while the desktop bridge is handling a request.
@@ -34,10 +34,24 @@ export function LocalFileLink({ fileReference, directories = [], onPreview, chil
   const hoverResolving = useRef(false);
   const abbreviated = isAbbreviatedFileReference(fileReference);
 
+  const openMenuAt = (x: number, y: number) => {
+    const viewport = window.visualViewport;
+    const left = (viewport?.offsetLeft ?? 0) + 8;
+    const top = (viewport?.offsetTop ?? 0) + 8;
+    const width = Math.max(0, Math.min(240, (viewport?.width ?? window.innerWidth) - 16));
+    const right = left + (viewport?.width ?? window.innerWidth) - 16;
+    const bottom = top + (viewport?.height ?? window.innerHeight) - 16;
+    const menuTop = Math.max(top, Math.min(y, bottom - 150));
+    setPosition({ x: Math.max(left, Math.min(x, right - width)), y: menuTop, width, maxHeight: Math.max(0, bottom - menuTop) });
+  };
+
   useEffect(() => {
     if (!position) return;
     menuRef.current?.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus();
     const dismiss = () => setPosition(null);
+    const dismissOnScroll = (event: Event) => {
+      if (!(event.target instanceof Node) || !menuRef.current?.contains(event.target)) dismiss();
+    };
     const outside = (event: MouseEvent) => {
       if (!menuRef.current?.contains(event.target as Node)) dismiss();
     };
@@ -49,13 +63,18 @@ export function LocalFileLink({ fileReference, directories = [], onPreview, chil
     };
     document.addEventListener('mousedown', outside);
     document.addEventListener('keydown', key);
-    window.addEventListener('scroll', dismiss, true);
+    window.addEventListener('scroll', dismissOnScroll, true);
     window.addEventListener('resize', dismiss);
+    const viewport = window.visualViewport;
+    viewport?.addEventListener('resize', dismiss);
+    viewport?.addEventListener('scroll', dismiss);
     return () => {
       document.removeEventListener('mousedown', outside);
       document.removeEventListener('keydown', key);
-      window.removeEventListener('scroll', dismiss, true);
+      window.removeEventListener('scroll', dismissOnScroll, true);
       window.removeEventListener('resize', dismiss);
+      viewport?.removeEventListener('resize', dismiss);
+      viewport?.removeEventListener('scroll', dismiss);
     };
   }, [position]);
 
@@ -155,13 +174,13 @@ export function LocalFileLink({ fileReference, directories = [], onPreview, chil
     }}
       onContextMenu={event => {
         event.preventDefault(); event.stopPropagation(); setError(null);
-        setPosition({ x: Math.max(8, Math.min(event.clientX, window.innerWidth - 248)), y: Math.max(8, Math.min(event.clientY, window.innerHeight - 150)) });
+        openMenuAt(event.clientX, event.clientY);
       }}
       onKeyDown={event => {
         if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) {
           event.preventDefault();
           const bounds = event.currentTarget.getBoundingClientRect();
-          setPosition({ x: Math.max(8, Math.min(bounds.left, window.innerWidth - 248)), y: Math.max(8, Math.min(bounds.bottom, window.innerHeight - 150)) });
+          openMenuAt(bounds.left, bounds.bottom);
         }
       }}>{children}</a>
     {choices && <span role="group" aria-label="匹配的文件" className="ml-2 inline-flex flex-wrap items-center gap-1 align-middle text-xs">
@@ -175,8 +194,8 @@ export function LocalFileLink({ fileReference, directories = [], onPreview, chil
     </span>}
     {error && <span role="alert" className="ml-2 text-xs text-red-600 dark:text-red-400">{error}</span>}
     {position && createPortal(<div ref={menuRef} role="menu" aria-label={t('fileLink.menu', 'File actions')}
-      className="fixed z-[10000] w-60 max-w-[calc(100vw-16px)] rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-lg"
-      style={{ left: position.x, top: position.y }}
+      className="fixed z-[10000] overflow-y-auto overflow-x-hidden overscroll-contain rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-lg"
+      style={{ left: position.x, top: position.y, width: position.width, maxHeight: position.maxHeight }}
       onKeyDown={event => {
         if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
         event.preventDefault();
