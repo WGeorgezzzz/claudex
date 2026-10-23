@@ -34,6 +34,8 @@ export default function VoiceInputButton({ state, onToggle, errorMsg }: Props) {
         </span>
       )}
       <PromptInputButton
+        className="h-10 w-10 shrink-0"
+        aria-label={state === 'recording' ? t('voice.stopRecording') : t('voice.input')}
         tooltip={{ content: state === 'recording' ? t('voice.stopRecording') : t('voice.input') }}
         onClick={(e: { preventDefault: () => void }) => {
           e.preventDefault();

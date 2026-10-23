@@ -199,8 +199,16 @@ function ChatInterface({
   const contextTime=contextCutoff?Date.parse(contextCutoff):NaN;
   const showMessage=(message:ChatMessage)=>showInherited || !Number.isFinite(contextTime)
     || new Date(message.timestamp instanceof Date?message.timestamp.getTime():message.timestamp).getTime()>contextTime;
-  const displayMessages=isSideChat?chatMessages.filter(showMessage):chatMessages;
-  const displayVisibleMessages=isSideChat?visibleMessages.filter(showMessage):visibleMessages;
+  // Durable live receipts restore insertion badges after a server history refresh replaces local echoes.
+  const markInsertedMessage=(message:ChatMessage)=>{
+    if(message.type!=='user'||message.insertedMidTurn)return message;
+    const timestamp=new Date(message.timestamp).getTime();
+    const inserted=messageQueue.items.some(item=>item.delivery_mode==='live'&&['running','succeeded'].includes(item.status)
+      &&item.content===message.content&&Math.abs(Date.parse(item.created_at)-timestamp)<5*60*1000);
+    return inserted?{...message,insertedMidTurn:true}:message;
+  };
+  const displayMessages=(isSideChat?chatMessages.filter(showMessage):chatMessages).map(markInsertedMessage);
+  const displayVisibleMessages=(isSideChat?visibleMessages.filter(showMessage):visibleMessages).map(markInsertedMessage);
 
   // Brand-new conversation: the composer allocated a stable session id via
   // the session gateway before the first send. Record it locally and put it
@@ -587,9 +595,6 @@ function ChatInterface({
                 if (answer) onReturnReply(String(answer.content));
               }}>{t('sideChat.returnReply')}</button>
           </div>}
-          <MessageQueuePanel key={currentSessionId||selectedSession?.id||'new'} items={messageQueue.items}
-            error={messageQueue.error} update={messageQueue.update} attempts={messageQueue.attempts}
-            paused={messageQueue.paused} setPaused={messageQueue.setPaused}/>
           <NextPromptSuggestions messages={displayMessages} busy={isProcessing} onInsert={insertComposerText}
             sessionId={currentSessionId || selectedSession?.id} provider={provider}/>
           <ChatComposer
@@ -597,8 +602,6 @@ function ChatInterface({
           busySendMode={busySendMode}
           onBusySendModeChange={setBusySendMode}
           supportsLiveInput={supportsLiveInsertion(provider)}
-          onSendLive={supportsLiveInsertion(provider)&&isProcessing&&!editingAnchorId?()=>{void handleSubmit({preventDefault:()=>{}} as never,undefined,{forceLive:true});}:undefined}
-          onQueue={currentSessionId||selectedSession?.id?()=>{void handleSubmit({preventDefault:()=>{}} as never,undefined,{forceQueue:true});}:undefined}
           compact={isSideChat}
           pendingPermissionRequests={pendingPermissionRequests}
           handlePermissionDecision={handlePermissionDecision}
@@ -632,11 +635,16 @@ function ChatInterface({
           onClearInput={handleClearInput}
           onSubmit={handleSubmit}
           isDragActive={isDragActive}
-          queuedDraft={queuedDraft}
+          submissionNotice={messageQueue.notice}
+          pendingTray={<MessageQueuePanel key={currentSessionId||selectedSession?.id||'new'} items={messageQueue.items}
+            error={messageQueue.error} update={messageQueue.update} attempts={messageQueue.attempts}
+            paused={messageQueue.paused} setPaused={messageQueue.setPaused} retryLive={async item => {
+              const outcome=await messageQueue.retryLive(item);
+              if(outcome==='live')addMessage({type:'user',content:item.content,timestamp:new Date(),insertedMidTurn:true});
+            }}
+            convertLive={messageQueue.convertLive} queuedDraft={queuedDraft} onEditQueuedDraft={editQueuedDraft} onDeleteQueuedDraft={deleteQueuedDraft}/>}
           backgroundSendPrompt={backgroundSendPrompt}
           onResolveBackgroundSendPrompt={resolveBackgroundSendPrompt}
-          onEditQueuedDraft={editQueuedDraft}
-          onDeleteQueuedDraft={deleteQueuedDraft}
           attachedFiles={attachedFiles}
           onRemoveAttachment={(index) =>
             setAttachedFiles((previous) =>

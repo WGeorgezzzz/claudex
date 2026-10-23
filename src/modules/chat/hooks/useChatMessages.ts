@@ -428,6 +428,7 @@ export function normalizedToChatMessages(messages: NormalizedMessage[]): ChatMes
             converted.push({
               type: 'user',
               content,
+              insertedMidTurn: msg.insertedMidTurn,
               timestamp: msg.timestamp,
               images,
               files,

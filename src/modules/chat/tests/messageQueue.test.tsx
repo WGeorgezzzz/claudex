@@ -42,6 +42,7 @@ test('empty idle queues take no composer space while paused queues remain action
   const view=render(<MessageQueuePanel items={[]} error="" update={vi.fn()} paused={false}/>);
   assert.equal(view.container.textContent,'');
   view.rerender(<MessageQueuePanel items={[]} error="" update={vi.fn()} paused setPaused={vi.fn()}/>);
+  fireEvent.click(screen.getByRole('button',{name:/Expand pending|展开待发送/}));
   assert.ok(screen.getByRole('button',{name:/Resume queue|继续队列/}));
 });
 
@@ -49,10 +50,12 @@ test('queue controls pause future dispatch and only reorder adjacent pending ent
   const update=vi.fn().mockResolvedValue(undefined),pause=vi.fn().mockResolvedValue(undefined);
   render(<MessageQueuePanel items={[{...item,id:'running',status:'running'},item,{...item,id:'two',content:'Second'}]}
     error="" update={update} paused={false} setPaused={pause}/>);
-  const earlier=screen.getAllByRole('button',{name:/Move earlier|提前一位/});
-  assert.equal((earlier[0] as HTMLButtonElement).disabled,true);
-  assert.equal((earlier[1] as HTMLButtonElement).disabled,false);
-  fireEvent.click(earlier[1]);await waitFor(()=>assert.equal(update.mock.calls[0][1].action,'move-up'));
+  fireEvent.click(screen.getByRole('button',{name:/Expand pending|展开待发送/}));
+  fireEvent.click(screen.getAllByRole('button',{name:/Message actions|消息操作/})[0]);
+  assert.equal((screen.getByRole('button',{name:/Move earlier|提前一位/}) as HTMLButtonElement).disabled,true);
+  fireEvent.click(screen.getAllByRole('button',{name:/Message actions|消息操作/})[1]);
+  fireEvent.click(screen.getByRole('button',{name:/Move earlier|提前一位/}));
+  await waitFor(()=>assert.equal(update.mock.calls[0][1].action,'move-up'));
   await waitFor(()=>assert.equal((screen.getByRole('button',{name:/Pause queue|暂停队列/}) as HTMLButtonElement).disabled,false));
   fireEvent.click(screen.getByRole('button',{name:/Pause queue|暂停队列/}));
   await waitFor(()=>assert.deepEqual(pause.mock.calls,[[true]]));
@@ -83,13 +86,14 @@ test('a failed refresh after acceptance does not report the POST as failed',asyn
 test('queue edits retain the original revision and do not hide a conflicted edit',async()=>{
   const update=vi.fn(async()=>{throw new Error('conflict');});
   const view=render(<MessageQueuePanel items={[item]} error="conflict" update={update}/>);
+  fireEvent.click(view.getByRole('button',{name:/Message actions|消息操作/}));
   fireEvent.click(view.getByRole('button',{name:/Edit queued message|编辑排队消息/}));
   fireEvent.change(view.getByRole('textbox'),{target:{value:'My edit'}});
   fireEvent.click(view.getByRole('button',{name:/Save|保存/}));
   await waitFor(()=>assert.equal(update.mock.calls.length,1));
   assert.equal((update.mock.calls[0] as unknown[])[0],item);
   assert.equal((view.getByRole('textbox') as HTMLTextAreaElement).value,'My edit');
-  assert.match(view.getByRole('alert').textContent||'',/conflict/);
+  assert.ok(view.getAllByRole('alert').some(alert=>/conflict/.test(alert.textContent||'')));
 });
 
 
@@ -100,4 +104,60 @@ test('delivered messages no longer occupy the pending queue',()=>{
   assert.equal(view.container.textContent,'');
   view.rerender(<MessageQueuePanel items={[{...item,status:'failed'}]} error="" update={vi.fn()}/>);
   assert.ok(view.getAllByText('First').length);
+});
+
+test('tray starts collapsed, exposes one action per row, and keeps a dispatched edit',()=>{
+  const view=render(<MessageQueuePanel items={[item]} error="" update={vi.fn()}/>);
+  assert.equal(screen.queryByRole('button',{name:'Message actions'}),null);
+  fireEvent.click(screen.getByRole('button',{name:'Expand pending messages'}));
+  assert.equal(screen.getAllByRole('button',{name:'Message actions'}).length,1);
+  fireEvent.click(screen.getByRole('button',{name:'Message actions'}));
+  fireEvent.click(screen.getByRole('button',{name:'Edit queued message'}));
+  fireEvent.change(screen.getByRole('textbox'),{target:{value:'Unsent edit'}});
+  view.rerender(<MessageQueuePanel items={[{...item,status:'running'}]} error="" update={vi.fn()}/>);
+  assert.equal((screen.getByRole('textbox') as HTMLTextAreaElement).value,'Unsent edit');
+  assert.match(screen.getByRole('alert').textContent||'',/Sending has started/);
+  assert.equal((screen.getByRole('button',{name:'Save'}) as HTMLButtonElement).disabled,true);
+});
+
+test('failed live messages automatically expose separate insertion and queue recovery',async()=>{
+  const retryLive=vi.fn().mockResolvedValue('live'),convertLive=vi.fn().mockResolvedValue(undefined),update=vi.fn();
+  render(<MessageQueuePanel items={[{...item,status:'failed',delivery_mode:'live',error:'offline'}]} error="" update={update} retryLive={retryLive} convertLive={convertLive}/>);
+  assert.ok(screen.getAllByText('Delivery unconfirmed').length);
+  fireEvent.click(screen.getByRole('button',{name:'Retry insertion'}));
+  await waitFor(()=>assert.equal(retryLive.mock.calls.length,1));
+  await waitFor(()=>assert.equal((screen.getByRole('button',{name:'Send next turn'}) as HTMLButtonElement).disabled,false));
+  fireEvent.click(screen.getByRole('button',{name:'Send next turn'}));
+  await waitFor(()=>assert.equal(convertLive.mock.calls.length,1));
+  assert.equal(update.mock.calls.length,0);
+});
+
+test('old queue responses and errors cannot leak into a different session',async()=>{
+  let reject!: (reason:Error)=>void;
+  vi.mocked(api.messageQueue.list).mockImplementationOnce(()=>new Promise((_,fail)=>{reject=fail;}));
+  const hook=renderHook(({id})=>useMessageQueue(id),{initialProps:{id:'s1'}});
+  hook.rerender({id:'s2'});
+  await act(async()=>reject(new Error('old session offline')));
+  assert.deepEqual(hook.result.current.items,[]);assert.equal(hook.result.current.error,'');
+});
+
+test('live conversion retains its ticket until uncertain cancellation is acknowledged',async()=>{
+  vi.mocked(api.messageQueue.update).mockRejectedValueOnce(new Error('cancel offline')).mockResolvedValueOnce(response({...item,status:'cancelled'}));
+  const hook=renderHook(()=>useMessageQueue('s1'));
+  const failed={...item,status:'failed' as const,delivery_mode:'live' as const};
+  await act(async()=>{await assert.rejects(hook.result.current.convertLive(failed),/cancel offline/);});
+  await act(async()=>hook.result.current.convertLive(failed));
+  assert.equal(vi.mocked(api.messageQueue.enqueue).mock.calls[0][0].requestId,vi.mocked(api.messageQueue.enqueue).mock.calls[1][0].requestId);
+  assert.ok(vi.mocked(api.messageQueue.update).mock.calls.every(call=>call[1].action==='cancel'));
+});
+
+test('legacy local drafts use the same collapsed pending tray',()=>{
+  const edit=vi.fn(),remove=vi.fn();
+  render(<MessageQueuePanel items={[]} error="" update={vi.fn()} queuedDraft={{content:'Local draft',attachments:[],options:{}} as never} onEditQueuedDraft={edit} onDeleteQueuedDraft={remove}/>);
+  assert.ok(screen.getByText('Pending 1'));
+  fireEvent.click(screen.getByRole('button',{name:'Expand pending messages'}));
+  fireEvent.click(screen.getByRole('button',{name:'Message actions'}));
+  fireEvent.click(screen.getByRole('button',{name:'Edit queued message'}));
+  assert.equal(edit.mock.calls.length,1);
+  fireEvent.click(screen.getByRole('button',{name:'Cancel'}));assert.equal(remove.mock.calls.length,1);
 });

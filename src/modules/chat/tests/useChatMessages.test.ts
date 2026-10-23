@@ -21,6 +21,11 @@ function message(
   };
 }
 
+test('preserves the inserted badge when projecting a user echo through the store',()=>{
+  const inserted=message('local-insert',{role:'user',content:'Live addition',insertedMidTurn:true});
+  assert.equal(normalizedToChatMessages([inserted])[0].insertedMidTurn,true);
+});
+
 test('preserves historical UI message identity when only the stream record changes', () => {
   const first = message('first', { content: 'First answer' });
   const second = message('second', { content: 'Second answer' });

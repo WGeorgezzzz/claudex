@@ -502,6 +502,8 @@ type QuestionOption = {
 
 /** A provider-agnostic transcript event as normalized by the backend adapters, with all kind-specific fields kept flat; it is the shape the session store holds and that chat converts into ChatMessage for rendering, so treat it as the wire contract rather than a view model. */
 export type NormalizedMessage = {
+  /** Preserves the live-insertion badge while a local user echo passes through the session store. */
+  insertedMidTurn?: boolean;
   id: string;
   /**
    * The provider's own id for the transcript row behind this message, when the

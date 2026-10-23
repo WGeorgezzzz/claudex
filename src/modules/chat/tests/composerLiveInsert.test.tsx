@@ -29,7 +29,7 @@ function renderComposer(provider: LLMProvider, isLoading = true) {
   const added: ChatMessage[] = [];
   const sent: unknown[] = [];
   const sendLiveMessage = vi.fn(async () => 'live' as const);
-  const enqueueMessage = vi.fn(async () => undefined);
+  const enqueueMessage = vi.fn(async ():Promise<void> => undefined);
   const view = renderHook(() => useChatComposerState({
     selectedProject: PROJECT,
     selectedSession: SESSION,
@@ -109,6 +109,36 @@ test('the chosen queue mode controls Enter and can be switched back to native in
   assert.equal(sendLiveMessage.mock.calls.length, 1);
 });
 
+test('Alt+Enter in queue mode inserts, while unavailable alternatives do not submit',async()=>{
+  const live=renderComposer('claude');
+  act(()=>live.view.result.current.setBusySendMode('queue'));
+  await type(live.view,'alternate insertion');await pressEnter(live.view,{altKey:true});
+  assert.equal(live.sendLiveMessage.mock.calls.length,1);
+  assert.equal(live.enqueueMessage.mock.calls.length,0);
+  await type(live.view,'/compact');await pressEnter(live.view,{altKey:true});
+  assert.equal(live.enqueueMessage.mock.calls.length,0);
+  const cursor=renderComposer('cursor');
+  await type(cursor.view,'keep draft');await pressEnter(cursor.view,{altKey:true});
+  assert.equal(cursor.enqueueMessage.mock.calls.length,0);
+  assert.equal(cursor.view.result.current.input,'keep draft');
+});
+
+test('attachments visibly choose the queue and the draft waits for acknowledgment',async()=>{
+  const pending=renderComposer('claude');
+  let accept!:()=>void;
+  pending.enqueueMessage.mockImplementationOnce(()=>new Promise<void>(resolve=>{accept=resolve;}));
+  act(()=>pending.view.result.current.setAttachedFiles([new File(['data'],'note.txt',{type:'text/plain'})]));
+  // Upload response follows the existing durable attachment API.
+  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({attachments:[{name:'note.txt',path:'/uploaded/note.txt'}]}))));
+  await type(pending.view,'with file');
+  await pressEnter(pending.view);
+  assert.equal(pending.sendLiveMessage.mock.calls.length,0);
+  assert.equal(pending.enqueueMessage.mock.calls.length,1);
+  assert.equal(pending.view.result.current.input,'with file');
+  await act(async()=>accept());
+  assert.equal(pending.view.result.current.input,'');
+});
+
 test('slash commands and providers without live input keep the next-turn queue', async () => {
   const slash = renderComposer('claude');
   await type(slash.view, '/compact');
@@ -136,4 +166,5 @@ test('an insertion whose turn already ended falls back to the queue without an i
   assert.equal(vi.mocked(api.messageQueue.sendLive).mock.calls.length, 0);
   assert.equal(vi.mocked(api.messageQueue.enqueue).mock.calls.length, 1);
   assert.equal(hook.result.current.error, '');
+  assert.match(hook.result.current.notice,/task ended|任务已结束/);
 });

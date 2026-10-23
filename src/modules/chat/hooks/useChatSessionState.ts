@@ -182,6 +182,7 @@ function chatMessageToNormalized(
     // Survives the truncation that follows an edit, which clears every other
     // live row.
     replacesAnchorId: msg.replacesAnchorId,
+    insertedMidTurn: msg.insertedMidTurn,
   } as NormalizedMessage;
 }
 

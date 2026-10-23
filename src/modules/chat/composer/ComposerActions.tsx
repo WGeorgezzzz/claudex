@@ -15,7 +15,7 @@ export function ComposerActions({children}:{children:ReactNode}) {
   const { triggerRef, menuRef, anchor, updateAnchor } = useViewportMenuAnchor(isOpen, close, 256, 'above', 'left');
   return <div className="composer-actions">
     <button ref={triggerRef} type="button" aria-label={t('ui.addContext')} title={t('ui.addContext')}
-      aria-expanded={isOpen} className="workspace-icon-button" onClick={() => {
+      aria-expanded={isOpen} className="workspace-icon-button !h-10 !w-10 shrink-0" onClick={() => {
         updateAnchor();
         setIsOpen(open => !open);
       }}><Plus size={18}/></button>

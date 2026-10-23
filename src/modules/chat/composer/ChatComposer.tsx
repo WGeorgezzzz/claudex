@@ -10,11 +10,11 @@ import type {
   RefObject,
   TouchEvent,
 } from 'react';
-import { ListPlus, PaperclipIcon, MessageSquareIcon, XIcon, Loader2, ArrowUpIcon, CornerDownRight, PencilIcon, Monitor } from 'lucide-react';
+import { ListPlus, PaperclipIcon, MessageSquareIcon, XIcon, Loader2, CornerDownRight, PencilIcon, Monitor } from 'lucide-react';
 
 import { useVoiceInput } from '@/modules/chat/hooks/useVoiceInput';
 import { useVoiceAvailable } from '@/modules/chat/hooks/useVoiceAvailable';
-import type { BackgroundSendChoice, BackgroundSendPrompt, QueuedDraft, ScheduledMessage, SlashCommand,SessionActivity,PendingPermissionRequest,PermissionMode,ProviderModelOption } from '@/shared/types';
+import type { BackgroundSendChoice, BackgroundSendPrompt, ScheduledMessage, SlashCommand,SessionActivity,PendingPermissionRequest,PermissionMode,ProviderModelOption } from '@/shared/types';
 import {
   PromptInput,
   PromptInputHeader,
@@ -31,7 +31,6 @@ import ComposerAttachment from '@/modules/chat/composer/ComposerAttachment';
 import VoiceInputButton from '@/modules/chat/composer/VoiceInputButton';
 import PermissionRequestsBanner from '@/modules/chat/composer/PermissionRequestsBanner';
 import TokenUsageSummary from '@/modules/chat/composer/TokenUsageSummary';
-import QueuedMessageCard from '@/modules/chat/composer/QueuedMessageCard';
 import BackgroundSendDialog from '@/modules/chat/composer/BackgroundSendDialog';
 import { MonitorPanel } from '@/modules/chat/composer/MonitorPanel';
 import { ScheduleMessagePopover } from '@/modules/chat/composer/ScheduleMessagePopover';
@@ -47,8 +46,8 @@ type MentionableFile = {
 
 type ChatComposerProps = {
   extraActions?: ReactNode;
-  onQueue?: ()=>void;
-  onSendLive?: ()=>void;
+  pendingTray?: ReactNode;
+  submissionNotice?: string;
   busySendMode?: 'insert' | 'queue';
   supportsLiveInput?: boolean;
   onBusySendModeChange?: (mode: 'insert' | 'queue') => void;
@@ -83,7 +82,6 @@ type ChatComposerProps = {
   onClearInput: () => void;
   onSubmit: (event: FormEvent<HTMLFormElement> | MouseEvent<HTMLButtonElement> | TouchEvent<HTMLButtonElement>) => void;
   isDragActive: boolean;
-  queuedDraft: QueuedDraft | null;
   backgroundSendPrompt: BackgroundSendPrompt | null;
   onResolveBackgroundSendPrompt: (choice: BackgroundSendChoice) => void;
   /** Set while the composer is replacing an already-sent message. */
@@ -93,8 +91,6 @@ type ChatComposerProps = {
   scheduledMessages: ScheduledMessage[];
   onScheduleMessage: (scheduledFor: Date) => void;
   onCancelScheduledMessage: (id: string) => void;
-  onEditQueuedDraft: () => void;
-  onDeleteQueuedDraft: () => void;
   attachedFiles: File[];
   onRemoveAttachment: (index: number) => void;
   fileErrors: Map<string, string>;
@@ -136,8 +132,8 @@ type ChatComposerProps = {
  */
 export default function ChatComposer({
   extraActions,
-  onQueue,
-  onSendLive,
+  pendingTray,
+  submissionNotice,
   busySendMode = 'insert',
   supportsLiveInput = false,
   onBusySendModeChange,
@@ -168,7 +164,6 @@ export default function ChatComposer({
   onClearInput,
   onSubmit,
   isDragActive,
-  queuedDraft,
   backgroundSendPrompt,
   onResolveBackgroundSendPrompt,
   isEditingSentMessage,
@@ -176,8 +171,6 @@ export default function ChatComposer({
   scheduledMessages,
   onScheduleMessage,
   onCancelScheduledMessage,
-  onEditQueuedDraft,
-  onDeleteQueuedDraft,
   attachedFiles,
   onRemoveAttachment,
   fileErrors,
@@ -273,19 +266,14 @@ export default function ChatComposer({
 
   // Hide the thinking/status bar while any permission request is pending
   const hasPendingPermissions = pendingPermissionRequests.length > 0;
-  const hasActivityIndicator = Boolean(activity && !hasPendingPermissions);
 
-  const hasQueuedDraft = Boolean(queuedDraft);
   const canQueueDraft = isLoading && Boolean(input.trim() || attachedFiles.length > 0);
-  // Enter/send inserts into the running turn (text only, not slash commands);
-  // the queue stays one Alt+Enter or the "add to queue" action away.
-  const insertsLive = busySendMode === 'insert' && canQueueDraft && Boolean(onSendLive) && attachedFiles.length === 0 && !input.trimStart().startsWith('/');
-  const submitHint = insertsLive
-    ? t('liveInput.enterHint')
-    : canQueueDraft
-    ? hasQueuedDraft
-      ? t('input.hintText.updateQueued', { defaultValue: 'Enter to update queued message' })
-      : t('input.hintText.queue', { defaultValue: 'Enter to queue your next message' })
+  const liveDisabledReason = attachedFiles.length ? t('liveInput.attachmentsNext')
+    : isEditingSentMessage ? t('liveInput.editNext')
+    : input.trimStart().startsWith('/') ? t('liveInput.commandsNext') : '';
+  const insertsLive = supportsLiveInput && busySendMode === 'insert' && canQueueDraft && !liveDisabledReason;
+  const submitHint = canQueueDraft
+    ? t(insertsLive ? 'liveInput.insertKeys' : supportsLiveInput && !liveDisabledReason ? 'liveInput.queueKeys' : 'liveInput.queueOnlyKeys')
     : sendByCtrlEnter
       ? providerLabel === 'Claude'
         ? t('input.hintText.claudeCtrlEnter', 'Ctrl+Enter to send · Shift+Enter for a new line · Shift+Tab for permissions')
@@ -296,9 +284,7 @@ export default function ChatComposer({
   const submitAriaLabel = insertsLive
     ? t('liveInput.insert')
     : canQueueDraft
-    ? hasQueuedDraft
-      ? t('input.queue.update', { defaultValue: 'Update queued message' })
-      : t('input.queue.sendNext', { defaultValue: 'Queue next message' })
+    ? t('liveInput.next')
     : isLoading
       ? t('input.stop')
       : t('input.send');
@@ -349,16 +335,8 @@ export default function ChatComposer({
         onResolve={onResolveBackgroundSendPrompt}
       />
 
-      {queuedDraft && (
-        <QueuedMessageCard
-          content={queuedDraft.content}
-          attachmentCount={
-            queuedDraft.uploadedAttachments?.length ?? queuedDraft.attachments.length
-          }
-          onEdit={onEditQueuedDraft}
-          onDelete={onDeleteQueuedDraft}
-        />
-      )}
+      {submissionNotice && <p role="status" className="mx-auto mb-1 max-w-[54.25rem] px-2 text-xs text-muted-foreground">{submissionNotice}</p>}
+      {pendingTray}
 
       {!hasQuestionPanel && <div className="relative mx-auto max-w-[54.25rem]">
         {showFileDropdown && filteredFiles.length > 0 && (
@@ -468,8 +446,22 @@ export default function ChatComposer({
             />
         </PromptInputBody>
 
-        <PromptInputFooter className="gap-2">
-          <PromptInputTools className="min-w-0">
+        {canQueueDraft && supportsLiveInput && <div className="busy-send-destination mx-3 my-1 flex h-8 min-w-0 items-center gap-2" role="group" aria-label={t('liveInput.modeLabel')}>
+          <div className="flex h-8 shrink-0 items-center rounded-lg bg-muted/60 px-1">
+            <button type="button" disabled={Boolean(liveDisabledReason)} aria-pressed={insertsLive} aria-label={t('liveInput.insert')}
+              title={liveDisabledReason || t('liveInput.insertKeys')} onClick={() => onBusySendModeChange?.('insert')}
+              className="min-h-10 whitespace-nowrap rounded-md px-3 text-xs disabled:opacity-40 aria-pressed:bg-primary/10 aria-pressed:text-primary">
+              <span className="sm:hidden">{t('liveInput.insertShort')}</span><span className="hidden sm:inline">{t('liveInput.insert')}</span>
+            </button>
+            <button type="button" aria-pressed={!insertsLive} aria-label={t('liveInput.next')} title={submitHint}
+              onClick={() => onBusySendModeChange?.('queue')} className="min-h-10 whitespace-nowrap rounded-md px-3 text-xs aria-pressed:bg-primary/10 aria-pressed:text-primary">
+              <span className="sm:hidden">{t('liveInput.nextShort')}</span><span className="hidden sm:inline">{t('liveInput.next')}</span>
+            </button>
+          </div>
+          {liveDisabledReason && <span role="status" title={liveDisabledReason} className="min-w-0 truncate text-[11px] text-muted-foreground">{liveDisabledReason}</span>}
+        </div>}
+        <PromptInputFooter className="min-w-0 gap-1">
+          <PromptInputTools className="min-w-0 flex-1">
             <ComposerActions>
             <PromptInputButton
               tooltip={{ content: t('input.attachFiles') }}
@@ -497,9 +489,6 @@ export default function ChatComposer({
               </PromptInputButton>
             )}
 
-            {!compact&&onQueue&&<button type="button" aria-label={t('queue.add')} title={t('queue.add')}
-              disabled={!input.trim()&&attachedFiles.length===0} onClick={onQueue}
-              className="disabled:opacity-40"><ListPlus size={16}/><span>{t('queue.add')}</span></button>}
             {!compact && providerLabel.toLowerCase().includes('claude') && <MonitorPanel sessionId={monitorSessionId ?? null} draft={input} options={{model,effort,permissionMode}} />}
             {!compact && <ScheduleMessagePopover
               disabled={!input.trim()}
@@ -519,14 +508,6 @@ export default function ChatComposer({
             />
           </PromptInputTools>
           <div className="ml-auto flex shrink-0 items-center gap-2">
-            {isLoading && onBusySendModeChange && <select aria-label={t('liveInput.modeLabel', { defaultValue: '运行中消息发送方式' })}
-              title={t('liveInput.modeHint', { defaultValue: '插入当前任务，或等当前任务结束后排队发送。附件和命令始终排队。' })}
-              className="h-8 max-w-24 rounded-md border border-border bg-background px-1 text-xs"
-              value={supportsLiveInput ? busySendMode : 'queue'}
-              onChange={event => onBusySendModeChange(event.target.value as 'insert' | 'queue')}>
-              {supportsLiveInput && <option value="insert">{t('liveInput.modeInsert', { defaultValue: '运行中：插入' })}</option>}
-              <option value="queue">{t('liveInput.modeQueue', { defaultValue: '运行中：排队' })}</option>
-            </select>}
             {onVoiceTranscript && voiceAvailable && <VoiceInputButton state={voiceState} onToggle={voiceToggle} errorMsg={voiceError} />}
             <PromptInputSubmit
               onClick={
@@ -555,14 +536,14 @@ export default function ChatComposer({
               }
               aria-label={submitAriaLabel}
               title={insertsLive ? t('liveInput.insertHint') : submitAriaLabel}
-              className="h-8 w-8 rounded-full sm:h-8 sm:w-8"
+              className="h-10 w-auto min-w-10 shrink-0 rounded-xl px-2"
             >
               {isTranscribing ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : insertsLive ? (
-                <CornerDownRight className="h-4 w-4" data-testid="insert-live-icon" />
+                <><CornerDownRight className="h-4 w-4" data-testid="insert-live-icon" /><span className="ml-1 hidden text-xs sm:inline">{t('liveInput.insertShort')}</span></>
               ) : canQueueDraft ? (
-                <ArrowUpIcon className="h-4 w-4" />
+                <><ListPlus className="h-4 w-4" /><span className="ml-1 hidden text-xs sm:inline">{t('liveInput.nextShort')}</span></>
               ) : undefined}
             </PromptInputSubmit>
           </div>

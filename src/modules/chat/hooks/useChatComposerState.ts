@@ -831,7 +831,7 @@ export function useChatComposerState({
       // descriptors that can be sent even if another session is open later.
       if (isLoading || submitOptions?.forceQueue || submitOptions?.forceLive) {
         const liveCapable=supportsLiveInsertion(provider) && Boolean(sendLiveMessage) && isLoading && !editingAnchorId
-          && !currentAttachments.length && !previouslyUploadedAttachments.length;
+          && !currentAttachments.length && !previouslyUploadedAttachments.length && !currentInput.trimStart().startsWith('/');
         if (submitOptions?.forceLive && !liveCapable) {
           addMessage({type:'error',content:t('liveInput.textOnly'),timestamp:new Date()});
           return;
@@ -1326,13 +1326,15 @@ export function useChatComposerState({
         }
 
         if (event.altKey && isLoading && !event.shiftKey && !event.ctrlKey && !event.metaKey) {
-          // Alt+Enter during a running turn: wait for it and send as the next turn.
+          // Alternate destination is available only for eligible plain text.
           event.preventDefault();
-          handleSubmit(event, undefined, { forceQueue: true });
+          const canInsert = supportsLiveInsertion(provider) && Boolean(sendLiveMessage) && !editingAnchorId
+            && !attachedFiles.length && !inputValueRef.current.trimStart().startsWith('/');
+          if (canInsert) handleSubmit(event, undefined, busySendMode === 'queue' ? { forceLive: true } : { forceQueue: true });
         } else if ((event.ctrlKey || event.metaKey) && !event.shiftKey) {
           event.preventDefault();
           handleSubmit(event);
-        } else if (!event.shiftKey && !event.ctrlKey && !event.metaKey && !sendByCtrlEnter) {
+        } else if (!event.shiftKey && !event.ctrlKey && !event.metaKey && (!sendByCtrlEnter || isLoading)) {
           event.preventDefault();
           handleSubmit(event);
         }
@@ -1345,6 +1347,10 @@ export function useChatComposerState({
       handleHistoryKeyDown,
       handleSubmit,
       isLoading,
+      attachedFiles,
+      editingAnchorId,
+      sendLiveMessage,
+      busySendMode,
       provider,
       sendByCtrlEnter,
       showCommandMenu,
