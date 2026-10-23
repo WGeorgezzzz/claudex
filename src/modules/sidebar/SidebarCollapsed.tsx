@@ -1,4 +1,4 @@
-import { Settings, Sparkles, PanelLeftOpen, Bug, AlertTriangle } from 'lucide-react';
+import { Settings, Sparkles, Bug, AlertTriangle } from 'lucide-react';
 import type { TFunction } from 'i18next';
 
 const DISCORD_INVITE_URL = 'https://discord.gg/buxwujPNRE';
@@ -39,7 +39,7 @@ export default function SidebarCollapsed({
         aria-label={t('common:versionUpdate.ariaLabels.showSidebar')}
         title={t('common:versionUpdate.ariaLabels.showSidebar')}
       >
-        <PanelLeftOpen className="h-4 w-4 text-muted-foreground transition-colors group-hover:text-foreground" />
+        <img src="/gaci-mark.svg" alt="GACI" className="h-6 w-6 rounded-md" />
       </button>
 
       <div className="nav-divider my-1 w-6" />

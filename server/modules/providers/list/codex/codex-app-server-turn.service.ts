@@ -276,7 +276,7 @@ export async function* runCodexAppServerTurn(options: CodexAppServerTurnOptions)
   options.signal.addEventListener('abort', onAbort, { once: true });
 
   try {
-    await call('initialize', { clientInfo: { name: 'claudex', title: 'Claudex', version: '1' }, capabilities: { experimentalApi: true } });
+    await call('initialize', { clientInfo: { name: 'claudex', title: 'GACI', version: '1' }, capabilities: { experimentalApi: true } });
     write({ method: 'initialized', params: {} });
     const threadParams = {
       cwd: options.cwd, model: options.model ?? null,

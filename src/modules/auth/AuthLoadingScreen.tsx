@@ -10,14 +10,14 @@ export default function AuthLoadingScreen() {
       <div className="relative text-center" role="status" aria-live="polite">
         <div className="mb-5 flex justify-center">
           <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-muted">
-            <img src="/logo.svg" alt="Claudex" className="h-7 w-7" />
+            <img src="/logo.svg" alt="GACI" className="h-7 w-7" />
           </div>
         </div>
 
         <h1
           className="mb-4 text-lg font-medium tracking-tight text-foreground"
         >
-          Claudex
+          GACI
         </h1>
         <p className="sr-only">{t('misc.loadingState')}</p>
         <div aria-hidden className="flex items-center justify-center gap-2">

@@ -1,12 +1,14 @@
-# Claudex
+# GACI
 
-Claudex 是面向 Claude Code 的独立桌面工作台，支持跨项目会话、持久消息队列、运行中补充、分支讨论、文件预览、终端和自动监测。也保留 Codex 等提供商入口。
+**General Agent Cloud Integration** · **Your agents, one workspace.**
 
-This is an independently maintained, modified version of **CloudCLI UI (https://github.com/siteboon/claudecodeui)**, based on upstream 1.37.5. Original authorship, commit history, and the AGPL-3.0-or-later license and additional notices are preserved. Claudex is not an official OpenAI or Anthropic product.
+GACI 是统一的 Agent 工作台，连接本地与云端的 Claude、Codex、Cursor、OpenCode 和 WorkBuddy，提供跨项目会话、持久消息队列、分支讨论、文件预览与终端。不同提供商的能力以实际接入为准。
+
+This is an independently maintained, modified version of **CloudCLI UI (https://github.com/siteboon/claudecodeui)**, based on upstream 1.37.5. Original authorship, commit history, and the AGPL-3.0-or-later license and additional notices are preserved. GACI is not an official OpenAI or Anthropic product.
 
 ## 使用
 
-Windows 安装包和校验值见 [Releases](https://github.com/WGeorgezzzz/claudex/releases)。只使用完成安装验收后发布的 `Claudex-<version>-win-x64.exe`。安装包目前未签名。
+Windows 安装包和校验值见 [Releases](https://github.com/WGeorgezzzz/claudex/releases)。新构建命名为 `GACI-<version>-win-x64.exe`，只使用完成安装验收后发布的安装包；旧发布仍可能使用 Claudex 名称。安装包目前未签名。
 
 桌面端默认使用本机操作系统身份登录，无需另建用户名和密码；已有本地账号及数据继续保留。在桌面启动器 **Local Settings → Claude profile** 中填入现有 Claude 配置目录和可选 CLI 路径。凭据、个人启动脚本和聊天记录不包含在项目或安装包里。
 
@@ -57,12 +59,12 @@ npm run lint
 npm run build
 ```
 
-后端测试位于 `server/modules/*/tests`，桌面测试位于 `electron/tests`。Windows 安装构建与独立安装验收由 [Claudex Windows installer](.github/workflows/workbench-windows.yml) 执行；模型真实回复与安装验收分开记录。
+后端测试位于 `server/modules/*/tests`，桌面测试位于 `electron/tests`。Windows 安装构建与独立安装验收由 [GACI Windows installer](.github/workflows/workbench-windows.yml) 执行；模型真实回复与安装验收分开记录。
 
-贡献前阅读 [AGENTS.md](AGENTS.md)。反馈和代码提交请面向本仓库。旧的 `WGeorgezzzz/claudecodeui` 保留为历史归档，旧安装包不会冒充 Claudex 新版本。
+贡献前阅读 [AGENTS.md](AGENTS.md)。反馈和代码提交请面向本仓库。旧的 `WGeorgezzzz/claudecodeui` 保留为历史归档，旧安装包不会冒充 GACI 新版本。
 
 ## 来源与许可证
 
-Claudex 保留 **CloudCLI UI (https://github.com/siteboon/claudecodeui)** 的原始提交历史、作者和著作权声明。它是明确标识的修改版本，独立维护并通过本仓库发布；GitHub 仓库的独立状态不改变代码来源或许可证。
+GACI 保留 **CloudCLI UI (https://github.com/siteboon/claudecodeui)** 的原始提交历史、作者和著作权声明。它是明确标识的修改版本，独立维护并通过本仓库发布；GitHub 仓库的独立状态不改变代码来源或许可证。
 
 适用 [AGPL-3.0-or-later 及附加条款](LICENSE)，参见 [NOTICE](NOTICE)。实现中的 Codex 生命周期设计参考见 [固定版本参考说明](docs/CODEX-SOURCE-REFERENCES.md)。

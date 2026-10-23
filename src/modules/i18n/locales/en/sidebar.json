@@ -42,7 +42,7 @@
     "sessionCountShort_one": "{{display}} session"
   },
   "app": {
-    "title": "Claudex",
+    "title": "GACI",
     "subtitle": "AI coding assistant interface"
   },
   "sessions": {
@@ -251,7 +251,7 @@
     "searchChats": "Search chats",
     "chats": "Chats",
     "filterChats": "Filter chats",
-    "about": "About Claudex",
+    "about": "About GACI",
     "view": {
       "projects": "Projects",
       "conversations": "Recent chats",

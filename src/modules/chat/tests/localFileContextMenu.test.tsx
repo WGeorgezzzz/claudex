@@ -42,7 +42,7 @@ test('keyboard menu navigation and Escape restore the link without launching', (
   const menu = screen.getByRole('menu');
   assert.equal(document.activeElement, screen.getByRole('menuitem', { name: /Open locally|本地打开/ }));
   fireEvent.keyDown(menu, { key: 'ArrowDown' });
-  assert.equal(document.activeElement, screen.getByRole('menuitem', { name: /Preview in Claudex|在 Claudex 中预览/ }));
+  assert.equal(document.activeElement, screen.getByRole('menuitem', { name: /Preview in GACI|在 GACI 中预览/ }));
   fireEvent.keyDown(menu, { key: 'Escape' });
   assert.equal(screen.queryByRole('menu'), null);
   assert.equal(document.activeElement, link);
