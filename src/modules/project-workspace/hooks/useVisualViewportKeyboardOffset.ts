@@ -9,11 +9,21 @@ export function useVisualViewportKeyboardOffset() {
     }
 
     const updateKeyboardHeight = () => {
-      const keyboardHeight = Math.max(0, window.innerHeight - visualViewport.height);
+      const keyboardHeight = Math.max(0, window.innerHeight - visualViewport.height - visualViewport.offsetTop);
       document.documentElement.style.setProperty('--keyboard-height', `${keyboardHeight}px`);
+      document.documentElement.style.setProperty('--visual-viewport-height', `${visualViewport.height}px`);
+      document.documentElement.style.setProperty('--visual-viewport-top', `${visualViewport.offsetTop}px`);
     };
 
+    updateKeyboardHeight();
     visualViewport.addEventListener('resize', updateKeyboardHeight);
-    return () => visualViewport.removeEventListener('resize', updateKeyboardHeight);
+    visualViewport.addEventListener('scroll', updateKeyboardHeight);
+    return () => {
+      visualViewport.removeEventListener('resize', updateKeyboardHeight);
+      visualViewport.removeEventListener('scroll', updateKeyboardHeight);
+      for (const property of ['--keyboard-height', '--visual-viewport-height', '--visual-viewport-top']) {
+        document.documentElement.style.removeProperty(property);
+      }
+    };
   }, []);
 }

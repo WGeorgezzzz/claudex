@@ -797,8 +797,8 @@ export type BackgroundSendPrompt = {
   work: string[];
 };
 
-/** Layout viewport offsets and visible size limits for chat's model and permission popovers; top is used when opening below the trigger. */
-export type ComposerMenuAnchor = {
+/** Layout viewport offsets and visible size limits for chat popovers and shared action menus; top is used when opening below the trigger. */
+export type ViewportMenuAnchor = {
   right: number;
   bottom?: number;
   top?: number;

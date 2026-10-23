@@ -588,7 +588,7 @@ function ChatInterface({
           <MessageQueuePanel key={currentSessionId||selectedSession?.id||'new'} items={messageQueue.items}
             error={messageQueue.error} update={messageQueue.update} attempts={messageQueue.attempts}
             paused={messageQueue.paused} setPaused={messageQueue.setPaused}/>
-          {provider === 'claude' && <NextPromptSuggestions messages={displayMessages} busy={isProcessing} onInsert={insertComposerText}/>}
+          <NextPromptSuggestions messages={displayMessages} busy={isProcessing} onInsert={insertComposerText}/>
           <ChatComposer
           extraActions={provider === 'claude' && (currentSessionId || selectedSession?.id) ? <CrossSessionDialog key={`bridge-${currentSessionId || selectedSession?.id}`} sourceSessionId={(currentSessionId || selectedSession?.id)!} draft={input} onInsert={insertComposerText}/> : undefined}
           onSendLive={supportsLiveInsertion(provider)&&isProcessing&&!editingAnchorId?()=>{void handleSubmit({preventDefault:()=>{}} as never,undefined,{forceLive:true});}:undefined}

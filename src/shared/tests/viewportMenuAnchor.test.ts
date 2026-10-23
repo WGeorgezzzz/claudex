@@ -1,13 +1,13 @@
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, expect, test, vi } from 'vitest';
 
-import { useComposerMenuAnchor } from '@/modules/chat/hooks/useComposerMenuAnchor';
+import { useViewportMenuAnchor } from '@/shared/hooks/useViewportMenuAnchor';
 
 afterEach(() => vi.unstubAllGlobals());
 
 function openMenu(right = 91, top = 807) {
   const onClose = vi.fn();
-  const { result, unmount } = renderHook(() => useComposerMenuAnchor(true, onClose, 352));
+  const { result, unmount } = renderHook(() => useViewportMenuAnchor(true, onClose, 352));
   const button = document.createElement('button');
   button.getBoundingClientRect = () => ({ right, top, bottom: top + 26 } as DOMRect);
   result.current.triggerRef.current = button;

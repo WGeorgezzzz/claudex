@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 
 import type { PermissionMode } from '@/shared/types';
-import { useComposerMenuAnchor } from '@/modules/chat/hooks/useComposerMenuAnchor';
+import { useViewportMenuAnchor } from '@/shared/hooks/useViewportMenuAnchor';
 import {
   ComposerMenuHeading,
   ComposerMenuItem,
@@ -92,7 +92,7 @@ function ComposerPermissionMenu({
   const { t } = useTranslation('chat');
   const [isOpen, setIsOpen] = useState(false);
   const close = useCallback(() => setIsOpen(false), []);
-  const { triggerRef, menuRef, anchor, updateAnchor } = useComposerMenuAnchor(isOpen, close, 22 * 16);
+  const { triggerRef, menuRef, anchor, updateAnchor } = useViewportMenuAnchor(isOpen, close, 22 * 16);
 
   if (permissionModes.length === 0) {
     return null;

@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Clock } from 'lucide-react';
 
 import { cn } from '@/shared/utils';
-import { useComposerMenuAnchor } from '@/modules/chat/hooks/useComposerMenuAnchor';
+import { useViewportMenuAnchor } from '@/shared/hooks/useViewportMenuAnchor';
 import {
   ComposerMenuHeading,
   ComposerMenuItem,
@@ -48,7 +48,7 @@ export function ScheduleMessagePopover({ disabled, onSchedule }: ScheduleMessage
   // Portalled and anchored like the model and permission menus: the composer
   // sits inside the scrolling transcript's stacking context, so a popover
   // positioned inside it is clipped by the message pane.
-  const { triggerRef, menuRef, anchor, updateAnchor } = useComposerMenuAnchor(isOpen, close);
+  const { triggerRef, menuRef, anchor, updateAnchor } = useViewportMenuAnchor(isOpen, close);
   // Seeded an hour out, because a picker that opens on "now" is never what
   // scheduling means.
   const [customValue, setCustomValue] = useState(() => toLocalInputValue(new Date(Date.now() + 3_600_000)));

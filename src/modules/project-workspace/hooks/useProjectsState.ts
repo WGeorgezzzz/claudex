@@ -469,6 +469,9 @@ export function useProjectsState({
 
   useEffect(() => {
     sessionLookupRef.current = null;
+    // Browser Back to the conversation list must release the old chat selection.
+    // Run on URL changes only: selecting a session updates state before navigation.
+    if (!sessionId) setSelectedSession(null);
   }, [sessionId]);
 
   const markSessionAttention = useCallback((targetSessionId?: string | null) => {
@@ -1045,21 +1048,12 @@ export function useProjectsState({
       }
 
       if (isMobile) {
-        // Sessions are tagged with the owning project's DB `projectId` when
-        // picked from the sidebar (see useSidebarController); compare against
-        // the current selection's `projectId` so we know whether to collapse
-        // the sidebar after navigation.
-        const sessionProjectId = session.__projectId;
-        const currentProjectId = selectedProject?.projectId;
-
-        if (sessionProjectId !== currentProjectId) {
-          setSidebarOpen(false);
-        }
+        setSidebarOpen(false);
       }
 
       navigate(`/session/${session.id}`);
     },
-    [activeTab, clearSessionAttention, isMobile, navigate, selectedProject?.projectId],
+    [activeTab, clearSessionAttention, isMobile, navigate],
   );
 
   const handleNewSession = useCallback(

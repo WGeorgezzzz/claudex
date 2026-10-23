@@ -17,9 +17,9 @@ function ProjectWorkspaceShell({
   return (
     <div
       className="workspace-shell fixed inset-0 flex bg-background"
-      style={{ bottom: 'var(--keyboard-height, 0px)' }}
+      style={{ top: 'var(--visual-viewport-top, 0px)', bottom: 'var(--keyboard-height, 0px)' }}
     >
-      <ProjectEffects navigate={navigate} />
+      <ProjectEffects navigate={navigate} isMobile={isMobile} />
       <ProjectSidebarRegion isMobile={isMobile} />
 
       <div className="flex min-w-0 flex-1 flex-col">

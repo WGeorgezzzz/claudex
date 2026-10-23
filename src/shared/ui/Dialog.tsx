@@ -199,7 +199,7 @@ export const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps
           role="dialog"
           aria-modal="true"
           className={cn(
-            'fixed left-1/2 top-1/2 z-50 w-full max-w-lg -translate-x-1/2 -translate-y-1/2',
+            'fixed left-1/2 top-[calc(var(--visual-viewport-top,0px)+var(--visual-viewport-height,100dvh)/2)] z-50 max-h-[calc(var(--visual-viewport-height,100dvh)-1rem)] w-full max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-y-auto',
             'rounded-xl border bg-popover text-popover-foreground shadow-lg',
             animationClassName ?? 'animate-dialog-content-show',
             className
@@ -222,4 +222,3 @@ export const DialogTitle = React.forwardRef<HTMLHeadingElement, React.HTMLAttrib
   )
 );
 DialogTitle.displayName = 'DialogTitle';
-

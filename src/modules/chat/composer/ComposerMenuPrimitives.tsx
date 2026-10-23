@@ -2,7 +2,7 @@ import type { ReactNode, Ref } from 'react';
 import { Check } from 'lucide-react';
 
 import { cn } from '@/shared/utils';
-import type { ComposerMenuAnchor } from '@/shared/types';
+import type { ViewportMenuAnchor } from '@/shared/types';
 
 /**
  * Shared shell for the composer popovers (model/effort and permissions) so both
@@ -16,7 +16,7 @@ export function ComposerMenuSurface({
   ariaLabel,
   children,
 }: {
-  anchor: ComposerMenuAnchor;
+  anchor: ViewportMenuAnchor;
   menuRef: Ref<HTMLDivElement>;
   ariaLabel: string;
   children: ReactNode;

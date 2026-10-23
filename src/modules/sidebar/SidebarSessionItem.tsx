@@ -57,7 +57,6 @@ function SidebarSessionItem({
   onStartEditingSession,
   onCancelEditingSession,
   onSaveEditingSession,
-  onProjectSelect,
   onSessionSelect,
   onDeleteSession,
   onForkSession,
@@ -92,7 +91,8 @@ function SidebarSessionItem({
   // Sessions are owned by a project identified by `projectId` (DB primary key)
   // after the projectName → projectId migration.
   const selectMobileSession = () => {
-    onProjectSelect(project);
+    // Selecting the owning project and session is one navigation. A separate
+    // project pick would insert a blank route into mobile Back history.
     onSessionSelect(session, project.projectId);
   };
 
@@ -251,7 +251,7 @@ function SidebarSessionItem({
           <DialogContent
             aria-describedby="mobile-session-options-description"
             animationClassName="animate-bottom-sheet-content-show motion-reduce:animate-none"
-            className="bottom-0 left-0 top-auto max-w-none translate-x-0 translate-y-0 rounded-b-none rounded-t-2xl border-x-0 border-b-0 px-4 pb-safe-area-inset-bottom pt-3"
+            className="bottom-[var(--keyboard-height,0px)] left-0 top-auto max-w-none translate-x-0 translate-y-0 rounded-b-none rounded-t-2xl border-x-0 border-b-0 px-4 pb-safe-area-inset-bottom pt-3"
           >
             <DialogTitle>Session options</DialogTitle>
             <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-muted-foreground/30" aria-hidden="true" />

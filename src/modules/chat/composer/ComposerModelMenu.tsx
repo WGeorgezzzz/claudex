@@ -5,7 +5,7 @@ import { ChevronDown, ChevronRight } from 'lucide-react';
 
 import type { ProviderModelOption } from '@/shared/types';
 import { DEFAULT_EFFORT_VALUE } from '@/shared/constants';
-import { useComposerMenuAnchor } from '@/modules/chat/hooks/useComposerMenuAnchor';
+import { useViewportMenuAnchor } from '@/shared/hooks/useViewportMenuAnchor';
 import {
   ComposerMenuHeading,
   ComposerMenuItem,
@@ -47,7 +47,7 @@ function ComposerModelMenu({
   const isClaude = providerLabel === 'Claude';
   const [isModelSectionOpen, setIsModelSectionOpen] = useState(isClaude);
   const close = useCallback(() => setIsOpen(false), []);
-  const { triggerRef, menuRef, anchor, updateAnchor } = useComposerMenuAnchor(isOpen, close);
+  const { triggerRef, menuRef, anchor, updateAnchor } = useViewportMenuAnchor(isOpen, close);
 
   // The model list starts collapsed every time the menu opens, the way Codex
   // shows reasoning first and keeps the longer model list one click away.

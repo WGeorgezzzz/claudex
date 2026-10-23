@@ -553,6 +553,10 @@
     }
   },
   "nextPrompts": {
+    "quickTitle": "Quick replies",
+    "continue": "Continue with the next step",
+    "explain": "Explain in more detail",
+    "review": "Check for anything missing",
     "title": "Suggested next prompts",
     "hint": "Next steps · click to add to your draft"
   },
