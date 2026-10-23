@@ -66,3 +66,16 @@ test('keyboard and visual viewport scrolling keep an open menu in the visible ar
   check();
   unmount();
 });
+
+test('a child popup retains its anchor after the parent menu is hidden',()=>{
+  vi.stubGlobal('innerWidth',390);
+  vi.stubGlobal('innerHeight',844);
+  const {result}=openMenu(200,500);
+  const trigger=result.current.triggerRef.current!;
+  trigger.getBoundingClientRect=()=>({left:50,right:200,top:500,bottom:530,width:150,height:30} as DOMRect);
+  act(()=>result.current.updateAnchor());
+  const before=result.current.anchor;
+  trigger.getBoundingClientRect=()=>({left:0,right:0,top:0,bottom:0,width:0,height:0} as DOMRect);
+  act(()=>window.dispatchEvent(new Event('resize')));
+  expect(result.current.anchor).toEqual(before);
+});

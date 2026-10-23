@@ -21,7 +21,7 @@ export function ComposerActions({children}:{children:ReactNode}) {
       }}><Plus size={18}/></button>
     {createPortal(<div ref={menuRef} role="group" aria-label={t('ui.moreActions')}
       className="composer-actions-menu fixed z-[100] overflow-y-auto overflow-x-hidden overscroll-contain rounded-xl border border-border bg-popover p-1.5 text-popover-foreground shadow-lg"
-      style={{ ...anchor, width: anchor?.maxWidth, visibility: isOpen && anchor ? 'visible' : 'hidden', pointerEvents: isOpen ? 'auto' : 'none' }}>
+      style={{ ...anchor, width: anchor?.maxWidth, display: isOpen && anchor ? undefined : 'none' }}>
       {children}
     </div>, document.body)}
   </div>;

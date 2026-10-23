@@ -19,14 +19,20 @@ export function useViewportMenuAnchor(
 ) {
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
+  // Nested popovers can outlive a hidden parent menu; retain their last visible
+  // trigger geometry so keyboard resizing does not anchor them to a zero rect.
+  const lastTriggerRectRef = useRef<DOMRect | null>(null);
   // Portal placement must follow the trigger and the visible viewport while open.
   const [anchor, setAnchor] = useState<ViewportMenuAnchor | null>(null);
 
   const updateAnchor = useCallback(() => {
-    const rect = triggerRef.current?.getBoundingClientRect();
-    if (!rect) {
+    const measuredRect = triggerRef.current?.getBoundingClientRect();
+    if (!measuredRect) {
       return;
     }
+    if (measuredRect.width > 0 || measuredRect.height > 0) lastTriggerRectRef.current = measuredRect;
+    const rect = measuredRect.width === 0 && measuredRect.height === 0
+      ? lastTriggerRectRef.current ?? measuredRect : measuredRect;
 
     const viewport = window.visualViewport;
     const left = (viewport?.offsetLeft ?? 0) + VIEWPORT_MARGIN;
