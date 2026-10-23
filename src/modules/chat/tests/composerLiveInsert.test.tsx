@@ -6,6 +6,7 @@ import { afterEach, beforeEach, test, vi } from 'vitest';
 
 import '@/modules/i18n';
 import { api } from '@/shared/api';
+import type * as ApiModule from '@/shared/api';
 import { useChatComposerState } from '@/modules/chat/hooks/useChatComposerState';
 import { useMessageQueue } from '@/modules/chat/composer/useMessageQueue';
 import type { ChatMessage, LLMProvider, PermissionMode, Project, ProjectSession, QueuedConversationMessage } from '@/shared/types';
@@ -17,7 +18,7 @@ import type { ChatMessage, LLMProvider, PermissionMode, Project, ProjectSession,
  */
 
 vi.mock('@/shared/api', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@/shared/api')>();
+  const actual = await importOriginal<typeof ApiModule>();
   return { ...actual, api: { ...actual.api, messageQueue: { list: vi.fn(), enqueue: vi.fn(), update: vi.fn(), liveState: vi.fn(), sendLive: vi.fn() } } };
 });
 
