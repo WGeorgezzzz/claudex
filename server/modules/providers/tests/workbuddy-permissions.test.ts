@@ -48,5 +48,6 @@ test('WorkBuddy preserves tool calls and error results in live events and histor
     { type: 'tool_result', tool_use_id: 'call_1', is_error: true, content: [{ type: 'text', text: 'Denied' }] },
   ] } }, 'session');
   assert.equal(result.kind, 'tool_result'); assert.equal(result.toolId, call.toolId);
+  assert.equal(result.content, 'Denied', 'the transcript UI reads the result content from the normalized envelope');
   assert.deepEqual(result.toolResult, { content: 'Denied', isError: true });
 });

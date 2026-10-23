@@ -31,7 +31,7 @@ export class WorkBuddySessionsProvider implements IProviderSessions {
         if (block.type === 'tool_result') {
           const result = typeof block.content === 'string' ? block.content : Array.isArray(block.content)
             ? block.content.map(part => readObjectRecord(part)?.text || '').join('\n') : JSON.stringify(block.content ?? '');
-          return [createNormalizedMessage({ ...base, kind: 'tool_result', toolId: block.tool_use_id,
+          return [createNormalizedMessage({ ...base, kind: 'tool_result', toolId: block.tool_use_id, content: result,
             toolResult: { content: result, isError: block.is_error === true }, isError: block.is_error === true })];
         }
         return [];

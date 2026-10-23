@@ -130,6 +130,7 @@ function ChatInterface({
     pendingPermissionRequests,
     setPendingPermissionRequests,
     availablePermissionModes,
+    permissionModeNamespace,
     selectPermissionMode,
     cyclePermissionMode,
     providerModelCatalog,
@@ -601,6 +602,7 @@ function ChatInterface({
           onAbortSession={handleAbortSession}
           permissionMode={permissionMode}
           availablePermissionModes={availablePermissionModes}
+          permissionModeNamespace={permissionModeNamespace}
           onSelectPermissionMode={selectPermissionMode}
           providerLabel={selectedProviderLabel}
           effort={currentProviderEffort}

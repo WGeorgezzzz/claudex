@@ -73,6 +73,7 @@ type ComposerPermissionMenuProps = {
   permissionMode: PermissionMode;
   /** Modes the active provider supports, in the order the backend reports them. */
   permissionModes: PermissionMode[];
+  permissionModeNamespace?: string;
   onSelectPermissionMode: (mode: PermissionMode) => void;
   providerLabel: string;
 };
@@ -84,6 +85,7 @@ type ComposerPermissionMenuProps = {
 function ComposerPermissionMenu({
   permissionMode,
   permissionModes,
+  permissionModeNamespace,
   onSelectPermissionMode,
   providerLabel,
 }: ComposerPermissionMenuProps) {
@@ -98,7 +100,7 @@ function ComposerPermissionMenu({
 
   const activeAppearance = getAppearance(permissionMode);
   const isClaude = providerLabel === 'Claude';
-  const modeNamespace = isClaude ? 'claudeModes' : 'codex';
+  const modeNamespace = permissionModeNamespace || (isClaude ? 'claudeModes' : 'codex');
   const ActiveIcon = activeAppearance.icon;
   const heading = t('composer.permissionHeading', {
     provider: providerLabel,

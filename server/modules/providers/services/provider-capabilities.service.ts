@@ -12,6 +12,8 @@ type ProviderCapabilities = {
   provider: LLMProvider;
   /** Permission modes the provider runtime understands, in cycle order. */
   permissionModes: string[];
+  /** Optional chat translation namespace for provider-specific permission semantics. */
+  permissionModeNamespace?: string;
   defaultPermissionMode: string;
   /** Whether image attachments can be included in a chat.send. */
   supportsImages: boolean;
@@ -100,6 +102,7 @@ const PROVIDER_CAPABILITIES: Record<LLMProvider, ProviderCapabilities> = {
     supportsSessionForking: true,
   },
   workbuddy: {
+    permissionModeNamespace: 'workbuddyModes',
     provider: 'workbuddy', permissionModes: ['default', 'acceptEdits', 'bypassPermissions', 'plan'], defaultPermissionMode: 'default',
     supportsImages: false, supportsFiles: false, supportsAbort: true,
     supportsPermissionRequests: true, supportsTokenUsage: false, supportsEffort: false,
