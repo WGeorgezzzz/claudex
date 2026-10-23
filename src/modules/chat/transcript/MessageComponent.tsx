@@ -60,7 +60,7 @@ const MessageComponent = memo(({ message, prevMessage, createDiff, onFileOpen, s
   const formattedMessageContent = useMemo(
     () => {
       const raw = formatUsageLimitText(String(message.content || ''));
-      const content = provider === 'claude' && message.type === 'assistant' && !message.isThinking && !message.isToolUse ? readClaudeNextPrompts(raw, Boolean(message.isStreaming)).content : raw;
+      const content = message.type === 'assistant' && !message.isThinking && !message.isToolUse ? readClaudeNextPrompts(raw, Boolean(message.isStreaming)).content : raw;
       return provider === 'codex' && message.type === 'assistant' && !message.isThinking
         ? stripProposedPlanEnvelope(content)
         : content;
