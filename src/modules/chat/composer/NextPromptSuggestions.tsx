@@ -25,8 +25,8 @@ export function NextPromptSuggestions({ messages, busy, onInsert }: { messages: 
   if (!contextual) prompts = [t('nextPrompts.continue'), t('nextPrompts.explain'), t('nextPrompts.review')];
   return <section aria-label={t(contextual ? 'nextPrompts.title' : 'nextPrompts.quickTitle')} title={t('nextPrompts.hint')} className="next-prompt-suggestions mx-auto mb-2 w-full max-w-[54.25rem] px-4">
     <p className="mb-1 text-[10px] text-muted-foreground">{t(contextual ? 'nextPrompts.title' : 'nextPrompts.quickTitle')}</p>
-    <div className="scrollbar-hide flex touch-pan-x gap-2 overflow-x-auto overscroll-x-contain pb-1">{prompts.map(prompt => <button key={prompt} type="button" title={prompt} onClick={() => onInsert(prompt)} className="flex min-w-36 flex-1 items-center gap-1.5 rounded-lg border border-border/60 px-2.5 py-2 text-left text-xs text-muted-foreground hover:bg-muted">
-      <ArrowUpRight size={13} className="shrink-0"/><span className="line-clamp-2 break-words">{prompt}</span>
+    <div className="grid gap-2 pb-1" style={{ gridTemplateColumns: `repeat(${prompts.length}, minmax(0, 1fr))` }}>{prompts.map(prompt => <button key={prompt} type="button" title={prompt} onClick={() => onInsert(prompt)} className="flex min-w-0 items-center gap-1.5 rounded-lg border border-border/60 px-2.5 py-2 text-left text-xs text-muted-foreground hover:bg-muted">
+      <ArrowUpRight size={13} className="hidden shrink-0 sm:block"/><span className="line-clamp-2 break-words">{prompt}</span>
     </button>)}</div>
   </section>;
 }
