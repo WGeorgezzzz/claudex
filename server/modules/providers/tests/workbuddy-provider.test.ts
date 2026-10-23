@@ -32,6 +32,15 @@ test('WorkBuddy never invents a free fallback when prices are absent or become n
   }
 });
 
+test('WorkBuddy includes remotely added Step 5 only inside its free promotion window', () => {
+  const catalog = { models: [{ id: 'step-5-preview', name: 'Step 5', credits: 'x0.00', supportsToolCall: true }], modelPromotions: [
+    { enabled: true, modelIds: ['step-5-preview'], discount: { factor: 0 }, schedule: { validFrom: '2026-10-12T00:00:00+08:00', validUntil: '2026-10-26T00:00:00+08:00' } },
+  ] };
+  assert.equal(buildWorkBuddyFreeModels(catalog, Date.parse('2026-10-24T12:00:00+08:00')).DEFAULT, 'step-5-preview');
+  assert.equal(buildWorkBuddyFreeModels(catalog, Date.parse('2026-10-26T00:00:00+08:00')).OPTIONS.length, 0);
+  assert.equal(buildWorkBuddyFreeModels(catalog, Date.parse('2026-10-11T23:59:59+08:00')).OPTIONS.length, 0);
+});
+
 test('WorkBuddy blocks a paid saved selection before spawning a process or saving a prompt', { skip: process.platform !== 'win32' }, async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), 'claudex-workbuddy-test-'));
   const previous = process.env.WORKBUDDY_INSTALL_DIR;
