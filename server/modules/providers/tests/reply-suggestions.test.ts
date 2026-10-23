@@ -45,3 +45,10 @@ test('a running session does not start auxiliary inference',async()=>{
   const service=createReplySuggestionsService({authorize:()=>({provider:'claude'}),readHistory:async()=>rows,isRunning:()=>true,generate:async()=>{calls++;return ['Unused'];}});
   assert.equal((await service.get(1,'s',rows[1].content!)).status,'stale');assert.equal(calls,0);
 });
+
+
+test('auxiliary suggestions use Sonnet even when the conversation uses Opus',async()=>{
+  const service=createReplySuggestionsService({authorize:()=>({provider:'claude',model:'opus'}),readHistory:async()=>rows,
+    generate:async(_context,model)=>{assert.equal(model,'sonnet');return ['Choose garden B.'];}});
+  assert.equal((await service.get(1,'s',rows[1].content!)).status,'ready');
+});

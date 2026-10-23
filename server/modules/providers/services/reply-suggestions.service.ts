@@ -104,7 +104,7 @@ export function createReplySuggestionsService(dependencies: Dependencies) {
       if (existing) return existing;
       if (pending.size >= 2) throw new AppError('Reply suggestion generator is busy.', { statusCode: 429 });
       const task = (async (): Promise<SuggestionResult> => {
-        const replies = validateReplies({ replies: await dependencies.generate(context, session.model) });
+        const replies = validateReplies({ replies: await dependencies.generate(context, 'sonnet') });
         const current = prepareContext(await dependencies.readHistory(sessionId));
         if (dependencies.isRunning?.(sessionId) || createHash('sha256').update(JSON.stringify(current)).digest('hex') !== revision) return { status: 'stale', replies: [] };
         const value: SuggestionResult = { status: 'ready', replies, revision };

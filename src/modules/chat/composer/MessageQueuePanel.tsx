@@ -22,7 +22,7 @@ export function MessageQueuePanel({items,error,update,attempts,paused=null,setPa
   const [pending,setPending]=useState(false);
   // Keep the requested immutable receipts separate from the live queue summary.
   const [receipts,setReceipts]=useState<{id:string;items:QueuedMessageAttempt[];error?:string}|null>(null);
-  const active=items.filter(item=>['queued','running','failed','interrupted'].includes(item.status));
+  const active=items.filter(item=>['queued','failed','interrupted'].includes(item.status));
   const ordinary=active.filter(item=>item.delivery_mode!=='live');
   const canMove=(item:QueuedConversationMessage,direction:number)=>{
     const neighbor=ordinary[ordinary.findIndex(row=>row.id===item.id)+direction];
@@ -33,11 +33,11 @@ export function MessageQueuePanel({items,error,update,attempts,paused=null,setPa
     try {await update(item,body);setEditing(null);} catch {/* The hook retains the visible error and edit text. */}
     finally {setPending(false);}
   };
-  if (!items.length && !error && !paused) return null;
+  if (!active.length && !error && !paused) return null;
   const needsAttention=active.length>0||Boolean(error)||Boolean(paused);
   return <section aria-label={t('queue.title')} className={`queue-panel mx-auto mb-2 w-[calc(100%-2rem)] max-w-[52.25rem] rounded-xl text-xs ${needsAttention?'border border-border bg-muted/20':'text-muted-foreground'}`}>
     {needsAttention&&<div className="flex items-center gap-2 px-3 py-2"><ListOrdered size={14}/><span className="font-medium">{t('queue.title')}</span>
-      <span className="text-muted-foreground">{active.length}</span>
+      <span className="text-muted-foreground">{active.filter(item=>item.status==='queued').length}</span>
       {paused!==null&&setPaused&&<button type="button" disabled={pending} className="ml-auto flex items-center gap-1 rounded px-2 py-1 hover:bg-muted disabled:opacity-40"
         title={t('queue.pauseHint')} aria-label={t(paused?'queue.resume':'queue.pause')} onClick={()=>{
           setPending(true);void setPaused(!paused).catch(()=>{}).finally(()=>setPending(false));

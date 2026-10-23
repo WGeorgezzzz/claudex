@@ -91,3 +91,13 @@ test('queue edits retain the original revision and do not hide a conflicted edit
   assert.equal((view.getByRole('textbox') as HTMLTextAreaElement).value,'My edit');
   assert.match(view.getByRole('alert').textContent||'',/conflict/);
 });
+
+
+test('delivered messages no longer occupy the pending queue',()=>{
+  const view=render(<MessageQueuePanel items={[{...item,status:'running',delivery_mode:'live'}]} error="" update={vi.fn()}/>);
+  assert.equal(view.container.textContent,'');
+  view.rerender(<MessageQueuePanel items={[{...item,status:'running'}]} error="" update={vi.fn()}/>);
+  assert.equal(view.container.textContent,'');
+  view.rerender(<MessageQueuePanel items={[{...item,status:'failed'}]} error="" update={vi.fn()}/>);
+  assert.ok(view.getAllByText('First').length);
+});

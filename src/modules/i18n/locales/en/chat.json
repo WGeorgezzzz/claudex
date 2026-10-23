@@ -31,8 +31,8 @@
     "inserted": "Inserted",
     "insertedHint": "Sent while the assistant was still responding and delivered into that turn",
     "modeLabel": "Messages while running",
-    "modeInsert": "While running: Insert",
-    "modeQueue": "While running: Queue",
+    "modeInsert": "Send now",
+    "modeQueue": "Send next turn",
     "modeHint": "Insert into the current turn or queue for the next turn. Attachments and commands are queued."
   },
   "fileLink": {

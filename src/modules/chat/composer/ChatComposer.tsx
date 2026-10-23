@@ -519,7 +519,7 @@ export default function ChatComposer({
             />
           </PromptInputTools>
           <div className="ml-auto flex shrink-0 items-center gap-2">
-            {onBusySendModeChange && <select aria-label={t('liveInput.modeLabel', { defaultValue: '运行中消息发送方式' })}
+            {isLoading && onBusySendModeChange && <select aria-label={t('liveInput.modeLabel', { defaultValue: '运行中消息发送方式' })}
               title={t('liveInput.modeHint', { defaultValue: '插入当前任务，或等当前任务结束后排队发送。附件和命令始终排队。' })}
               className="h-8 max-w-24 rounded-md border border-border bg-background px-1 text-xs"
               value={supportsLiveInput ? busySendMode : 'queue'}

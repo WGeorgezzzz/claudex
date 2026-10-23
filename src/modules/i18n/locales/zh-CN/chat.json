@@ -31,8 +31,8 @@
     "inserted": "插入",
     "insertedHint": "在助手回复过程中发送，并已送入该回合",
     "modeLabel": "运行中消息发送方式",
-    "modeInsert": "运行中：插入",
-    "modeQueue": "运行中：排队",
+    "modeInsert": "立即补充",
+    "modeQueue": "下一轮发送",
     "modeHint": "插入当前任务，或等当前任务结束后排队发送。附件和命令始终排队。"
   },
   "fileLink": {
