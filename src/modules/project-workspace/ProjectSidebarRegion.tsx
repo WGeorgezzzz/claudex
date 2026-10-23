@@ -7,6 +7,7 @@ import type {
 import { useTranslation } from 'react-i18next';
 
 import { useProjectSidebarState } from '@/modules/project-workspace/context/ProjectsStateContext';
+import { useMobileSidebarSwipe } from '@/modules/project-workspace/hooks/useMobileSidebarSwipe';
 import { Sidebar } from '@/modules/sidebar';
 import { useUiPreferences } from '@/shared/context/UiPreferencesContext';
 import {
@@ -23,6 +24,7 @@ function ProjectSidebarRegion({
 }: Pick<ProjectWorkspaceShellProps, 'isMobile'>) {
   const { t } = useTranslation('common');
   const { sidebarOpen, setSidebarOpen, sidebarSharedProps } = useProjectSidebarState();
+  useMobileSidebarSwipe(isMobile, sidebarOpen, setSidebarOpen);
   const { width: sidebarWidth, setWidth: setSidebarWidth, resetWidth: resetSidebarWidth } = useSidebarWidth();
   // Hide sidebar leaves a 48px icon rail behind, which sizes itself — the stored
   // width and the drag handle only apply while the full sidebar is on screen.
