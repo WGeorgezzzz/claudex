@@ -39,3 +39,14 @@ Run a targeted suite with `node scripts/test-backend-isolated.mjs server/modules
 5. Update backend code only through a release that preserves active sessions and workers. Do not restart an active service merely to synchronize a source checkout.
 
 The original working directories and uncommitted changes remain available for provenance. Use the integrated main history for subsequent feature work.
+
+## Follow-up audit: mobile gestures and shell presentation
+
+The initial integration missed the desktop launcher's uncommitted removal of hosted-cloud menus. It also treated browser Back handling as evidence for an application-level right swipe, although no touch gesture handler existed. Both are now corrected:
+
+- Right swipe opens the mobile sidebar and left swipe closes it without changing the session URL or draft. Vertical scroll, editing, code scrolling, text selection and multi-touch keep their own behavior.
+- Bash and PowerShell use compact, collapsed command rows in the main transcript, expanded tool groups and subagent history. The legacy terminal renderer also uses this component; it no longer renders black panels with green command text.
+- The native launcher and tray keep local controls without the old hosted-cloud account/environment UI. Existing native processes need a later restart to load main-process menu changes; restarting the backend is unnecessary.
+- The session pagination fix from `2ec3eee5` is retained.
+
+An older queued backend release activated after the first frontend verification and replaced the served frontend with an earlier build. Therefore release acceptance must resolve the **current** service runtime immediately before and after publishing, rather than reuse an earlier runtime path. Record the frontend commit and entrypoint hash in that runtime's `frontend-release.json`, and check outstanding deployment workers before reporting the live result. Preserve old hashed assets for existing tabs.
