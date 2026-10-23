@@ -31,6 +31,7 @@ import ChatComposer from '@/modules/chat/composer/ChatComposer';
 import CommandResultModal from '@/modules/chat/modals/CommandResultModal';
 import { useMessageQueue } from '@/modules/chat/composer/useMessageQueue';
 import { MessageQueuePanel } from '@/modules/chat/composer/MessageQueuePanel';
+import { restoreLiveInsertionMessages } from '@/modules/chat/utils/liveInsertionMessages';
 import { NextPromptSuggestions } from '@/modules/chat/composer/NextPromptSuggestions';
 import { CrossSessionDialog } from '@/modules/chat/modals/CrossSessionDialog';
 
@@ -199,16 +200,11 @@ function ChatInterface({
   const contextTime=contextCutoff?Date.parse(contextCutoff):NaN;
   const showMessage=(message:ChatMessage)=>showInherited || !Number.isFinite(contextTime)
     || new Date(message.timestamp instanceof Date?message.timestamp.getTime():message.timestamp).getTime()>contextTime;
-  // Durable live receipts restore insertion badges after a server history refresh replaces local echoes.
-  const markInsertedMessage=(message:ChatMessage)=>{
-    if(message.type!=='user'||message.insertedMidTurn)return message;
-    const timestamp=new Date(message.timestamp).getTime();
-    const inserted=messageQueue.items.some(item=>item.delivery_mode==='live'&&['running','succeeded'].includes(item.status)
-      &&item.content===message.content&&Math.abs(Date.parse(item.created_at)-timestamp)<5*60*1000);
-    return inserted?{...message,insertedMidTurn:true}:message;
-  };
-  const displayMessages=(isSideChat?chatMessages.filter(showMessage):chatMessages).map(markInsertedMessage);
-  const displayVisibleMessages=(isSideChat?visibleMessages.filter(showMessage):visibleMessages).map(markInsertedMessage);
+  // Live receipts are authoritative even when provider history omits streaming-input user rows.
+  const restoredMessages=restoreLiveInsertionMessages(chatMessages,messageQueue.items);
+  const restoredVisibleMessages=restoreLiveInsertionMessages(visibleMessages,messageQueue.items);
+  const displayMessages=isSideChat?restoredMessages.filter(showMessage):restoredMessages;
+  const displayVisibleMessages=isSideChat?restoredVisibleMessages.filter(showMessage):restoredVisibleMessages;
 
   // Brand-new conversation: the composer allocated a stable session id via
   // the session gateway before the first send. Record it locally and put it
