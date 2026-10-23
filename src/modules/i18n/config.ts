@@ -172,7 +172,14 @@ const getSavedLanguage = (): string => {
   if (saved && languages.some(lang => lang.value === saved)) {
     return saved;
   }
-  return 'en';
+  // A new account has no saved choice yet: follow the browser when it asks for
+  // a supported language (exact tag first, then the base language).
+  const browser = typeof navigator === 'undefined' ? '' : navigator.language || '';
+  const exact = languages.find(lang => lang.value.toLowerCase() === browser.toLowerCase());
+  if (exact) return exact.value;
+  const base = browser.split('-')[0].toLowerCase();
+  const byBase = base && base !== 'en' ? languages.find(lang => lang.value.split('-')[0].toLowerCase() === base) : undefined;
+  return byBase?.value ?? 'en';
 };
 
 // Initialize i18next

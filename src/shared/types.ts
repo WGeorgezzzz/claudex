@@ -378,6 +378,8 @@ export type ChatMessage = {
    * already-sent one, naming the anchor it replaces. Local to this client.
    */
   replacesAnchorId?: string;
+  /** Local echo of a message inserted into a turn that was still running (Claude streaming input / Codex steer). */
+  insertedMidTurn?: boolean;
   /**
    * The model that produced this assistant turn, as the provider reported it
    * on the transcript row. Absent on user turns and on rows the provider
@@ -1382,7 +1384,7 @@ export type AgentContext = {
 };
 
 /** Identifier of a top-level section in the settings dialog; use it whenever a tab is stored, compared or requested so deep links, the sidebar and the command palette all agree on the same set of names. */
-export type SettingsMainTab = 'users' | 'agents' | 'appearance' | 'git' | 'api' | 'voice' | 'tasks' | 'browser' | 'notifications' | 'plugins' | 'about';
+export type SettingsMainTab = 'account' | 'users' | 'agents' | 'appearance' | 'git' | 'api' | 'voice' | 'tasks' | 'browser' | 'notifications' | 'plugins' | 'about';
 
 /** The coding-agent CLI a settings screen is configuring, aliasing LLMProvider so agent-scoped settings read as being about an agent rather than a chat model. */
 export type AgentProvider = LLMProvider;

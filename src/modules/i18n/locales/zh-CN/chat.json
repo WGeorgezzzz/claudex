@@ -1,12 +1,17 @@
 {
   "liveInput": {
-    "send": "发送补充",
-    "hint": "送入当前 Claude 进程，在可接收时处理；沿用当前回合设置，不中断正在执行的工具",
-    "label": "运行中补充",
+    "send": "插入",
+    "hint": "插入到正在进行的回合：助手在下一步读取，不中断正在执行的工具",
+    "label": "插入",
     "delivered": "已送达，等待确认",
     "retryQueued": "作为下一轮重新排队",
     "unconfirmed": "未确认完成，不会自动重发。检查记录后，可作为下一轮重新排队。",
-    "textOnly": "运行中补充支持正在响应的 Claude 会话中的文字；附件请加入下一轮队列。"
+    "textOnly": "插入仅支持 Claude 或 Codex 正在回复时的文字；附件请加入下一轮队列。",
+    "insert": "插入到当前对话",
+    "insertHint": "插入到正在进行的回合（Enter）。Alt+Enter 改为排队到本轮之后。",
+    "enterHint": "Enter 插入到当前回合 · Alt+Enter 排队到本轮之后",
+    "inserted": "插入",
+    "insertedHint": "在助手回复过程中发送，并已送入该回合"
   },
   "fileLink": {
     "menu": "文件操作",
@@ -188,7 +193,15 @@
     "pressToSearch": "按 <kbd>{{shortcut}}</kbd> 搜索会话、文件和提交",
     "chooseModelDescriptionCustomOnly": "{{providers, list}} 仅列出您的模型",
     "claudeTitle": "今天想一起完成什么？",
-    "claudeDescription": "让 Claude 帮你理解项目、修改代码或处理任务。"
+    "claudeDescription": "让 Claude 帮你理解项目、修改代码或处理任务。",
+    "chooseModel": "选择模型",
+    "chooseModelDescription": "内置模型和自定义模型统一列出",
+    "addModel": "添加模型",
+    "searchModels": "搜索模型…",
+    "manageModels": "管理模型",
+    "noModelsFound": "没有找到模型。",
+    "loadingModels": "正在加载模型…",
+    "clickToChange": "点击切换模型"
   },
   "session": {
     "continue": {
@@ -284,7 +297,13 @@
       "title": "正在替换先前的消息",
       "filesNotReverted": "已修改的文件不会被还原",
       "cancel": "取消"
-    }
+    },
+    "reasoning": "推理强度",
+    "model": "模型",
+    "effortDefault": "默认",
+    "loadingModels": "正在加载模型…",
+    "modelMenu": "选择模型和推理强度",
+    "permissionHeading": "{{provider}} 的操作如何审批？"
   },
   "export": {
     "trigger": "导出对话",
@@ -454,5 +473,12 @@
       "shell": "终端",
       "browser": "浏览器"
     }
+  },
+  "misc": {
+    "close": "关闭",
+    "copyToClipboard": "复制到剪贴板",
+    "exportChat": "导出对话",
+    "showTokenUsage": "显示 Token 用量",
+    "escClosesModal": "按 Esc 关闭。"
   }
 }

@@ -206,7 +206,7 @@ function WorkspaceMain({
         claudeLayout={isClaude}
         onOpenSideChat={isClaude && selectedSession ? openSelectedSideChat : undefined}
         sideChatOpen={sideChatOpen}
-        displayOptions={isClaude&&<details className="workspace-display-menu relative shrink-0 self-end sm:self-center">
+        displayOptions={isClaude&&<details className="workspace-display-menu relative shrink-0 self-center">
           <summary aria-label={t('ui.displayOptions')} title={t('ui.displayOptions')} className="workspace-icon-button cursor-pointer list-none"><SlidersHorizontal size={16}/></summary>
           <div className="workspace-view-options absolute right-0 top-full z-50 mt-2 flex w-56 flex-col gap-3 rounded-xl border border-border bg-popover p-3 text-xs text-muted-foreground shadow-lg" data-testid="claude-workspace-controls">
           {!isMobile && <label className="flex items-center gap-1.5"><input type="checkbox" checked={splitEnabled} onChange={event => {

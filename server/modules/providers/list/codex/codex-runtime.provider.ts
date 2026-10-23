@@ -23,6 +23,7 @@ import {
   createNormalizedMessage,
 } from '@/shared/index.js';
 import { notifyRunFailed, notifyRunStopped } from '@/modules/notifications/index.js';
+import { runCodexAppServerTurn, submitCodexLiveInput } from '@/modules/providers/list/codex/codex-app-server-turn.service.js';
 import type { AnyRecord, ProviderRuntimeContext, ProviderRuntimeWriter } from '@/shared/index.js';
 
 type ActiveCodexSession = {
@@ -354,20 +355,34 @@ async function queryCodex(
     const turnInput = normalizedImages.length > 0
       ? buildCodexInputItems(promptWithImageFallback, normalizedImages, workingDirectory)
       : promptWithFiles;
-    const streamedTurn = await thread.runStreamed(turnInput, {
-      signal: abortController.signal
-    });
+    // The app-server transport accepts `turn/steer`, so text typed while the
+    // turn runs is folded into it. CLAUDEX_CODEX_TRANSPORT=exec restores the
+    // SDK's `codex exec` path, which cannot take input mid-turn.
+    const events: AsyncIterable<AnyRecord> = process.env.CLAUDEX_CODEX_TRANSPORT === 'exec'
+      ? (await thread.runStreamed(turnInput, { signal: abortController.signal })).events as AsyncIterable<AnyRecord>
+      : runCodexAppServerTurn({
+        env,
+        resumeThreadId: providerSessionId,
+        cwd: workingDirectory,
+        model: resolvedModel,
+        sandbox: sandboxMode || 'workspace-write',
+        approvalPolicy: approvalPolicy || 'on-request',
+        effort: resolvedEffort,
+        input: turnInput as string | AnyRecord[],
+        signal: abortController.signal,
+        sessionKeys: () => [sessionId, capturedSessionId],
+      });
 
-    for await (const event of streamedTurn.events) {
+    for await (const event of events) {
       // Capture thread/session id lazily from the stream (Codex emits this asynchronously).
       if (event.type === 'thread.started') {
-        const discoveredSessionId = event.thread_id || null;
+        const discoveredSessionId: string | null = event.thread_id || null;
         if (discoveredSessionId && !capturedSessionId) {
           capturedSessionId = discoveredSessionId;
           registerSession(sessionKey());
 
           if (ws.setSessionId && typeof ws.setSessionId === 'function') {
-            ws.setSessionId(capturedSessionId);
+            ws.setSessionId(discoveredSessionId);
           }
 
           if (!providerSessionId && !sessionCreatedSent) {
@@ -529,6 +544,7 @@ function abortCodexSession(sessionId: string) {
 export const codexRuntime = {
   run: queryCodex,
   abort: abortCodexSession,
+  submitLiveInput: submitCodexLiveInput,
 };
 
 /**

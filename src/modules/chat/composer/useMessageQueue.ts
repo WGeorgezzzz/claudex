@@ -5,9 +5,16 @@ import type { QueuedConversationMessage, QueuedMessageAttempt, QueueSubmission, 
 
 async function readQueueResult<T>(response: Response): Promise<T> {
   const body=await response.json();
-  if (!response.ok) throw new Error(readApiErrorMessage(body)||`HTTP ${response.status}`);
+  if (!response.ok) {
+    const error=new Error(readApiErrorMessage(body)||`HTTP ${response.status}`) as Error&{code?:string};
+    error.code=typeof body?.error?.code==='string'?body.error.code:undefined;
+    throw error;
+  }
   return body.data as T;
 }
+
+/** The turn ended (or never belonged to this server) before an insertion was persisted. */
+const isLiveUnavailable=(reason:unknown)=>(reason as {code?:string})?.code==='LIVE_INPUT_UNAVAILABLE';
 
 /** ChatInterface uses durable server snapshots; transport retries reuse the same request ID. */
 export function useMessageQueue(sessionId: string|null) {
@@ -57,7 +64,8 @@ export function useMessageQueue(sessionId: string|null) {
       throw reason;
     }
   },[reload]);
-  const sendLive=useCallback(async(submission:QueueSubmission,targetSessionId:string)=>{
+  /** Inserts into the running turn; resolves 'queued' when no turn was running and the draft went to the queue instead. */
+  const sendLive=useCallback(async(submission:QueueSubmission,targetSessionId:string):Promise<'live'|'queued'>=>{
     if (submission.attachments.length) throw new Error('Live additions accept text; use the queue for attachments.');
     const fingerprint=JSON.stringify([targetSessionId,submission.content]);
     const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(fingerprint))))
@@ -75,11 +83,19 @@ export function useMessageQueue(sessionId: string|null) {
       if (currentSession.current===targetSessionId) void reload().catch(reason=>setError(String(reason.message)));
       if (row.status==='failed'||row.status==='interrupted') throw new Error(row.error||'The addition was not confirmed. Review its receipt before retrying.');
       setError('');
+      return 'live';
     } catch(reason) {
+      if (isLiveUnavailable(reason)) {
+        // Nothing was persisted for this insertion: the turn already ended, so
+        // the same text goes to the ordinary next-turn queue instead.
+        localStorage.removeItem(key);
+        await enqueue(submission,targetSessionId);
+        return 'queued';
+      }
       setError(reason instanceof Error?reason.message:String(reason));
       throw reason;
     }
-  },[reload]);
+  },[reload,enqueue]);
   const update=useCallback(async(item:QueuedConversationMessage,body:QueueMessageChange)=>{
     try {
       await readQueueResult(await api.messageQueue.update(item.id,{revision:item.revision,...body}));

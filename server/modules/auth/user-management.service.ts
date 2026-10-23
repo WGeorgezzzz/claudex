@@ -28,6 +28,9 @@ function access(input:Record<string,unknown>, username:string) {
   if(input.is_active!==undefined && typeof input.is_active!=='boolean')fail('is_active must be boolean');
   return {root:path.resolve(root),folders:folders as string[],email,active:input.is_active!==false};
 }
+function activeAdmins():number {
+  return (userDb.listUsers() as {role:string;is_active:number}[]).filter(u=>u.role==='admin'&&u.is_active).length;
+}
 function conflict(error:unknown): never {
   if(typeof error==='object'&&error!==null&&'code' in error&&error.code==='SQLITE_CONSTRAINT_UNIQUE')fail('Username or SSO email already exists',409);
   throw error;
@@ -56,11 +59,36 @@ export const userManagementService = {
     admin(id);
     const existing=(userDb.listUsers() as {id:number;username:string;role:string;work_root:string|null;allowed_folders:string;access_sso_email:string|null;is_active:number}[]).find(u=>u.id===target);
     if(!existing)fail('User not found',404);
-    if(existing.role==='admin'&&input.is_active===false)fail('The administrator cannot be disabled');
+    const role=input.role===undefined?existing.role:input.role;
+    if(role!=='admin'&&role!=='member')fail('Role must be admin or member');
+    if(role!==existing.role){
+      if(target===id)fail('You cannot change your own role');
+      if(existing.role==='admin'&&activeAdmins()<=1)fail('At least one administrator is required');
+    }
+    if(role==='admin'&&input.is_active===false)fail('The administrator cannot be disabled');
+    const {role:_role,...accessInput}=input;
+    input=accessInput;
     const a=access({work_root:existing.work_root??undefined,allowed_folders:JSON.parse(existing.allowed_folders),access_sso_email:existing.access_sso_email,is_active:Boolean(existing.is_active),...input},existing.username);
-    try {mkdirSync(a.root,{recursive:true});userDb.updateAccess(target,a.root,a.folders,a.email,a.active);}catch(error){conflict(error);}
-    // Disabled devices must not revive when the account is enabled again.
-    if (!a.active) revoke(target);
+    try {
+      getConnection().transaction(()=>{
+        mkdirSync(a.root,{recursive:true});
+        userDb.updateAccess(target,a.root,a.folders,a.email,role==='admin'?true:a.active);
+        if(role!==existing.role)userDb.setRole(target,role as 'admin'|'member');
+      })();
+    }catch(error){conflict(error);}
+    // Disabled devices must not revive when the account is enabled again; a role
+    // change also invalidates tokens that still carry the previous role.
+    if (!a.active || role!==existing.role) revoke(target);
+    return {success:true};
+  },
+  remove(id:number,target:number) {
+    admin(id);
+    const existing=(userDb.listUsers() as {id:number;role:string}[]).find(u=>u.id===target);
+    if(!existing)fail('User not found',404);
+    if(target===id)fail('You cannot delete your own account');
+    if(existing.role==='admin'&&activeAdmins()<=1)fail('At least one administrator is required');
+    revoke(target);
+    userDb.softDelete(target);
     return {success:true};
   },
   async reset(id:number,target:number,input:Record<string,unknown>) {

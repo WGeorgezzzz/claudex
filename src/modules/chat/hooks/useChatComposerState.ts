@@ -34,7 +34,7 @@ import { useSlashCommands } from '@/modules/chat/hooks/useSlashCommands';
 
 type UseChatComposerStateArgs = {
   enqueueMessage?: (submission:QueueSubmission,sessionId:string)=>Promise<void>;
-  sendLiveMessage?: (submission:QueueSubmission,sessionId:string)=>Promise<void>;
+  sendLiveMessage?: (submission:QueueSubmission,sessionId:string)=>Promise<'live'|'queued'|void>;
   onOpenSideChat?: (prompt?: string) => void;
   selectedProject: Project | null;
   selectedSession: ProjectSession | null;
@@ -89,6 +89,9 @@ type CommandExecutionResult = {
 
 
 
+
+/** Providers whose running turn accepts inserted text (Claude streaming input, Codex `turn/steer`). */
+export const supportsLiveInsertion = (provider: string) => provider === 'claude' || provider === 'codex';
 
 type SubmitOptions = {
   forceQueue?: boolean;
@@ -729,8 +732,15 @@ export function useChatComposerState({
       if (submit) {
         if (!queuedSessionKey) return;
         try {
-          await submit({content:durableDraft.content,options:{...durableDraft.options},
+          const delivered=await submit({content:durableDraft.content,options:{...durableDraft.options},
             attachments:durableDraft.uploadedAttachments??[]},queuedSessionKey);
+          // Echo an accepted insertion where it landed: after whatever the
+          // running turn has streamed so far.
+          if (live && delivered==='live' && sessionKeyRef.current===queuedSessionKey) {
+            addMessage({type:'user',content:durableDraft.content,timestamp:new Date(),insertedMidTurn:true});
+            setIsUserScrolledUp(false);
+            setTimeout(() => scrollToBottom(), 100);
+          }
         } catch (error) {
           addMessage({type:'error',content:error instanceof Error?error.message:String(error),timestamp:new Date()});
           return;
@@ -778,7 +788,7 @@ export function useChatComposerState({
         writeDraftText(draftScopeRef.current, '');
       }
     },
-    [recordSentMessage, resetCommandMenuState, setInput, enqueueMessage, sendLiveMessage, addMessage],
+    [recordSentMessage, resetCommandMenuState, setInput, enqueueMessage, sendLiveMessage, addMessage, setIsUserScrolledUp, scrollToBottom],
   );
 
   const submitMessage = useCallback(
@@ -816,10 +826,17 @@ export function useChatComposerState({
       // Upload attached files now so the queued record contains durable image
       // descriptors that can be sent even if another session is open later.
       if (isLoading || submitOptions?.forceQueue || submitOptions?.forceLive) {
-        if (submitOptions?.forceLive && (provider!=='claude' || !isLoading || currentAttachments.length || previouslyUploadedAttachments.length)) {
+        const liveCapable=supportsLiveInsertion(provider) && Boolean(sendLiveMessage) && isLoading && !editingAnchorId
+          && !currentAttachments.length && !previouslyUploadedAttachments.length;
+        if (submitOptions?.forceLive && !liveCapable) {
           addMessage({type:'error',content:t('liveInput.textOnly'),timestamp:new Date()});
           return;
         }
+        // Like the Claude Code / Codex CLIs: Enter during a running turn inserts
+        // the text into that turn. Alt+Enter (forceQueue), attachments, slash
+        // commands and providers without live input keep the next-turn queue.
+        const insertLive=Boolean(submitOptions?.forceLive) || (liveCapable && !submitOptions?.forceQueue
+          && !queuedSubmission && !currentInput.trimStart().startsWith('/'));
         // A run can restart in the tiny gap between scheduling and flushing a
         // queued submission. Put the same durable draft back without uploading
         // its files again.
@@ -850,7 +867,7 @@ export function useChatComposerState({
           attachments: currentAttachments,
           uploadedAttachments,
           options: queuedOptions,
-        }, queuedSessionKey,Boolean(submitOptions?.forceLive));
+        }, queuedSessionKey,insertLive);
         return;
       }
 
@@ -1074,6 +1091,7 @@ export function useChatComposerState({
       scrollToBottom,
       selectedProject,
       sendMessage,
+      sendLiveMessage,
       sessionKey,
       addMessage,
       setIsUserScrolledUp,
@@ -1302,7 +1320,11 @@ export function useChatComposerState({
           return;
         }
 
-        if ((event.ctrlKey || event.metaKey) && !event.shiftKey) {
+        if (event.altKey && isLoading && !event.shiftKey && !event.ctrlKey && !event.metaKey) {
+          // Alt+Enter during a running turn: wait for it and send as the next turn.
+          event.preventDefault();
+          handleSubmit(event, undefined, { forceQueue: true });
+        } else if ((event.ctrlKey || event.metaKey) && !event.shiftKey) {
           event.preventDefault();
           handleSubmit(event);
         } else if (!event.shiftKey && !event.ctrlKey && !event.metaKey && !sendByCtrlEnter) {
@@ -1317,6 +1339,7 @@ export function useChatComposerState({
       handleFileMentionsKeyDown,
       handleHistoryKeyDown,
       handleSubmit,
+      isLoading,
       provider,
       sendByCtrlEnter,
       showCommandMenu,

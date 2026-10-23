@@ -319,5 +319,16 @@
     "customModelsOnlyHint": "在所有模型選擇器中隱藏 {{provider}} 的內建模型，並將您的第一個模型設為預設模型。在您新增模型之前，內建模型仍會顯示。",
     "builtInModelsHidden": "開啟「僅使用我的模型」時，這些模型不會出現在模型選擇器中。",
     "customModelsOnlyFailed": "無法變更此設定。"
+  },
+  "liveInput": {
+    "send": "插入",
+    "hint": "插入到正在進行的回合：助手在下一步讀取，不中斷正在執行的工具",
+    "label": "插入",
+    "insert": "插入到目前對話",
+    "insertHint": "插入到正在進行的回合（Enter）。Alt+Enter 改為排隊到本輪之後。",
+    "enterHint": "Enter 插入到目前回合 · Alt+Enter 排隊到本輪之後",
+    "inserted": "插入",
+    "insertedHint": "在助手回覆過程中傳送，並已送入該回合",
+    "textOnly": "插入僅支援 Claude 或 Codex 正在回覆時的文字；附件請加入下一輪佇列。"
   }
 }

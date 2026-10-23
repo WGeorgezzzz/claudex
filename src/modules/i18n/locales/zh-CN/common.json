@@ -134,7 +134,8 @@
       "refresh": "刷新",
       "menuLabel": "文件上下文菜单",
       "loading": "加载中..."
-    }
+    },
+    "loadFailed": "无法加载文件"
   },
   "projectWizard": {
     "title": "创建新项目",
@@ -323,5 +324,28 @@
     "unread": "未读",
     "running": "运行中",
     "searchLimitHint": "正文检索取全局最多 50 条匹配，再按项目筛选；更多历史标题可继续加载。"
+  },
+  "folderBrowser": {
+    "title": "选择文件夹",
+    "hideHidden": "隐藏隐藏文件夹",
+    "showHidden": "显示隐藏文件夹",
+    "createNew": "新建文件夹",
+    "newFolderPlaceholder": "新文件夹名称",
+    "create": "创建",
+    "loadFailed": "加载文件夹失败",
+    "createFailed": "创建文件夹失败",
+    "noSubfolders": "没有子文件夹",
+    "select": "选择",
+    "pathLabel": "路径：",
+    "useThisFolder": "使用此文件夹"
+  },
+  "misc": {
+    "openMenu": "打开菜单",
+    "close": "关闭",
+    "browseFolders": "浏览文件夹",
+    "noProjectSelected": "未选择项目",
+    "errorTitle": "出错了",
+    "errorDescription": "加载聊天界面时发生错误。",
+    "tryAgain": "重试"
   }
 }

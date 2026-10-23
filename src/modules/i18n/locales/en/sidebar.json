@@ -37,7 +37,9 @@
     "projects": "projects",
     "noMatchingProjects": "No matching projects",
     "tryDifferentSearch": "Try adjusting your search term",
-    "runClaudeCli": "Run Claude CLI in a project directory to get started"
+    "runClaudeCli": "Run Claude CLI in a project directory to get started",
+    "sessionCountShort": "{{display}} sessions",
+    "sessionCountShort_one": "{{display}} session"
   },
   "app": {
     "title": "Claudex",
@@ -60,7 +62,8 @@
     "deleteSelected_one": "Delete {{count}} session",
     "deleteSelected_other": "Delete {{count}} sessions",
     "newClaude": "New Claude chat",
-    "otherProviders": "Other chats"
+    "otherProviders": "Other chats",
+    "loadMoreSessions": "Load more sessions"
   },
   "tooltips": {
     "viewEnvironments": "View Environments",

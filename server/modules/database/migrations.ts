@@ -510,6 +510,8 @@ export const runMigrations = (db: Database) => {
       addColumnToTableIfNotExists(db, 'users', userColumnNames, 'work_root', 'TEXT');
       addColumnToTableIfNotExists(db, 'users', userColumnNames, 'allowed_folders', "TEXT NOT NULL DEFAULT '[]'");
       addColumnToTableIfNotExists(db, 'users', userColumnNames, 'access_sso_email', 'TEXT');
+      // Deleted accounts stay as tombstones so owned rows and data folders are kept.
+      addColumnToTableIfNotExists(db, 'users', userColumnNames, 'deleted_at', 'DATETIME');
       // Promote the legacy owner once, without changing roles on subsequent startups.
       if (needsRole) db.exec("UPDATE users SET role='admin' WHERE id=(SELECT MIN(id) FROM users)");
       db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_access_sso_email ON users(lower(access_sso_email)) WHERE access_sso_email IS NOT NULL');

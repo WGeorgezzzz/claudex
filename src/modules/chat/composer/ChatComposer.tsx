@@ -10,7 +10,7 @@ import type {
   RefObject,
   TouchEvent,
 } from 'react';
-import { ListPlus, PaperclipIcon, MessageSquareIcon, XIcon, Loader2, ArrowUpIcon, PencilIcon, Monitor } from 'lucide-react';
+import { ListPlus, PaperclipIcon, MessageSquareIcon, XIcon, Loader2, ArrowUpIcon, CornerDownRight, PencilIcon, Monitor } from 'lucide-react';
 
 import { useVoiceInput } from '@/modules/chat/hooks/useVoiceInput';
 import { useVoiceAvailable } from '@/modules/chat/hooks/useVoiceAvailable';
@@ -269,7 +269,12 @@ export default function ChatComposer({
 
   const hasQueuedDraft = Boolean(queuedDraft);
   const canQueueDraft = isLoading && Boolean(input.trim() || attachedFiles.length > 0);
-  const submitHint = canQueueDraft
+  // Enter/send inserts into the running turn (text only, not slash commands);
+  // the queue stays one Alt+Enter or the "add to queue" action away.
+  const insertsLive = canQueueDraft && Boolean(onSendLive) && attachedFiles.length === 0 && !input.trimStart().startsWith('/');
+  const submitHint = insertsLive
+    ? t('liveInput.enterHint')
+    : canQueueDraft
     ? hasQueuedDraft
       ? t('input.hintText.updateQueued', { defaultValue: 'Enter to update queued message' })
       : t('input.hintText.queue', { defaultValue: 'Enter to queue your next message' })
@@ -280,7 +285,9 @@ export default function ChatComposer({
       : providerLabel === 'Claude'
         ? t('input.hintText.claudeEnter', 'Enter to send · Shift+Enter for a new line · Shift+Tab for permissions')
         : t('input.hintText.enter');
-  const submitAriaLabel = canQueueDraft
+  const submitAriaLabel = insertsLive
+    ? t('liveInput.insert')
+    : canQueueDraft
     ? hasQueuedDraft
       ? t('input.queue.update', { defaultValue: 'Update queued message' })
       : t('input.queue.sendNext', { defaultValue: 'Queue next message' })
@@ -504,9 +511,6 @@ export default function ChatComposer({
             />
           </PromptInputTools>
           <div className="ml-auto flex shrink-0 items-center gap-2">
-            {onSendLive&&<button type="button" aria-label={t('liveInput.send')} title={t('liveInput.hint')}
-              disabled={!input.trim()||attachedFiles.length>0} onClick={onSendLive}
-              className="rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-muted disabled:opacity-40">{t('liveInput.send')}</button>}
             {onVoiceTranscript && voiceAvailable && <VoiceInputButton state={voiceState} onToggle={voiceToggle} errorMsg={voiceError} />}
             <PromptInputSubmit
               onClick={
@@ -534,11 +538,13 @@ export default function ChatComposer({
                       : !input.trim() && attachedFiles.length === 0
               }
               aria-label={submitAriaLabel}
-              title={submitAriaLabel}
+              title={insertsLive ? t('liveInput.insertHint') : submitAriaLabel}
               className="h-8 w-8 rounded-full sm:h-8 sm:w-8"
             >
               {isTranscribing ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
+              ) : insertsLive ? (
+                <CornerDownRight className="h-4 w-4" data-testid="insert-live-icon" />
               ) : canQueueDraft ? (
                 <ArrowUpIcon className="h-4 w-4" />
               ) : undefined}

@@ -129,31 +129,59 @@ export default function SidebarProjectSessions({
   return (
     <div className="sidebar-project-sessions ml-3 space-y-0.5 pl-2">
       {isCompact ? (
-        <div className="px-3 pb-1 pt-1">
+        <div className="flex items-center gap-2 px-3 pb-1 pt-1">
           <button
-            className="flex h-8 w-full items-center justify-center gap-2 rounded-md bg-primary text-xs font-medium text-primary-foreground transition-all duration-150 hover:bg-primary/90 active:scale-[0.98]"
+            className="flex h-9 min-w-0 flex-1 items-center justify-center gap-2 rounded-md bg-primary text-xs font-medium text-primary-foreground transition-all duration-150 hover:bg-primary/90 active:scale-[0.98]"
             onClick={() => {
               onProjectSelect(project);
               onNewSession(project);
             }}
           >
-            <Plus className="h-3 w-3" />
+            <Plus className="h-3.5 w-3.5" />
             {t('sessions.newSession')}
           </button>
+          {!isSelecting && initialSessionsLoaded && selectableSessionIds.length > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-9 flex-shrink-0 gap-1.5 px-2 text-xs font-normal text-muted-foreground hover:text-foreground"
+              onClick={() =>
+                onSetSessionSelection({ projectId: project.projectId, sessionIds: new Set() })
+              }
+            >
+              <CheckSquare className="h-3.5 w-3.5" />
+              {t('sessions.select')}
+            </Button>
+          )}
         </div>
       ) : (
-        <Button
-          variant="default"
-          size="sm"
-          className="flex h-7 w-full justify-start gap-2 bg-transparent text-xs font-normal text-muted-foreground shadow-none transition-colors hover:bg-muted hover:text-foreground"
-          onClick={() => onNewSession(project)}
-        >
-          <Plus className="h-3 w-3" />
-          {t('sessions.newSession')}
-        </Button>
+        <div className="flex h-7 items-center gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 min-w-0 flex-1 justify-start gap-2 px-2 text-xs font-normal text-muted-foreground hover:bg-muted hover:text-foreground"
+            onClick={() => onNewSession(project)}
+          >
+            <Plus className="h-3.5 w-3.5 flex-shrink-0" />
+            <span className="truncate">{t('sessions.newSession')}</span>
+          </Button>
+          {!isSelecting && initialSessionsLoaded && selectableSessionIds.length > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 flex-shrink-0 gap-1.5 px-2 text-xs font-normal text-muted-foreground hover:text-foreground"
+              onClick={() =>
+                onSetSessionSelection({ projectId: project.projectId, sessionIds: new Set() })
+              }
+            >
+              <CheckSquare className="h-3.5 w-3.5" />
+              {t('sessions.select')}
+            </Button>
+          )}
+        </div>
       )}
 
-      {(isSelecting || (initialSessionsLoaded && selectableSessionIds.length > 0)) && (
+      {isSelecting && (
         <div className={cn('space-y-1', isCompact && 'px-3')}>
           {isSelecting ? (
             <>

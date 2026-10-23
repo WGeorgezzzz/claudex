@@ -123,6 +123,10 @@ const MessageComponent = memo(({ message, prevMessage, createDiff, onFileOpen, s
                   </Markdown>
                 </div>
                 <div className="mt-1 flex items-center justify-end gap-1 text-xs text-muted-foreground">
+                  {message.insertedMidTurn && (
+                    <span data-testid="inserted-mid-turn" title={t('liveInput.insertedHint')}
+                      className="mr-auto rounded border border-border/60 px-1 text-[10px] leading-4">{t('liveInput.inserted')}</span>
+                  )}
                   {onEditMessage && message.transcriptAnchorId && (
                     <button
                       type="button"

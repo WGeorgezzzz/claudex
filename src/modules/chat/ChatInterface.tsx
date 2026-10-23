@@ -20,7 +20,7 @@ import { useChatProviderState } from '@/modules/chat/hooks/useChatProviderState'
 import { useScheduledMessages } from '@/modules/chat/composer/useScheduledMessages';
 import { useChatSessionState } from '@/modules/chat/hooks/useChatSessionState';
 import { useChatRealtimeHandlers } from '@/modules/chat/hooks/useChatRealtimeHandlers';
-import { useChatComposerState } from '@/modules/chat/hooks/useChatComposerState';
+import { supportsLiveInsertion, useChatComposerState } from '@/modules/chat/hooks/useChatComposerState';
 import { useSessionStore } from '@/modules/chat/hooks/useSessionStore';
 import {
   useProcessingSessions,
@@ -590,7 +590,7 @@ function ChatInterface({
           {provider === 'claude' && <NextPromptSuggestions messages={displayMessages} busy={isProcessing} onInsert={insertComposerText}/>}
           <ChatComposer
           extraActions={provider === 'claude' && (currentSessionId || selectedSession?.id) ? <CrossSessionDialog key={`bridge-${currentSessionId || selectedSession?.id}`} sourceSessionId={(currentSessionId || selectedSession?.id)!} draft={input} onInsert={insertComposerText}/> : undefined}
-          onSendLive={provider==='claude'&&isProcessing&&!editingAnchorId?()=>{void handleSubmit({preventDefault:()=>{}} as never,undefined,{forceLive:true});}:undefined}
+          onSendLive={supportsLiveInsertion(provider)&&isProcessing&&!editingAnchorId?()=>{void handleSubmit({preventDefault:()=>{}} as never,undefined,{forceLive:true});}:undefined}
           onQueue={currentSessionId||selectedSession?.id?()=>{void handleSubmit({preventDefault:()=>{}} as never,undefined,{forceQueue:true});}:undefined}
           compact={isSideChat}
           pendingPermissionRequests={pendingPermissionRequests}

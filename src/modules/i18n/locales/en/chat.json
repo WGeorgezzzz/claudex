@@ -1,12 +1,17 @@
 {
   "liveInput": {
-    "send": "Send addition",
-    "hint": "Deliver to the current Claude process when it can accept input, using the current turn settings without interrupting tools",
-    "label": "Live addition",
+    "send": "Insert",
+    "hint": "Insert into the running turn: the agent reads it at its next step without stopping current tools",
+    "label": "Inserted",
     "delivered": "Delivered, awaiting confirmation",
     "retryQueued": "Requeue as a new turn",
     "unconfirmed": "Completion was not confirmed. This will not resend automatically. Review the receipt before requeuing.",
-    "textOnly": "Live additions support text during an active Claude reply. Queue attachments for the next turn."
+    "textOnly": "Inserting supports text while a Claude or Codex reply is running. Queue attachments for the next turn.",
+    "insert": "Insert into current turn",
+    "insertHint": "Insert into the running turn (Enter). Alt+Enter queues it for after this turn.",
+    "enterHint": "Enter to insert into the running turn · Alt+Enter to queue after it",
+    "inserted": "Inserted",
+    "insertedHint": "Sent while the assistant was still responding and delivered into that turn"
   },
   "fileLink": {
     "menu": "File actions",

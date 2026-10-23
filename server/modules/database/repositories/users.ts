@@ -105,7 +105,7 @@ export const userDb = {
 
   /** User management returns public metadata only. */
   listUsers() {
-    return getConnection().prepare('SELECT id, username, role, work_root, allowed_folders, access_sso_email, is_active FROM users ORDER BY id').all();
+    return getConnection().prepare('SELECT id, username, role, work_root, allowed_folders, access_sso_email, is_active, created_at, last_login FROM users WHERE deleted_at IS NULL ORDER BY id').all();
   },
   getUserBySsoEmail(email: string) {
     const row = getConnection().prepare('SELECT id FROM users WHERE lower(access_sso_email)=lower(?) AND is_active=1').get(email) as {id:number} | undefined;
@@ -119,6 +119,13 @@ export const userDb = {
   },
   updateAccess(userId: number, root: string, folders: string[], email: string | null, active: boolean) {
     return getConnection().prepare('UPDATE users SET work_root=?, allowed_folders=?, access_sso_email=?, is_active=? WHERE id=?').run(root, JSON.stringify(folders), email, Number(active), userId);
+  },
+  setRole(userId: number, role: 'admin' | 'member') {
+    getConnection().prepare('UPDATE users SET role=? WHERE id=? AND deleted_at IS NULL').run(role, userId);
+  },
+  /** Tombstones the account: frees its username and SSO email, keeps owned rows and data folders. */
+  softDelete(userId: number) {
+    getConnection().prepare("UPDATE users SET is_active=0, deleted_at=CURRENT_TIMESTAMP, access_sso_email=NULL, username=username || '.deleted-' || id || '-' || strftime('%s','now') WHERE id=? AND deleted_at IS NULL").run(userId);
   },
   setPassword(userId: number, hash: string) {
     getConnection().prepare('UPDATE users SET password_hash=? WHERE id=?').run(hash, userId);

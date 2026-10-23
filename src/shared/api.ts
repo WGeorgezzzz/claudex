@@ -52,7 +52,9 @@ export const authenticatedFetch = (
     // real rejection ends the session. Note that a revalidated response surfaces
     // its stored status (typically 200), not the 304 from the wire, so the
     // header alone says nothing about the current request.
-    if (response.status === 401 && response.headers.get('X-Auth-Error')) {
+    // Without a stored token there is no session to expire: an anonymous request
+    // made before sign-in must not show a 'session expired' banner.
+    if (response.status === 401 && response.headers.get('X-Auth-Error') && localStorage.getItem('auth-token')) {
       expireAuthSession();
     }
     return response;
@@ -203,6 +205,7 @@ export const api = {
     users: () => get('/api/auth/users'),
     createUser: (input: Record<string, unknown>) => post('/api/auth/users', input),
     updateUser: (id: number, input: Record<string, unknown>) => patch('/api/auth/users/'+id, input),
+    deleteUser: (id: number) => del('/api/auth/users/'+id),
     resetPassword: (id: number, password: string) => post('/api/auth/users/'+id+'/password', {password}),
     changePassword: (current_password: string, password: string) => post('/api/auth/password', {current_password,password}),
     exchangeAccess: () => fetch('/api/auth/access-exchange',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}),

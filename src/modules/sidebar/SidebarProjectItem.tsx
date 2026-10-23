@@ -111,7 +111,11 @@ function SidebarProjectItem({
   const isSelected = selectedProject?.projectId === project.projectId;
   const totalSessionCount = Number(project.sessionMeta?.total ?? sessions.length);
   const sessionCountDisplay = getSessionCountDisplay(project, sessions);
-  const sessionCountLabel = `${sessionCountDisplay} session${totalSessionCount === 1 ? '' : 's'}`;
+  const sessionCountLabel = t('projects.sessionCountShort', {
+    count: totalSessionCount,
+    display: sessionCountDisplay,
+    defaultValue: `${sessionCountDisplay} session${totalSessionCount === 1 ? '' : 's'}`,
+  });
   const taskStatus = getTaskIndicatorStatus(project, mcpServerStatus);
   const mobileRenameInputRef = useRef<HTMLInputElement>(null);
 

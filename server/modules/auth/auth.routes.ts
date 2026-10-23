@@ -26,6 +26,7 @@ export function createAuthRouter(
   router.get('/users',authenticateToken,(req,res,next)=>{try{res.json(userManagementService.list(requireAuthenticatedUserId(req)));}catch(e){next(e);}});
   router.post('/users',authenticateToken,async(req,res,next)=>{try{res.json(await userManagementService.create(requireAuthenticatedUserId(req),req.body??{}));}catch(e){next(e);}});
   router.patch('/users/:id',authenticateToken,(req,res,next)=>{try{res.json(userManagementService.update(requireAuthenticatedUserId(req),Number(req.params.id),req.body??{}));}catch(e){next(e);}});
+  router.delete('/users/:id',authenticateToken,(req,res,next)=>{try{res.json(userManagementService.remove(requireAuthenticatedUserId(req),Number(req.params.id)));}catch(e){next(e);}});
   router.post('/users/:id/password',authenticateToken,async(req,res,next)=>{try{res.json(await userManagementService.reset(requireAuthenticatedUserId(req),Number(req.params.id),req.body??{}));}catch(e){next(e);}});
   router.post('/password',authenticateToken,async(req,res,next)=>{try{res.json(await userManagementService.change(requireAuthenticatedUserId(req),req.body??{}));}catch(e){next(e);}});
   const attempts=new Map<string,{count:number;until:number}>();

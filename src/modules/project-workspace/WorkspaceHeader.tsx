@@ -125,7 +125,7 @@ export default function WorkspaceHeader({
         </div>
 
         <div className="min-w-0 flex-1 sm:flex-none sm:shrink-0">
-          <div className="relative ml-auto w-fit max-w-full">
+          <div className="relative w-fit max-w-full sm:ml-auto">
             {canScrollLeft && (
               <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-12 bg-gradient-to-r from-background via-background/90 to-transparent" />
             )}
@@ -133,8 +133,8 @@ export default function WorkspaceHeader({
               ref={scrollRef}
               onScroll={updateScrollState}
               className={cn(
-                'scrollbar-hide max-w-full scroll-smooth overflow-x-auto overscroll-x-contain px-3 [-webkit-overflow-scrolling:touch]',
-                hasOverflow ? 'sm:px-9' : 'sm:pl-3 sm:pr-0',
+                'scrollbar-hide max-w-full scroll-smooth overflow-x-auto overscroll-x-contain px-0 [-webkit-overflow-scrolling:touch]',
+                hasOverflow ? 'px-0 sm:px-9' : 'sm:pl-3 sm:pr-0',
               )}
             >
               <WorkspaceTabs
@@ -171,7 +171,7 @@ export default function WorkspaceHeader({
             )}
           </div>
         </div>
-        {displayOptions}
+        {displayOptions && <div className="flex h-8 shrink-0 items-center">{displayOptions}</div>}
       </div>
     </header>
   );

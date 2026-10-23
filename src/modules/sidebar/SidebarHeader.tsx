@@ -26,13 +26,13 @@ export default function SidebarHeader({isPWA,isMobile,isLoading,projectsCount,ru
   const placeholder=searchMode==='conversations'?t('search.conversationsPlaceholder'):searchMode==='archived'
     ?t('search.archivedPlaceholder'):searchMode==='running'?t('search.runningPlaceholder'):t('projects.searchPlaceholder');
   return <div className="sidebar-navigation shrink-0 px-3 pb-2 pt-3" style={isPWA&&isMobile?{paddingTop:16}:undefined}>
-    <div className="mb-4 flex h-7 items-center gap-2 px-1">
+    <div className="mb-3 flex h-8 items-center gap-1.5">
       <button type="button" className="workspace-icon-button" onClick={onCollapseSidebar} title={t('tooltips.hideSidebar')} aria-label={t('tooltips.hideSidebar')}><PanelLeftClose size={16}/></button>
-      <span className="flex-1 text-xs font-medium text-muted-foreground">Claudex</span>
+      <span className="flex-1 truncate text-[13px] font-semibold text-foreground/80">Claudex</span>
     <div className="flex items-center gap-0.5">
-      <button type="button" className="workspace-icon-button" onClick={onCreateProject} title={t('tooltips.createProject')} aria-label={t('tooltips.createProject')}><FolderPlus size={14}/></button>
+      <button type="button" className="workspace-icon-button" onClick={onCreateProject} title={t('tooltips.createProject')} aria-label={t('tooltips.createProject')}><FolderPlus size={16}/></button>
       {showFilters&&<details className="sidebar-filter-menu relative">
-        <summary className="workspace-icon-button cursor-pointer list-none" title={t('ui.filterChats')} aria-label={t('ui.filterChats')}><ListFilter size={14}/></summary>
+        <summary className="workspace-icon-button cursor-pointer list-none" title={t('ui.filterChats')} aria-label={t('ui.filterChats')}><ListFilter size={16}/></summary>
         <div className="fixed left-3 top-14 z-50 w-64 rounded-xl border border-border bg-popover p-3 shadow-lg">
           <SidebarModeTabs searchMode={searchMode} onSearchModeChange={onSearchModeChange} runningSessionsCount={runningSessionsCount} t={t}/>
           <div className="relative mt-2"><Input aria-label={placeholder} placeholder={placeholder} value={searchFilter} onChange={event=>onSearchFilterChange(event.target.value)} className="h-8 pr-8 text-xs"/>
@@ -40,12 +40,12 @@ export default function SidebarHeader({isPWA,isMobile,isLoading,projectsCount,ru
           </div>
         </div>
       </details>}
+      <button type="button" className="workspace-icon-button" onClick={onRefresh} disabled={isRefreshing} title={t('tooltips.refresh')} aria-label={t('tooltips.refresh')}><RefreshCw size={16} className={isRefreshing?'animate-spin':''}/></button>
     </div>
-      <button type="button" className="workspace-icon-button" onClick={onRefresh} disabled={isRefreshing} title={t('tooltips.refresh')} aria-label={t('tooltips.refresh')}><RefreshCw size={14} className={isRefreshing?'animate-spin':''}/></button>
     </div>
     <nav aria-label={t('ui.navigation')} className="space-y-0.5">
       {onNewClaudeSession&&<button type="button" className="sidebar-nav-action" onClick={onNewClaudeSession}><SquarePen size={16}/><span>{t('ui.newChat')}</span></button>}
-      <button type="button" className="sidebar-nav-action" onClick={openSessionSwitcher}><Search size={16}/><span>{t('ui.searchChats')}</span><kbd className="ml-auto text-[10px] opacity-50">Ctrl ⇧ K</kbd></button>
+      <button type="button" className="sidebar-nav-action" onClick={openSessionSwitcher}><Search size={16}/><span>{t('ui.searchChats')}</span><kbd className="ml-auto font-sans text-[10px] tracking-wide text-muted-foreground/70">Ctrl ⇧ K</kbd></button>
       <MonitorDashboard/>
       <DotDashboard/>
     </nav>

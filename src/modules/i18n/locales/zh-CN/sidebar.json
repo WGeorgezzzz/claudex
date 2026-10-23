@@ -37,7 +37,8 @@
     "projects": "项目",
     "noMatchingProjects": "未找到匹配的项目",
     "tryDifferentSearch": "尝试调整您的搜索词",
-    "runClaudeCli": "在项目目录中运行 Claude CLI 以开始使用"
+    "runClaudeCli": "在项目目录中运行 Claude CLI 以开始使用",
+    "sessionCountShort": "{{display}} 个会话"
   },
   "app": {
     "title": "Claudex",
@@ -60,7 +61,8 @@
     "deleteSelected_one": "删除 {{count}} 个会话",
     "deleteSelected_other": "删除 {{count}} 个会话",
     "newClaude": "新建 Claude 会话",
-    "otherProviders": "其他会话"
+    "otherProviders": "其他会话",
+    "loadMoreSessions": "加载更多会话"
   },
   "tooltips": {
     "viewEnvironments": "查看环境",
@@ -78,7 +80,8 @@
     "cancel": "取消",
     "clearSearch": "清除搜索",
     "openCommandPalette": "打开命令面板",
-    "attentionRequiredIndicator": "会话需要处理"
+    "attentionRequiredIndicator": "会话需要处理",
+    "backgroundWorkIndicator": "后台任务运行中"
   },
   "navigation": {
     "chat": "聊天",
@@ -247,5 +250,13 @@
       "archived": "已归档"
     },
     "quickSettings": "快捷设置"
+  },
+  "recent": {
+    "title": "最近对话",
+    "emptyTitle": "还没有对话",
+    "emptyDescription": "最近更新的对话会显示在这里。",
+    "loadFailed": "无法加载最近对话",
+    "loadMore": "加载更早的对话",
+    "loadingMore": "正在加载…"
   }
 }

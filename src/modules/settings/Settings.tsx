@@ -15,6 +15,8 @@ import NotificationsSettingsTab from '@/modules/settings/tabs/NotificationsSetti
 import TasksSettingsTab from '@/modules/settings/tabs/tasks-settings/TasksSettingsTab';
 import { PluginSettingsTab } from '@/modules/plugins';
 import { UsersSettingsTab } from '@/modules/settings/tabs/UsersSettingsTab';
+import { UserManagementTab } from '@/modules/settings/tabs/UserManagementTab';
+import { useAuth } from '@/modules/auth';
 import AboutTab from '@/modules/settings/tabs/AboutTab';
 import { useSettingsController } from '@/modules/settings/hooks/useSettingsController';
 import { useWebPush } from '@/modules/settings/hooks/useWebPush';
@@ -38,6 +40,8 @@ type DesktopNotificationsState = {
 /** Exported as the settings module's public entry point and rendered by the sidebar module as its settings dialog. */
 function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }: SettingsProps) {
   const { t } = useTranslation('settings');
+  const { user } = useAuth();
+  const isAdmin = (user as { role?: string } | null)?.role === 'admin';
   const desktopNotificationsBridge = useMemo(() => (
     typeof window === 'undefined'
       ? null
@@ -275,7 +279,8 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }: Set
 
               {activeTab === 'plugins' && <PluginSettingsTab />}
 
-              {activeTab === 'users' && <UsersSettingsTab />}
+              {(activeTab === 'account' || (activeTab === 'users' && !isAdmin)) && <UsersSettingsTab />}
+              {activeTab === 'users' && isAdmin && <UserManagementTab />}
               {activeTab === 'about' && <AboutTab />}
             </div>
           </main>

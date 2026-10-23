@@ -8,6 +8,9 @@ import type { Thread, ThreadOptions } from '@openai/codex-sdk';
 import { codexRuntime } from '@/modules/providers/list/codex/codex-runtime.provider.js';
 import type { ProviderRuntimeContext } from '@/shared/index.js';
 
+// These cases cover the SDK `codex exec` transport; the app-server transport has its own test.
+process.env.CLAUDEX_CODEX_TRANSPORT = 'exec';
+
 for (const resumed of [false, true]) {
   for (const permissionMode of [undefined, 'default', 'unknown', 'acceptEdits', 'bypassPermissions']) {
     test(`Codex ${resumed ? 'resumes' : 'starts'} with supported permissions (${permissionMode ?? 'omitted'})`, async (t) => {

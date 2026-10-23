@@ -69,6 +69,18 @@ test('live input refuses a changed turn and keeps an auditable failure without c
   const receipt=live.submit(user,{sessionId:'queue-session',requestId:'stale',content:'addition',expectedStartedAt:1});
   assert.equal(receipt.status,'failed');assert.match(receipt.error||'',/active turn changed/);
 }));
+test('live input routes to the running provider (Codex steer) and reports no-run before persisting anything',()=>fixture(user=>{
+  const calls:string[]=[];
+  const live=createLiveInputService({...providerRuntimeService,submitLiveInput(provider,session,_id,content){calls.push(`${provider}:${session}:${content}`);}});
+  // No running turn: a plain 409 and no receipt, so the client can queue the draft instead.
+  assert.throws(()=>live.submit(user,{sessionId:'queue-session',requestId:'no-run',content:'insert',expectedStartedAt:1}),
+    error=>error instanceof Error && 'code' in error && error.code==='LIVE_INPUT_UNAVAILABLE');
+  assert.equal(messageQueueDb.byRequest(user,'no-run'),undefined);
+  const run=chatRunRegistry.startRun({appSessionId:'queue-session',provider:'codex',connection:null,userId:user,providerSessionId:null})!;
+  const receipt=live.submit(user,{sessionId:'queue-session',requestId:'steer',content:'停止计数',expectedStartedAt:run.startedAt});
+  assert.equal(receipt.status,'running');
+  assert.deepEqual(calls,['codex:queue-session:停止计数']);
+}));
 function runtime(run?:ProviderRuntimeGateway['run'],busy=false):ProviderRuntimeGateway {
   return {hasRuntime:()=>true,hasBackgroundWork:()=>busy,
     run:run??(async(_provider,_command,options,writer)=>{writer.send(createCompleteMessage({provider:'claude',sessionId:String(options.sessionId),exitCode:0}));}),
