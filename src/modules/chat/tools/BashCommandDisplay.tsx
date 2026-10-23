@@ -106,7 +106,7 @@ export const BashCommandDisplay: React.FC<BashCommandDisplayProps> = ({
             !hasOutput && 'opacity-0',
           )}
         />
-        <span className="flex-shrink-0 select-none font-mono text-xs font-semibold text-emerald-500 dark:text-emerald-400">
+        <span className="flex-shrink-0 select-none font-mono text-xs font-semibold text-muted-foreground">
           $
         </span>
         {/* Not a <code> tag: the global `.chat-message code` rule forces

@@ -28,7 +28,7 @@ export const TextContent: React.FC<TextContentProps> = ({
     }
 
     return (
-      <pre className={`mt-1 overflow-x-auto rounded bg-gray-900 p-2.5 font-mono text-xs text-gray-100 dark:bg-gray-950 ${className}`}>
+      <pre className={`mt-1 max-h-60 overflow-auto rounded border border-border/50 bg-muted/40 p-2.5 font-mono text-xs text-muted-foreground ${className}`}>
         {formattedJson}
       </pre>
     );

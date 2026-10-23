@@ -121,11 +121,11 @@ export const TOOL_CONFIGS: Record<string, ToolDisplayConfig> = {
       style: 'terminal',
       wrapText: true,
       colorScheme: {
-        primary: 'text-green-400 font-mono',
+        primary: 'text-muted-foreground font-mono',
         secondary: 'text-gray-400',
         background: '',
-        border: 'border-green-500 dark:border-green-400',
-        icon: 'text-green-500 dark:text-green-400'
+        border: 'border-border',
+        icon: 'text-muted-foreground'
       }
     },
     result: {
@@ -147,11 +147,11 @@ export const TOOL_CONFIGS: Record<string, ToolDisplayConfig> = {
       style: 'terminal',
       wrapText: true,
       colorScheme: {
-        primary: 'text-green-400 font-mono',
+        primary: 'text-muted-foreground font-mono',
         secondary: 'text-gray-400',
         background: '',
-        border: 'border-green-500 dark:border-green-400',
-        icon: 'text-green-500 dark:text-green-400'
+        border: 'border-border',
+        icon: 'text-muted-foreground'
       }
     },
     result: {
