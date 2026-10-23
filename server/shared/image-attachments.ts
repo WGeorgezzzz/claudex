@@ -139,7 +139,9 @@ function isPathInsideDirectory(candidate: string, directory: string): boolean {
 function getDirectoryPathVariants(directory: string): string[] {
   const resolvedDirectory = path.resolve(directory);
   try {
-    const canonicalDirectory = path.resolve(realpathSync(directory));
+    // Match fs.promises.realpath below: Node 22's JS resolver can retain an
+    // 8.3 ancestor while the native file resolver expands it on Windows.
+    const canonicalDirectory = path.resolve(realpathSync.native(directory));
     return canonicalDirectory === resolvedDirectory
       ? [resolvedDirectory]
       : [resolvedDirectory, canonicalDirectory];
