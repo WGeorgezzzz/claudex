@@ -101,7 +101,8 @@ export function getUserContext(userId: number | string): UserRuntimeContext {
   }
   const adminClaude = path.resolve(process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude'));
   const adminCodex = path.resolve(process.env.CODEX_HOME || path.join(os.homedir(), '.codex'));
-  const root = path.resolve(process.env.CLAUDEX_USER_CONFIG_ROOT || path.join(os.homedir(), '.cloudcli', 'users'), String(id));
+  const configRoot = path.resolve(process.env.CLAUDEX_USER_CONFIG_ROOT || path.join(os.homedir(), '.cloudcli', 'users'));
+  const root = path.join(configRoot, String(id));
   const claudeConfigDir = row.role === 'admin' ? adminClaude : path.join(root, 'claude');
   const codexHome = row.role === 'admin' ? adminCodex : path.join(root, 'codex');
   if (row.role === 'member') {
@@ -115,7 +116,17 @@ export function getUserContext(userId: number | string): UserRuntimeContext {
     for (const entry of ['.credentials.json', 'settings.json', 'plugins', 'skills', '.mcp.json']) {
       sharedFiles['claude/' + entry] = share(path.join(adminClaude, entry), path.join(claudeConfigDir, entry), entry === '.credentials.json');
     }
-    for (const entry of ['auth.json', 'config.toml']) sharedFiles['codex/' + entry] = share(path.join(adminCodex, entry), path.join(codexHome, entry), entry === 'auth.json');
+    // An administrator template replaces inherited defaults: members get the
+    // template CLAUDE.md, and a template Codex config means each member keeps a
+    // private auth.json (own relay key) instead of the administrator login.
+    const template = path.resolve(process.env.CLAUDEX_MEMBER_TEMPLATE_DIR || path.join(path.dirname(configRoot), 'member-template'));
+    sharedFiles['claude/CLAUDE.md'] = share(path.join(template, 'claude', 'CLAUDE.md'), path.join(claudeConfigDir, 'CLAUDE.md'));
+    if (fs.existsSync(path.join(template, 'codex', 'config.toml'))) {
+      sharedFiles['codex/config.toml'] = share(path.join(template, 'codex', 'config.toml'), path.join(codexHome, 'config.toml'));
+      sharedFiles['codex/auth.json'] = fs.existsSync(path.join(codexHome, 'auth.json')) ? 'private' : 'missing';
+    } else {
+      for (const entry of ['auth.json', 'config.toml']) sharedFiles['codex/' + entry] = share(path.join(adminCodex, entry), path.join(codexHome, entry), entry === 'auth.json');
+    }
     fs.writeFileSync(path.join(root, 'shared-config.json'), JSON.stringify(sharedFiles, null, 2));
   }
   const gitEnv = { ...process.env };

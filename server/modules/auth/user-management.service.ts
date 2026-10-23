@@ -49,6 +49,8 @@ export const userManagementService = {
       const user=getConnection().transaction(()=>{
         const created=userDb.createUser(username,hash);
         userDb.updateAccess(Number(created.id),a.root,a.folders,a.email,a.active);
+        // Members start in the workspace; Git identity is optional, not a login gate.
+        userDb.completeOnboarding(Number(created.id));
         mkdirSync(a.root,{recursive:true});
         return userDb.getUserById(Number(created.id));
       })();
