@@ -1,6 +1,6 @@
 window.__APP_VERSION__ = '1.34.0';
 window.__MOCK_STATE__ = {
-  account: { connected: true, email: 'you@cloudcli.ai' },
+  account: { connected: true, email: 'you@example.com' },
   activeTarget: { kind: 'launcher', name: 'Launcher', url: null },
   cloudLoading: false,
   desktopSettings: { keepLocalServerRunning: false, exposeLocalServerOnNetwork: false, themeMode: 'system' },
@@ -9,10 +9,10 @@ window.__MOCK_STATE__ = {
   localServerRunning: false,
   localStartupLogs: [],
   environments: [
-    { id: 'env-api', name: 'api-gateway', subdomain: 'api-gateway', access_url: 'https://api-gateway.cloudcli.ai', status: 'running', region: 'fra1', agent: 'Claude Code' },
-    { id: 'env-web', name: 'web-frontend', subdomain: 'web-frontend', access_url: 'https://web-frontend.cloudcli.ai', status: 'stopped', region: 'sfo1', agent: 'Codex' },
-    { id: 'env-data', name: 'data-pipeline', subdomain: 'data-pipeline', access_url: 'https://data-pipeline.cloudcli.ai', status: 'stopped', region: 'fra1', agent: 'Cursor' },
-    { id: 'env-ml', name: 'ml-trainer', subdomain: 'ml-trainer', access_url: 'https://ml-trainer.cloudcli.ai', status: 'paused', region: 'iad1', agent: 'OpenCode' },
+    { id: 'env-api', name: 'api-gateway', subdomain: 'api-gateway', access_url: 'https://api-gateway.example.com', status: 'running', region: 'fra1', agent: 'Claude Code' },
+    { id: 'env-web', name: 'web-frontend', subdomain: 'web-frontend', access_url: 'https://web-frontend.example.com', status: 'stopped', region: 'sfo1', agent: 'Codex' },
+    { id: 'env-data', name: 'data-pipeline', subdomain: 'data-pipeline', access_url: 'https://data-pipeline.example.com', status: 'stopped', region: 'fra1', agent: 'Cursor' },
+    { id: 'env-ml', name: 'ml-trainer', subdomain: 'ml-trainer', access_url: 'https://ml-trainer.example.com', status: 'paused', region: 'iad1', agent: 'OpenCode' },
   ],
 };
 
@@ -40,7 +40,7 @@ window.__MOCK_STATE__ = {
     },
     copyLocalWebUrl: function () { return Promise.resolve(clone(mockState)); },
     connectCloud: function () {
-      mockState.account = { connected: true, email: 'you@cloudcli.ai' };
+      mockState.account = { connected: true, email: 'you@example.com' };
       return Promise.resolve(clone(mockState));
     },
     disconnectCloud: function () {
@@ -296,7 +296,7 @@ window.__MOCK_STATE__ = {
       case 'local':
         return CC.run('Starting Local Nexcode...', function () { return bridge.openLocal(); });
       case 'connect':
-        return CC.run('Opening cloudcli.ai to connect your account...', function () { return bridge.connectCloud(); });
+        return CC.run('Opening the account page...', function () { return bridge.connectCloud(); });
       case 'logout':
         return CC.run('Logging out...', function () { return bridge.disconnectCloud(); });
       case 'open-web':

@@ -56,7 +56,7 @@ const getServerKey = (server: ProviderMcpServer): string => (
 );
 
 // Servers prefixed with `cloudcli-` are written and removed automatically by a
-// CloudCLI feature toggle (e.g. the Browser tab), not added by the user. They are
+// Nexcode feature toggle (e.g. the Browser tab), not added by the user. They are
 // shown read-only so users don't edit/delete them out of sync with the feature.
 const isManagedServer = (server: ProviderMcpServer): boolean => server.name.startsWith('cloudcli-');
 

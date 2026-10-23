@@ -30,7 +30,7 @@ export function createSystemUpdateService(dependencies: SystemUpdateDependencies
     /** Selects and executes the correct update workflow for this installation. */
     async updateSystem() {
       if (dependencies.environment.CLOUDCLI_DISTRIBUTION==='workbench') {
-        return {success:false as const,error:'This is CloudCLI Workbench. Use its independent installer from https://github.com/WGeorgezzzz/claudecodeui/releases; upstream npm updates are disabled.'};
+        return {success:false as const,error:'This is Nexcode. Use its independent installer from https://github.com/WGeorgezzzz/claudecodeui/releases; upstream npm updates are disabled.'};
       }
       const updateCommand = dependencies.isPlatform
         ? 'npm run update:platform'

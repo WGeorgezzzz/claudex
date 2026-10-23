@@ -21,7 +21,6 @@ export default function SidebarFooter({updateAvailable,restartRequired,releaseIn
         <div className="absolute bottom-full right-0 z-50 mb-2 w-56 rounded-xl border border-border bg-popover p-2 text-xs shadow-lg">
           <a className="sidebar-nav-action" href="https://github.com/WGeorgezzzz/claudex" target="_blank" rel="noopener noreferrer">Nexcode v{currentVersion}</a>
           <a className="sidebar-nav-action" href="https://github.com/WGeorgezzzz/claudex/issues/new" target="_blank" rel="noopener noreferrer">{t('actions.reportIssue')}</a>
-          <a className="sidebar-nav-action" href="https://discord.gg/buxwujPNRE" target="_blank" rel="noopener noreferrer">{t('actions.joinCommunity')}</a>
         </div>
       </details>
     </div>

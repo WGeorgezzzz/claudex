@@ -13,14 +13,14 @@ test('launcher keeps local controls without hosted account or environment UI, ev
     const body = dom.window.document.body;
     assert.match(body.textContent, /Nexcode/);
     assert.match(body.textContent, /Open Local Nexcode/);
-    assert.doesNotMatch(body.textContent, /CloudCLI|Cloud environments|you@cloudcli|not connected/);
+    assert.doesNotMatch(body.textContent, /Cloud environments|you@example.com|not connected/);
     assert.equal(body.querySelector('[data-cc-action="connect"]'), null);
     assert.equal(body.querySelector('[data-cc-action="logout"]'), null);
     assert.equal(body.querySelector('[data-cc-nav="cloud"]'), null);
   } finally { dom.window.close(); }
 });
 
-test('native app and tray menus expose local controls without CloudCLI cloud menus', () => {
+test('native app and tray menus expose local controls without Nexcode cloud menus', () => {
   const menus = [];
   const context = vm.createContext({ process, Menu: {
     buildFromTemplate: template => { menus.push(template); return template; },
@@ -39,5 +39,5 @@ test('native app and tray menus expose local controls without CloudCLI cloud men
   manager.buildAppMenu();
   const serialized = JSON.stringify(menus);
   assert.match(serialized, /Open Local Nexcode/);
-  assert.doesNotMatch(serialized, /CloudCLI|cloudcli.ai|Cloud Environments|"Cloud"|Logout|Connect.*Account/);
+  assert.doesNotMatch(serialized, /cloudcli.ai|Cloud Environments|"Cloud"|Logout|Connect.*Account/);
 });

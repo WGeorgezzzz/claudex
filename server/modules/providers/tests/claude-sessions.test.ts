@@ -2080,7 +2080,7 @@ test('synchronizeFile preserves existing DB custom_name regardless of JSONL and 
     ]);
 
     await withIsolatedDatabase(async () => {
-      // Pre-seed the DB with a custom_name set via CloudCLI sidebar rename.
+      // Pre-seed the DB with a custom_name set via Nexcode sidebar rename.
       sessionsDb.createSession(
         'test-session-1',
         'claude',

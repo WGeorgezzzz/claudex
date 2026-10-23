@@ -1,4 +1,4 @@
-// Service Worker for CloudCLI PWA
+// Service Worker for Nexcode PWA
 // Cache only manifest (needed for PWA install). HTML and JS are never pre-cached
 // so a rebuild + refresh always picks up the latest assets.
 const CACHE_NAME = 'nexcode-v1';
@@ -79,7 +79,7 @@ self.addEventListener('push', event => {
   try {
     payload = event.data.json();
   } catch {
-    payload = { title: 'CloudCLI', body: event.data.text() };
+    payload = { title: 'Nexcode', body: event.data.text() };
   }
 
   const options = {
@@ -92,7 +92,7 @@ self.addEventListener('push', event => {
   };
 
   event.waitUntil(
-    self.registration.showNotification(payload.title || 'CloudCLI', options)
+    self.registration.showNotification(payload.title || 'Nexcode', options)
   );
 });
 

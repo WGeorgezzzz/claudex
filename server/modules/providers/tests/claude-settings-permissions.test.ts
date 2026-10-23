@@ -13,7 +13,7 @@ import providerRouter from '@/modules/providers/provider.routes.js';
 import { claudeSettingsPermissionsService } from '@/modules/providers/services/claude-settings-permissions.service.js';
 
 // Issue #109: the Claude CLI applies the permission rules in its own settings
-// files on top of the lists CloudCLI passes it, but the Settings panel never
+// files on top of the lists Nexcode passes it, but the Settings panel never
 // showed them. These tests pin the read-only reader behind that view.
 
 type Source = Awaited<ReturnType<typeof claudeSettingsPermissionsService.listRuleSources>>[number];

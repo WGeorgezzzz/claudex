@@ -14,7 +14,7 @@ function isAllowedPermissionOrigin(sourceUrl, controlPlaneUrl) {
       return false;
     }
     const controlPlane = new URL(controlPlaneUrl);
-    return source.origin === controlPlane.origin || source.hostname.endsWith('.cloudcli.ai');
+    return source.origin === controlPlane.origin || source.hostname.endsWith(`.${controlPlane.hostname}`);
   } catch {
     return false;
   }

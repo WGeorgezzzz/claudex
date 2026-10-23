@@ -25,7 +25,8 @@ if (workbenchProfile) {
   app.setPath('userData',explicitProfile || path.join(app.getPath('appData'),workbenchProfile.storageFolder));
 }
 const CALLBACK_URL = `${CALLBACK_PROTOCOL}://auth/callback`;
-const CLOUDCLI_CONTROL_PLANE_URL = process.env.CLOUDCLI_CONTROL_PLANE_URL || 'https://cloudcli.ai';
+// Remote environments need an explicitly configured control plane; none is built in.
+const CLOUDCLI_CONTROL_PLANE_URL = process.env.NEXCODE_CONTROL_PLANE_URL || process.env.CLOUDCLI_CONTROL_PLANE_URL || '';
 const REMOTE_START_TIMEOUT_MS = 30000;
 const AUTH_CALLBACK_TTL_MS = 10 * 60 * 1000;
 
@@ -204,10 +205,12 @@ async function getEnvironmentLaunchTarget(environment) {
 }
 
 async function hasCloudWebSession() {
+  if (!CLOUDCLI_CONTROL_PLANE_URL) return false;
+  const controlPlaneHost = new URL(CLOUDCLI_CONTROL_PLANE_URL).hostname;
   const cookies = await session.defaultSession.cookies.get({});
   return cookies.some((cookie) => {
     const cookieDomain = String(cookie.domain || '');
-    return cookieDomain.includes('cloudcli.ai')
+    return cookieDomain.replace(/^./, '').endsWith(controlPlaneHost)
       && /-auth-token(?:\.\d+)?$/.test(cookie.name)
       && Boolean(cookie.value);
   });
@@ -290,6 +293,7 @@ async function refreshCloudEnvironments({ showErrors = false } = {}) {
 }
 
 async function connectCloudAccount() {
+  if (!CLOUDCLI_CONTROL_PLANE_URL) throw new Error('Remote environments are not configured for this Nexcode build.');
   const connectUrl = cloud.buildConnectUrl();
   pendingCloudConnectStartedAt = Date.now();
   clipboard.writeText(connectUrl);
@@ -438,18 +442,22 @@ function getProjectFolder(environment) {
   return String(environment.name || environment.subdomain || 'workspace').replace(/[^a-zA-Z0-9-]/g, '');
 }
 
+function getDefaultSshHost() {
+  return `ssh.${new URL(CLOUDCLI_CONTROL_PLANE_URL).hostname}`;
+}
+
 function getSshTarget(credentials) {
   if (credentials.ssh_command) {
     const parts = String(credentials.ssh_command).split(/\s+/);
     if (parts.length >= 2) return parts[1];
   }
-  return `${credentials.username}@ssh.cloudcli.ai`;
+  return `${credentials.username}@${getDefaultSshHost()}`;
 }
 
 function getSshHost(credentials) {
   const target = getSshTarget(credentials);
   const atIndex = target.indexOf('@');
-  return atIndex >= 0 ? target.slice(atIndex + 1) : 'ssh.cloudcli.ai';
+  return atIndex >= 0 ? target.slice(atIndex + 1) : getDefaultSshHost();
 }
 
 function getSafeSshUsername(credentials) {
@@ -525,6 +533,7 @@ async function copyEnvironmentMobileUrl(environment) {
 }
 
 async function openCloudDashboard() {
+  if (!CLOUDCLI_CONTROL_PLANE_URL) throw new Error('Remote environments are not configured for this Nexcode build.');
   await openExternalUrl(CLOUDCLI_CONTROL_PLANE_URL);
   return getDesktopState();
 }
@@ -712,6 +721,7 @@ function getRemoteEnvironmentMenuItems() {
   const cloudAccount = cloud.getAccount();
   const environments = cloud.getEnvironments();
 
+  if (!CLOUDCLI_CONTROL_PLANE_URL) return [];
   if (!cloudAccount?.apiKey) {
     return [{ label: 'Connect Nexcode Account...', click: () => void connectCloudAccount() }];
   }

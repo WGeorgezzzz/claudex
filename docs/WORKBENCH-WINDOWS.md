@@ -15,7 +15,7 @@ Node.js 22 runtime and backend dependencies; a global Node.js installation is
 not required to start the desktop app.
 
 The application name, installer identity, protocol, browser storage and backend
-data are separate from an existing CloudCLI installation:
+data are separate from an existing Nexcode installation:
 
 - Application: **Nexcode**
 - App ID: `io.github.wgeorgezzzz.cloudcli-workbench`
@@ -146,7 +146,7 @@ overrides, verifying that the sentinel and its database remain untouched.
 
 `installer-smoke.json` records this packaging acceptance. Real model behavior
 requires a configured model account and is validated separately from installer
-startup. Hosted CloudCLI cloud connections and non-Windows installers are not
+startup. Hosted Nexcode cloud connections and non-Windows installers are not
 qualified by this release.
 
 Source builds require Node.js 22, the repository dependencies and the Windows
