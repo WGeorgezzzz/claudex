@@ -14,6 +14,14 @@ provider configuration remain available in settings.
 
 ## Configure the public boundary
 
+Enable Cloudflare's App Launcher with an Allow policy restricted to the owner's
+exact email before requiring independent MFA. Users enroll authenticators at
+`https://<team>.cloudflareaccess.com/AddMfaDevice`. Cloudflare deliberately exempts
+the launcher from the global MFA requirement so first-time enrollment is possible;
+keep MFA required on the actual workspace application. If the launcher is absent,
+the **Setup MFA** button leads to the administrator-enable message instead of
+enrollment. Verify the enrollment page before asking the owner to sign in.
+
 Create a Cloudflare Access self-hosted application for one hostname, restrict it
 to the owner's exact email, and require MFA. Do not use an Everyone, Bypass or
 public service-token policy. Configure the backend with:
@@ -60,4 +68,4 @@ WebSocket connection and device revocation through the HTTPS hostname. Check the
 phone layout as well. DNS, a tunnel health indicator or the login page alone does
 not establish full remote-workspace acceptance.
 
-Cloudflare reference: [Validate Access tokens](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/authorization-cookie/validating-json/).
+Cloudflare references: [Validate Access tokens](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/authorization-cookie/validating-json/), [Independent MFA enrollment](https://developers.cloudflare.com/cloudflare-one/access-controls/access-settings/independent-mfa/), [Enable the App Launcher](https://developers.cloudflare.com/cloudflare-one/access-controls/access-settings/app-launcher/).
