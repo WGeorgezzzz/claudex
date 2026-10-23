@@ -549,7 +549,7 @@
     },
     "managed": {
       "badge": "Gerenciado",
-      "hint": "Gerenciado pelo Claudex."
+      "hint": "Gerenciado pelo GACI."
     },
     "help": {
       "title": "Sobre MCP do Codex",
@@ -581,7 +581,7 @@
     "docs": "Docs",
     "sections": {
       "officialTitle": "Plugins oficiais",
-      "officialDescription": "Mantidos pela equipe do Claudex e prontos para instalação direta.",
+      "officialDescription": "Mantidos pela equipe do GACI e prontos para instalação direta.",
       "unofficialTitle": "Outros plugins",
       "unofficialDescription": "Plugins e integrações não oficiais de outros usuários. Revise o código-fonte antes de instalar."
     },
@@ -604,9 +604,9 @@
       "install": "Instalar"
     },
     "prismClaudex": {
-      "name": "PRISM Claudex",
+      "name": "PRISM GACI",
       "badge": "não oficial",
-      "description": "Inteligência de sessão para o Claude Code, dentro do Claudex. Veja por que suas sessões estão queimando tokens sem sair do navegador.",
+      "description": "Inteligência de sessão para o Claude Code, dentro do GACI. Veja por que suas sessões estão queimando tokens sem sair do navegador.",
       "install": "Instalar"
     },
     "sessionManagerPlugin": {
@@ -823,7 +823,7 @@
   "mcpTeamCard": {
     "title": "Configs MCP da equipe",
     "description": "Compartilhe configurações de servidores MCP com sua equipe. Todos ficam em sincronia automaticamente.",
-    "proLink": "Disponível com Claudex Pro"
+    "proLink": "Disponível com GACI Pro"
   },
   "mcpServersAddErrors": {
     "loadFailedProvider": "Falha ao carregar servidores MCP do {{provider}}",
@@ -837,18 +837,18 @@
     "unknownError": "Erro desconhecido"
   },
   "about": {
-    "tagline": "Interface de assistente de codificação com IA de código aberto",
+    "tagline": "Your agents, one workspace.",
     "starOnGitHub": "Dar estrela no GitHub",
     "docs": "Docs",
-    "hostedTitle": "Experimente o Claudex hospedado",
+    "hostedTitle": "Experimente o GACI hospedado",
     "hostedDescription": "Colaboração em equipe, configs MCP compartilhados, sincronização de configurações entre ambientes e infraestrutura gerenciada.",
     "learnMore": "Saiba mais",
-    "proFeaturesTitle": "Recursos do Claudex Pro",
+    "proFeaturesTitle": "Recursos do GACI Pro",
     "syncSettingsTitle": "Sincronizar configurações",
     "syncSettingsDescription": "Mantenha suas preferências, configs MCP e tema em sincronia em todos os seus ambientes.",
     "teamManagementTitle": "Gerenciamento de equipe",
     "teamManagementDescription": "Múltiplos usuários, acesso baseado em funções e projetos compartilhados para sua equipe.",
     "licensed": "Licenciado sob AGPL-3.0",
-    "proCta": "Disponível com Claudex Pro"
+    "proCta": "Disponível com GACI Pro"
   }
 }

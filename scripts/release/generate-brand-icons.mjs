@@ -4,16 +4,14 @@ import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 
 // A local tooling bundle can supply Sharp without altering live application dependencies.
-const sharp=createRequire(import.meta.url)(process.env.CLAUDEX_SHARP_MODULE||'sharp');
+const sharp=createRequire(import.meta.url)(process.env.GACI_SHARP_MODULE||process.env.CLAUDEX_SHARP_MODULE||'sharp');
 
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../..');
-const codex=await fs.readFile(path.join(root,'public/icons/codex.svg'),'utf8');
-const claude=await fs.readFile(path.join(root,'public/icons/claude-ai-icon.svg'),'utf8');
-const knot=codex.match(/<path\s+d="([^"]+)"/)[1];
-const star=claude.match(/fill-rule="nonzero"\s+d="([^"]+)"/)[1];
-// The existing provider vectors form one mark: a Codex knot surrounding Claude's warm star.
-const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512"><title>Claudex — Claude × Codex</title><rect width="512" height="512" rx="112" fill="#F3F0E9"/><path d="${knot}" transform="translate(256 256) scale(.82) translate(-360.626 -360.626)" fill="#242422"/><circle cx="256" cy="256" r="66" fill="#F3F0E9"/><path d="${star}" transform="translate(194.56 194.56) scale(.24)" fill="#D77555"/></svg>\n`;
+// Canonical, provider-independent G mark. The open ring connects to one shared hub.
+const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512"><title>GACI</title><rect width="512" height="512" rx="112" fill="#132B2B"/><path d="M350 164 A132 132 0 1 0 388 256 H268" fill="none" stroke="#E8F5EF" stroke-width="48" stroke-linecap="square" stroke-linejoin="round"/><rect x="326" y="118" width="58" height="58" rx="14" fill="#88E6BE"/></svg>\n`;
 await fs.writeFile(path.join(root,'public/logo.svg'),svg);
+await fs.writeFile(path.join(root,'public/gaci-mark.svg'),svg);
+// Retain the old asset URL for cached clients during the brand transition.
 await fs.writeFile(path.join(root,'public/claudex-mark.svg'),svg);
 await fs.writeFile(path.join(root,'public/favicon.svg'),svg);
 await fs.writeFile(path.join(root,'public/icons/icon-template.svg'),svg);
@@ -33,4 +31,4 @@ const entries=[['icp4',16],['icp5',32],['icp6',64],['ic07',128],['ic08',256],['i
 const chunks=[];for(const [kind,size] of entries){const png=await render(size),h=Buffer.alloc(8);h.write(kind,0,4,'ascii');h.writeUInt32BE(png.length+8,4);chunks.push(h,png);}
 const icnsHeader=Buffer.alloc(8);icnsHeader.write('icns');icnsHeader.writeUInt32BE(8+chunks.reduce((sum,part)=>sum+part.length,0),4);
 await fs.writeFile(path.join(root,'electron/assets/logo-macos.icns'),Buffer.concat([icnsHeader,...chunks]));
-console.log('Generated canonical Claudex SVG, PNG, Windows ICO and macOS ICNS assets.');
+console.log('Generated canonical GACI SVG, PNG, Windows ICO and macOS ICNS assets.');

@@ -28,7 +28,8 @@ export default function SidebarHeader({isPWA,isMobile,isLoading,projectsCount,ru
   return <div className="sidebar-navigation shrink-0 px-3 pb-2 pt-3" style={isPWA&&isMobile?{paddingTop:16}:undefined}>
     <div className="mb-3 flex h-8 items-center gap-1.5">
       <button type="button" className="workspace-icon-button" onClick={onCollapseSidebar} title={t('tooltips.hideSidebar')} aria-label={t('tooltips.hideSidebar')}><PanelLeftClose size={16}/></button>
-      <span className="flex-1 truncate text-[13px] font-semibold text-foreground/80">Claudex</span>
+      <img src="/gaci-mark.svg" alt="" className="h-6 w-6 shrink-0 rounded-md" />
+      <span className="flex-1 truncate text-[13px] font-semibold tracking-[0.12em] text-foreground/80">GACI</span>
     <div className="flex items-center gap-0.5">
       <button type="button" className="workspace-icon-button" onClick={onCreateProject} title={t('tooltips.createProject')} aria-label={t('tooltips.createProject')}><FolderPlus size={16}/></button>
       {showFilters&&<details className="sidebar-filter-menu relative">

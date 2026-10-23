@@ -1,13 +1,14 @@
 {
   "name": "@wgeorgezzzz/claudex",
   "version": "0.8.0",
-  "productName": "Claudex",
-  "description": "Independent desktop workspace for Claude, with durable queues and contextual side conversations",
+  "productName": "GACI",
+  "description": "General Agent Cloud Integration. Your agents, one workspace.",
   "type": "module",
   "main": "dist-server/server/index.js",
   "bin": {
     "cloudcli": "dist-server/server/modules/cli/cli.js",
-    "claudex": "dist-server/server/modules/cli/cli.js"
+    "claudex": "dist-server/server/modules/cli/cli.js",
+    "gaci": "dist-server/server/modules/cli/cli.js"
   },
   "files": [
     "electron/",
@@ -66,9 +67,9 @@
   },
   "build": {
     "appId": "ai.cloudcli.desktop",
-    "productName": "CloudCLI",
+    "productName": "GACI",
     "asar": false,
-    "artifactName": "cloudcli-desktop-${version}-${os}-${arch}.${ext}",
+    "artifactName": "GACI-${version}-${os}-${arch}.${ext}",
     "directories": {
       "output": "release/desktop"
     },
@@ -87,7 +88,7 @@
     ],
     "protocols": [
       {
-        "name": "CloudCLI",
+        "name": "GACI",
         "schemes": [
           "cloudcli"
         ]
@@ -101,11 +102,11 @@
         "dmg"
       ],
       "extendInfo": {
-        "CFBundleName": "CloudCLI",
-        "CFBundleDisplayName": "CloudCLI",
+        "CFBundleName": "GACI",
+        "CFBundleDisplayName": "GACI",
         "CFBundleURLTypes": [
           {
-            "CFBundleURLName": "CloudCLI",
+            "CFBundleURLName": "GACI",
             "CFBundleURLSchemes": [
               "cloudcli"
             ]

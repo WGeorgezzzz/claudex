@@ -535,7 +535,7 @@
     },
     "managed": {
       "badge": "מנוהל",
-      "hint": "מנוהל על ידי Claudex."
+      "hint": "מנוהל על ידי GACI."
     },
     "help": {
       "title": "על Codex MCP",
@@ -567,7 +567,7 @@
     "docs": "תיעוד",
     "sections": {
       "officialTitle": "תוספים רשמיים",
-      "officialDescription": "מתוחזקים על ידי צוות Claudex ומוכנים להתקנה ישירה.",
+      "officialDescription": "מתוחזקים על ידי צוות GACI ומוכנים להתקנה ישירה.",
       "unofficialTitle": "תוספים נוספים",
       "unofficialDescription": "תוספים ושילובים לא רשמיים ממשתמשים אחרים. כדאי לבדוק את קוד המקור לפני ההתקנה."
     },
@@ -590,9 +590,9 @@
       "install": "התקנה"
     },
     "prismClaudex": {
-      "name": "PRISM Claudex",
+      "name": "PRISM GACI",
       "badge": "לא רשמי",
-      "description": "ניתוח סשנים של Claude Code בתוך Claudex. אפשר לראות למה הסשנים צורכים טוקנים בלי לצאת מהדפדפן.",
+      "description": "ניתוח סשנים של Claude Code בתוך GACI. אפשר לראות למה הסשנים צורכים טוקנים בלי לצאת מהדפדפן.",
       "install": "התקנה"
     },
     "sessionManagerPlugin": {
@@ -803,7 +803,7 @@
   "mcpTeamCard": {
     "title": "תצורות MCP לצוות",
     "description": "שיתוף תצורות שרתי MCP עם כל הצוות. כולם נשארים מסונכרנים אוטומטית.",
-    "proLink": "זמין ב-Claudex Pro"
+    "proLink": "זמין ב-GACI Pro"
   },
   "mcpServersAddErrors": {
     "loadFailedProvider": "טעינת שרתי ה-MCP של {{provider}} נכשלה",
@@ -817,18 +817,18 @@
     "unknownError": "שגיאה לא ידועה"
   },
   "about": {
-    "tagline": "ממשק קוד פתוח לעוזר תכנות מבוסס AI",
+    "tagline": "Your agents, one workspace.",
     "starOnGitHub": "כוכב ב-GitHub",
     "docs": "תיעוד",
-    "hostedTitle": "לנסות את Claudex Hosted",
+    "hostedTitle": "לנסות את GACI Hosted",
     "hostedDescription": "שיתוף פעולה בצוות, תצורות MCP משותפות, סנכרון הגדרות בין סביבות ותשתית מנוהלת.",
     "learnMore": "מידע נוסף",
-    "proFeaturesTitle": "יכולות Claudex Pro",
+    "proFeaturesTitle": "יכולות GACI Pro",
     "syncSettingsTitle": "סנכרון הגדרות",
     "syncSettingsDescription": "ההעדפות, תצורות ה-MCP וערכת הנושא נשארים מסונכרנים בכל הסביבות.",
     "teamManagementTitle": "ניהול צוות",
     "teamManagementDescription": "משתמשים מרובים, גישה מבוססת תפקידים ופרויקטים משותפים לצוות.",
     "licensed": "ברישיון AGPL-3.0",
-    "proCta": "זמין ב-Claudex Pro"
+    "proCta": "זמין ב-GACI Pro"
   }
 }
