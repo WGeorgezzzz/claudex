@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import os from 'node:os';
 import path from 'node:path';
-import test from 'node:test';
+import test, { after } from 'node:test';
 
 import {
   buildStoredAttachmentRecords,
@@ -11,7 +11,15 @@ import {
   resolveImageAssetFile,
 } from '@/modules/assets/services/image-assets.service.js';
 
-const ASSETS_DIR = path.join(os.homedir(), '.cloudcli', 'assets');
+// Exercise the configured storage root without depending on the developer's home.
+const previousHome = process.env.CLOUDCLI_HOME;
+const fixtureHome = path.join(os.tmpdir(), `claudex-assets-test-${process.pid}`);
+process.env.CLOUDCLI_HOME = fixtureHome;
+const ASSETS_DIR = path.join(fixtureHome, 'assets');
+after(() => {
+  if (previousHome === undefined) delete process.env.CLOUDCLI_HOME;
+  else process.env.CLOUDCLI_HOME = previousHome;
+});
 
 test('isAllowedImageMimeType accepts image formats and rejects the rest', () => {
   assert.equal(isAllowedImageMimeType('image/png'), true);

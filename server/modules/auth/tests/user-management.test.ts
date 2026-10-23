@@ -40,7 +40,8 @@ test('account lifecycle preserves roles, protects admin operations, and revokes 
   await assert.rejects(remoteIdentityService.configure(id,'remote-name','long-enough-password'));
   const token=generateToken(a.user);
   let seen:number|undefined;
-  await authenticateToken({headers:{authorization:'Bearer '+token},query:{},socket:{}},{setHeader(){},status(){throw Error('Rejected valid token');}},()=>{seen=getCurrentUserContext()?.userId;});
+  // This is a local token; retain the private gate's remote-device requirement.
+  await authenticateToken({headers:{authorization:'Bearer '+token,host:'127.0.0.1'},query:{},socket:{remoteAddress:'127.0.0.1'}},{setHeader(){},status(){throw Error('Rejected valid token');}},()=>{seen=getCurrentUserContext()?.userId;});
   assert.equal(seen,id);
   const device=authSessionsDb.create(id,'remote');
   userManagementService.update(Number(admin.id),id,{is_active:false});

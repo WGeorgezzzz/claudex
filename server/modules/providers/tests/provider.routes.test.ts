@@ -4,7 +4,7 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import type { AddressInfo } from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
-import test from 'node:test';
+import test, { mock } from 'node:test';
 
 import express, { type NextFunction, type Request, type Response } from 'express';
 
@@ -19,7 +19,19 @@ async function withProviderServer(
   run: (baseUrl: string, workspacePath: string) => Promise<void>,
 ): Promise<void> {
   const previousDatabasePath = process.env.DATABASE_PATH;
+  const previousCodexHome = process.env.CODEX_HOME;
   const tempDirectory = await mkdtemp(path.join(os.tmpdir(), 'provider-routes-'));
+
+  // Model routes consume an account catalog; never depend on the developer's login.
+  process.env.CODEX_HOME = path.join(tempDirectory, '.codex');
+  await mkdir(process.env.CODEX_HOME);
+  await writeFile(path.join(process.env.CODEX_HOME, 'config.toml'), 'model = "fixture-codex"\n');
+  await writeFile(path.join(process.env.CODEX_HOME, 'models_cache.json'), JSON.stringify({
+    models: [{ slug: 'fixture-codex', supported_reasoning_levels: [{ effort: 'low' }, { effort: 'high' }, { effort: 'ultra' }] }],
+  }));
+  const claudeCatalog = mock.method(providerRegistry.resolveProvider('claude').models, 'getSupportedModels', async () => ({
+    OPTIONS: [{ value: 'fixture-claude', label: 'Fixture Claude' }], DEFAULT: 'fixture-claude',
+  }));
 
   closeConnection();
   process.env.DATABASE_PATH = path.join(tempDirectory, 'auth.db');
@@ -45,10 +57,13 @@ async function withProviderServer(
     const address = server.address() as AddressInfo;
     await run(`http://127.0.0.1:${address.port}`, path.join(tempDirectory, 'workspace'));
   } finally {
+    claudeCatalog.mock.restore();
     await new Promise<void>((resolve, reject) => {
       server.close((error) => error ? reject(error) : resolve());
     });
     closeConnection();
+    if (previousCodexHome === undefined) delete process.env.CODEX_HOME;
+    else process.env.CODEX_HOME = previousCodexHome;
     if (previousDatabasePath === undefined) {
       delete process.env.DATABASE_PATH;
     } else {
