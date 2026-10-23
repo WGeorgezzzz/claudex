@@ -85,6 +85,7 @@ async function runSessionSynchronization(): Promise<SessionSynchronizeResult> {
     codex: 0,
     cursor: 0,
     opencode: 0,
+    workbuddy: 0,
   };
   const failures: string[] = [];
 
@@ -140,7 +141,7 @@ export const sessionSynchronizerService = {
     if (!context) {
       const users = getConnection().prepare('SELECT id FROM users WHERE is_active=1 ORDER BY id').all() as Array<{id: number}>;
       if (users.length) {
-        const combined: SessionSynchronizeResult = { processedByProvider: {claude: 0, codex: 0, cursor: 0, opencode: 0}, prunedOrphans: 0, failures: [] };
+        const combined: SessionSynchronizeResult = { processedByProvider: {claude: 0, codex: 0, cursor: 0, opencode: 0, workbuddy: 0}, prunedOrphans: 0, failures: [] };
         const results = await Promise.allSettled(users.map(user => withUserContext(user.id, () => this.synchronizeSessions())));
         for (const result of results) {
           if (result.status === 'rejected') { combined.failures.push(String(result.reason)); continue; }

@@ -1,3 +1,4 @@
+import { MessageCircle } from 'lucide-react';
 import type { LLMProvider } from '@/shared/types';
 import ClaudeLogo from '@/shared/ui/ClaudeLogo';
 import CodexLogo from '@/shared/ui/CodexLogo';
@@ -14,6 +15,8 @@ export function LLMProviderLogo({
   provider = 'claude',
   className = 'w-5 h-5',
 }: LLMProviderLogoProps) {
+  if (provider === 'workbuddy') return <MessageCircle aria-label="WorkBuddy" className={className} />;
+
   if (provider === 'cursor') {
     return <CursorLogo className={className} />;
   }

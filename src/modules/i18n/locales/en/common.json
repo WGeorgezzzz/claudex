@@ -1,4 +1,5 @@
 {
+  "workbuddy": {"localLogin": "Open WorkBuddy on this Windows computer and sign in. Then refresh to reuse that local login in Claudex. This connection currently supports conversations only."},
   "buttons": {
     "save": "Save",
     "cancel": "Cancel",

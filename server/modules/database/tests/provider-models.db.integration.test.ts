@@ -223,9 +223,14 @@ test('migrations add effort columns to an existing provider model table and keep
     assert.equal(legacy?.modelId, 'legacy-model');
     assert.equal(legacy?.effort, null);
 
+    const workbuddy = providerModelsDb.createCustomProviderModel('workbuddy', { id: 'fast-model', model: 'WorkBuddy Fast' });
+    assert.ok(workbuddy.recordId > legacy.recordId);
+    assert.equal(providerModelsDb.listCustomProviderModels('workbuddy')[0]?.modelId, 'fast-model');
+
     // Running the migrations again is a no-op.
     runMigrations(getConnection());
     assert.equal(providerModelsDb.listCustomProviderModels('codex')[0]?.effort, null);
+    assert.equal(providerModelsDb.listCustomProviderModels('workbuddy')[0]?.recordId, workbuddy.recordId);
   } finally {
     closeConnection();
     if (previousDatabasePath === undefined) {

@@ -16,3 +16,8 @@ export { IS_PLATFORM } from './utils.js';
 
 // Auth binds isolated execution contexts; Database and filesystem helpers read them.
 export { userContextStorage } from './utils.js';
+
+// Providers use these contracts and helpers to implement local WorkBuddy sessions.
+export type { IProviderAuth, IProviderModels, IProviderRuntime, IProviderSessions, IProviderMcp, IProviderSkills } from './interfaces.js';
+export type { ProviderAuthStatus, ProviderModelsDefinition, FetchHistoryOptions, FetchHistoryResult, NormalizedMessage } from './types.js';
+export { buildDefaultProviderCurrentActiveModel, readObjectRecord, sliceTailPage } from './utils.js';

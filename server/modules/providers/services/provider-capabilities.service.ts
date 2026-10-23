@@ -99,6 +99,12 @@ const PROVIDER_CAPABILITIES: Record<LLMProvider, ProviderCapabilities> = {
     supportsMessageEditing: true,
     supportsSessionForking: true,
   },
+  workbuddy: {
+    provider: 'workbuddy', permissionModes: ['default'], defaultPermissionMode: 'default',
+    supportsImages: false, supportsFiles: false, supportsAbort: true,
+    supportsPermissionRequests: false, supportsTokenUsage: false, supportsEffort: false,
+    effortLevels: [], supportsMessageEditing: false, supportsSessionForking: false,
+  },
   opencode: {
     provider: 'opencode',
     // Mapped by the runtime onto OpenCode's controls: `--agent plan` (plan),
