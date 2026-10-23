@@ -352,3 +352,14 @@ test('scheduling validates its input', async () => {
     );
   });
 });
+
+test('schedule references and legacy pending rows cannot cross the session owner boundary',()=>withIsolatedDatabase(async user=>{
+  const input={userId:user+1,sessionId:SESSION_ID,content:'foreign',options:{},scheduledFor:new Date(Date.now()+1000).toISOString()};
+  assert.throws(()=>scheduledMessagesService.schedule(input),error=>error instanceof Error && 'statusCode' in error && error.statusCode===403);
+  assert.throws(()=>scheduledMessagesService.listForSession(user+1,SESSION_ID),error=>error instanceof Error && 'statusCode' in error && error.statusCode===403);
+  const legacy=scheduledMessagesDb.create({...input,scheduledFor:new Date(0)});
+  assert.deepEqual(scheduledMessagesService.listPending(user+1),[]);
+  assert.throws(()=>scheduledMessagesService.cancel(user+1,legacy.id),error=>error instanceof Error && 'statusCode' in error && error.statusCode===403);
+  const runs:RunCall[]=[];await dispatchDueScheduledMessages(createRuntime(runs));
+  assert.equal(runs.length,0);assert.equal(scheduledMessagesDb.get(user+1,legacy.id)?.status,'failed');
+}));

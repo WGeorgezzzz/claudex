@@ -41,3 +41,6 @@ export { sessionBridgeDb } from '@/modules/database/repositories/session-bridge.
 export { dotDb } from '@/modules/database/repositories/dot.db.js';
 // Auth uses revocable login sessions and a distinct remote credential.
 export { authSessionsDb } from '@/modules/database/repositories/auth-sessions.db.js';
+
+// Projects, Providers and WebSocket share indexed resource ownership.
+export { getOwnerUserId, getSessionOwnerId } from './ownership.js';

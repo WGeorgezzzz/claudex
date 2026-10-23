@@ -1,3 +1,4 @@
+import { installAuthorizationFixture, authenticateTestRequest } from '../../access-control/tests/authorization-fixture.js';
 import assert from 'node:assert/strict';
 import { EventEmitter, once } from 'node:events';
 import type { AddressInfo } from 'node:net';
@@ -9,6 +10,8 @@ import express from 'express';
 import { connectedClients } from '@/modules/websocket/index.js';
 
 import { createTaskmasterRouter } from '../taskmaster.routes.js';
+
+installAuthorizationFixture();
 
 test('tasks route resolves project ids through the injected project adapter', async () => {
   const resolvedIds: string[] = [];
@@ -26,7 +29,7 @@ test('tasks route resolves project ids through the injected project adapter', as
       }),
     },
   });
-  const app = express().use('/api/taskmaster', router);
+  const app = express().use(authenticateTestRequest).use('/api/taskmaster', router);
   const server = app.listen(0, '127.0.0.1');
   await once(server, 'listening');
   try {
@@ -66,7 +69,7 @@ test('MCP status route delegates detection to the injected TaskMaster service', 
       },
     },
   });
-  const app = express().use('/api/taskmaster', router);
+  const app = express().use(authenticateTestRequest).use('/api/taskmaster', router);
   const server = app.listen(0, '127.0.0.1');
   await once(server, 'listening');
 
@@ -125,7 +128,7 @@ test('TaskMaster process errors use the endpoint failure response and settle onc
       }),
     },
   });
-  const app = express().use('/api/taskmaster', router);
+  const app = express().use(authenticateTestRequest).use('/api/taskmaster', router);
   const server = app.listen(0, '127.0.0.1');
   await once(server, 'listening');
 
@@ -176,7 +179,7 @@ test('TaskMaster broadcasts reach only the tracked chat clients', async () => {
       }),
     },
   });
-  const app = express().use('/api/taskmaster', router);
+  const app = express().use(authenticateTestRequest).use('/api/taskmaster', router);
   const server = app.listen(0, '127.0.0.1');
   await once(server, 'listening');
 

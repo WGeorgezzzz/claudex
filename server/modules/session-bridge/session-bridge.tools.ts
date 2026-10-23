@@ -1,3 +1,4 @@
+import { assertOwnedSession } from '@/modules/access-control/index.js';
 import { createSdkMcpServer, tool } from '@anthropic-ai/claude-agent-sdk';
 import { z } from 'zod';
 
@@ -17,8 +18,9 @@ const instructions = `Claudex 提供 claudex_sessions 的 session 工具，可�
 /** MCP adapter and tests use the bound origin identity; model arguments cannot replace the authenticated source. */
 export async function executeSessionBridgeTool(context: BridgeContext, input: unknown) {
   const args = z.object(shape).strict().parse(input);
-  if (args.action === 'list') return sessionBridgeService.list(args.query, args.offset);
-  if (args.action === 'read') return sessionBridgeService.read(args.sessionId ?? '', args.offset);
+  assertOwnedSession(context.userId, context.sessionId);
+  if (args.action === 'list') return sessionBridgeService.list(args.query, args.offset, context.userId);
+  if (args.action === 'read') return sessionBridgeService.read(args.sessionId ?? '', args.offset, context.userId);
   if (args.action === 'status') return sessionBridgeService.status(context.userId, context.sessionId, args.receiptId ?? '');
   if (context.autonomous || context.planMode) throw new Error('This scheduled/forwarded/planning turn may inspect conversations but cannot dispatch to another session. Ask the user to send explicitly from a normal turn.');
   return sessionBridgeService.send(context.userId, context.sessionId, args);

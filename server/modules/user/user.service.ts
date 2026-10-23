@@ -29,6 +29,8 @@ type UserDependencies = {
     saveDraft(userId: number, scope: string, draft: { text: string; queuedMessage: unknown | null }): void;
     deleteDraft(userId: number, scope: string): void;
   };
+  isAdmin(userId: number): boolean;
+  ownsDraftScope(userId: number, scope: string): boolean;
   readSystemGitConfig(): Promise<GitConfig>;
   applyGlobalGitConfig(gitName: string, gitEmail: string): Promise<void>;
   logInfo(message: string): void;
@@ -84,7 +86,7 @@ export function createUserService(dependencies: UserDependencies) {
   return {
     async getGitConfig(userId: number) {
       let gitConfig = dependencies.users.getGitConfig(userId);
-      if (!gitConfig || (!gitConfig.git_name && !gitConfig.git_email)) {
+      if (dependencies.isAdmin(userId) && (!gitConfig || (!gitConfig.git_name && !gitConfig.git_email))) {
         const systemConfig = await dependencies.readSystemGitConfig();
         if (systemConfig.git_name || systemConfig.git_email) {
           dependencies.users.updateGitConfig(
@@ -122,7 +124,7 @@ export function createUserService(dependencies: UserDependencies) {
 
       dependencies.users.updateGitConfig(userId, gitName, gitEmail);
       try {
-        await dependencies.applyGlobalGitConfig(gitName, gitEmail);
+        if (dependencies.isAdmin(userId)) await dependencies.applyGlobalGitConfig(gitName, gitEmail);
       } catch (error) {
         // Persisted user settings remain authoritative even if the host Git
         // installation cannot be updated (matching the previous behavior).
@@ -160,11 +162,12 @@ export function createUserService(dependencies: UserDependencies) {
     },
 
     getDrafts(userId: number) {
-      return { success: true, drafts: dependencies.drafts.getDrafts(userId) };
+      return { success: true, drafts: dependencies.drafts.getDrafts(userId).filter(draft=>dependencies.ownsDraftScope(userId,draft.scope)) };
     },
 
     saveDraft(userId: number, scopeInput: unknown, body: unknown) {
       const scope = readDraftScope(scopeInput);
+      if (!dependencies.ownsDraftScope(userId,scope)) throw new AppError('Draft scope belongs to another user or is unavailable.',{statusCode:403});
       const payload = (body ?? {}) as { text?: unknown; queuedMessage?: unknown };
       const text = typeof payload.text === 'string' ? payload.text : '';
 
@@ -183,7 +186,9 @@ export function createUserService(dependencies: UserDependencies) {
     },
 
     deleteDraft(userId: number, scopeInput: unknown) {
-      dependencies.drafts.deleteDraft(userId, readDraftScope(scopeInput));
+      const scope=readDraftScope(scopeInput);
+      if (!dependencies.ownsDraftScope(userId,scope)) throw new AppError('Draft scope belongs to another user or is unavailable.',{statusCode:403});
+      dependencies.drafts.deleteDraft(userId, scope);
       return { success: true };
     },
   };

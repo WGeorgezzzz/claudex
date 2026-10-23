@@ -1,4 +1,6 @@
-import { monitorsDb, sessionsDb } from '@/modules/database/index.js';
+import { withUserContext } from '@/modules/auth/index.js';
+import { assertOwnedSession } from '@/modules/access-control/index.js';
+import { monitorsDb } from '@/modules/database/index.js';
 import { sessionsService } from '@/modules/providers/index.js';
 import { chatRunRegistry, runDetachedChatTurn } from '@/modules/websocket/index.js';
 import type { ProviderRuntimeGateway } from '@/modules/websocket/index.js';
@@ -20,9 +22,9 @@ export async function dispatchMonitors(runtime: ProviderRuntimeGateway,now=new D
     const runId=monitorsDb.claim(row.id,now);
     if(!runId) continue;
     busySessions.add(row.session_id);
-    const job=(async () => {
+    const job=Promise.resolve().then(() => withUserContext(row.user_id, async () => {
       try {
-        const session=sessionsDb.getSessionById(row.session_id);
+        const session=assertOwnedSession(row.user_id,row.session_id);
         if(!session || session.isArchived) {monitorsDb.pauseUnavailable(row.id);throw new Error('会话已删除或归档，监测已暂停。');}
         let providerError: string|null=null;
         let completed=false;
@@ -53,7 +55,7 @@ export async function dispatchMonitors(runtime: ProviderRuntimeGateway,now=new D
       } catch(error) {
         monitorsDb.finish(row.id,runId,(error instanceof Error?error.message:String(error)).slice(0,1000));
       }
-    })();
+    })).catch(error => { monitorsDb.finish(row.id,runId,String(error).slice(0,1000)); });
     jobs.push(job);
   }
   await Promise.all(jobs);

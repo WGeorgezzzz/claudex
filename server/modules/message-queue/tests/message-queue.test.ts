@@ -186,3 +186,14 @@ test('legacy queue import is atomic and preserves unsent text',()=>fixture(user=
   const draft=sessionDraftsDb.getDrafts(user)[0];
   assert.equal(draft.text,'still typing');assert.equal(draft.queuedMessage,null);
 }));
+
+test('queue session references and live state reject another account before persistence or runtime access',()=>fixture(user=>{
+  assert.throws(()=>enqueue(user+1,'foreign'),error=>error instanceof Error && 'statusCode' in error && error.statusCode===403);
+  assert.throws(()=>messageQueueService.list(user+1,'queue-session'),error=>error instanceof Error && 'statusCode' in error && error.statusCode===403);
+  assert.throws(()=>messageQueueService.enqueue(user,{sessionId:'queue-session',requestId:'bad-source',content:'x'},'queued','missing-source'),error=>error instanceof Error && 'statusCode' in error && error.statusCode===403);
+  const legacy=messageQueueDb.create(user+1,'queue-session','legacy-cross-owner','hash','retain','{}');
+  assert.throws(()=>messageQueueService.update(user+1,legacy.id,{action:'cancel',revision:legacy.revision}),error=>error instanceof Error && 'statusCode' in error && error.statusCode===403);
+  assert.throws(()=>messageQueueService.attempts(user+1,legacy.id),error=>error instanceof Error && 'statusCode' in error && error.statusCode===403);
+  assert.throws(()=>createLiveInputService().current('queue-session',user+1),error=>error instanceof Error && 'statusCode' in error && error.statusCode===403);
+  assert.equal(messageQueueDb.get(user+1,legacy.id)?.status,'queued');
+}));

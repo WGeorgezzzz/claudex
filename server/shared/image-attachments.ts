@@ -1,7 +1,8 @@
 import { promises as fs, realpathSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { getCloudCliHomeDir } from '@/shared/utils.js';
+
+import { getCloudCliHomeDir, userContextStorage } from '@/shared/utils.js';
 
 /**
  * Shared chat-attachment plumbing for every provider runtime.
@@ -20,6 +21,12 @@ import { getCloudCliHomeDir } from '@/shared/utils.js';
 
 /** Global storage folder for uploaded chat image attachments. */
 export function getGlobalImageAssetsDir(): string {
+  const context = userContextStorage.getStore();
+  // Keep legacy administrator uploads available while member attachments are
+  // readable only through that member's authenticated storage namespace.
+  if (context?.role === 'member') {
+    return path.join(path.dirname(context.claudeConfigDir), 'assets');
+  }
   return path.join(getCloudCliHomeDir(), 'assets');
 }
 

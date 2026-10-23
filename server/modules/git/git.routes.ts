@@ -1,4 +1,5 @@
 // @ts-nocheck -- temporary while Git workflows are extracted into the injected service.
+import { userContextMiddleware, authorizePaths } from '@/modules/access-control/index.js';
 import path from 'path';
 
 import express from 'express';
@@ -27,6 +28,15 @@ const projectsDb = { getProjectPathById: dependencies.resolveProjectPathById };
 const queryClaudeSDK = dependencies.queryClaude;
 const spawnCursor = dependencies.queryCursor;
 const router = express.Router();
+  router.use(userContextMiddleware);
+  router.use(authorizePaths(req => {
+    const input = req.method === 'GET' ? req.query : req.body ?? {};
+    if (typeof input.project !== 'string') return [];
+    const root = dependencies.resolveProjectPathById(input.project);
+    if (!root) throw new AppError('项目不存在。', { statusCode: 404 });
+    const files = [input.file, input.oldPath, ...(Array.isArray(input.files) ? input.files : [])].filter(value => typeof value === 'string');
+    return [root, ...files.map(file => path.resolve(root, file))];
+  }));
 const COMMIT_DIFF_CHARACTER_LIMIT = 500_000;
 
 function spawnAsync(command, args, options = {}) {

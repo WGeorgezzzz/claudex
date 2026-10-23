@@ -1682,3 +1682,16 @@ export type DotThread={sessionId:string;title:string;createdAt:string};
 /** A delegation preserves its queue receipt, provenance and reporting state; success is a turn result only. */
 export type DotTask={id:string;user_id:number;source_session_id:string;target_session_id:string;queue_id:string;request_id:string;payload_hash:string;reported:number;created_at:string;status:string;error:string|null;revision:number;finished_at:string|null;title?:string;projectPath?:string};
 // ---------------------------
+
+//----------------- USER RUNTIME CONFIGURATION ------------
+/** Auth, provider adapters and shared configuration helpers use this immutable per-run identity.
+ * Environment values are copied per user; never install them into process.env. */
+export type UserRuntimeContext = {
+  userId: number;
+  role: 'admin' | 'member';
+  workRoot: string | null;
+  allowedFolders: string[];
+  claudeConfigDir: string;
+  codexHome: string;
+  env: NodeJS.ProcessEnv;
+};

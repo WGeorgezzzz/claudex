@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import http from 'node:http';
 
 import express from 'express';
+import { requireSharedResourceAdministrator } from '@/modules/auth/index.js';
 
 import type { createPluginsService } from './plugins.service.js';
 
@@ -16,6 +17,15 @@ function routeParameter(value: string | string[]): string {
 /** Creates plugin routes; transport streaming remains here while decisions live in the service. */
 export function createPluginsRouter(service: ReturnType<typeof createPluginsService>): express.Router {
   const router = express.Router();
+  // Plugins execute host processes and expose shared RPC state, so members can
+  // inspect manifests/assets but cannot mutate or invoke that global runtime.
+  router.use((request, response, next) => {
+    if (!['GET', 'HEAD'].includes(request.method) || request.path.includes('/rpc/')) {
+      requireSharedResourceAdministrator(request, response, next);
+      return;
+    }
+    next();
+  });
   const respond = (operation: (req: express.Request) => unknown | Promise<unknown>) =>
     async (req: express.Request, res: express.Response, next: express.NextFunction) => {
       try { res.json(await operation(req)); } catch (error) { next(error); }

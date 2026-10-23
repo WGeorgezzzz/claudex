@@ -114,3 +114,13 @@ test('the display boundary is frozen after copied timestamps and survives later 
   const renamed=await service.update(userId,created.id,{title:'Later title'});
   assert.equal(renamed.context_frozen_at,created.context_frozen_at);
 }));
+
+test('side-chat parent, adoption and stale child references require the real session owner',()=>fixture(async(user,root)=>{
+  const service=createSideChatsService(fakeFork(root));
+  assert.throws(()=>service.list(user+1,'parent'),error=>error instanceof Error && 'statusCode' in error && error.statusCode===403);
+  await assert.rejects(service.create(user+1,input),error=>error instanceof Error && 'statusCode' in error && error.statusCode===403);
+  const child=await service.create(user,input);
+  assert.throws(()=>service.adopt(user+1,'parent',child.child_session_id),error=>error instanceof Error && 'statusCode' in error && error.statusCode===403);
+  const legacy=sideChatsDb.reserve(user+1,'parent','legacy-foreign','foreign');
+  await assert.rejects(service.update(user+1,legacy.id,{title:'stolen'}),error=>error instanceof Error && 'statusCode' in error && error.statusCode===403);
+}));

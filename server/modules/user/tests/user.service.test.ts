@@ -22,6 +22,8 @@ function createDependencies(overrides: Partial<UserDependencies> = {}): UserDepe
       saveDraft: () => undefined,
       deleteDraft: () => undefined,
     },
+    isAdmin: () => true,
+    ownsDraftScope: () => true,
     readSystemGitConfig: async () => ({ git_name: null, git_email: null }),
     applyGlobalGitConfig: async () => undefined,
     logInfo: () => undefined,
@@ -39,6 +41,8 @@ test('getGitConfig imports system configuration when the repository is empty', a
       completeOnboarding: () => undefined,
       hasCompletedOnboarding: () => false,
     },
+    isAdmin: () => true,
+    ownsDraftScope: () => true,
     readSystemGitConfig: async () => ({ git_name: 'Alice', git_email: 'alice@example.com' }),
   }));
 
@@ -148,4 +152,27 @@ test('saveDraft rejects text past the storage limit', () => {
     () => service.saveDraft(5, 'session-1', { text: 'x'.repeat(100_001) }),
     /too long/i,
   );
+});
+
+test('member Git identity stays in the database and never reads or writes the global identity',async()=>{
+  let reads=0,writes=0;const saved:unknown[][]=[];
+  const service=createUserService(createDependencies({isAdmin:()=>false,
+    users:{...createDependencies().users,updateGitConfig:(...args)=>{saved.push(args);}},
+    readSystemGitConfig:async()=>{reads++;return {git_name:'Admin',git_email:'admin@example.com'};},
+    applyGlobalGitConfig:async()=>{writes++;}}));
+  assert.equal((await service.getGitConfig(2)).gitName,null);
+  await service.updateGitConfig(2,'Member','member@example.com');
+  assert.deepEqual(saved,[[2,'Member','member@example.com']]);assert.equal(reads,0);assert.equal(writes,0);
+});
+test('draft scope authorization filters legacy rows and rejects foreign sessions and projects',()=>{
+  const changed:string[]=[];
+  const service=createUserService(createDependencies({ownsDraftScope:(_user,scope)=>scope==='own-session',
+    drafts:{getDrafts:()=>['own-session','other-session','project:other'].map(scope=>({scope,text:'draft',queuedMessage:null,updatedAt:''})),
+      saveDraft:(_user,scope)=>{changed.push(scope);},deleteDraft:(_user,scope)=>{changed.push(scope);}}}));
+  assert.deepEqual(service.getDrafts(2).drafts.map(row=>row.scope),['own-session']);
+  for(const scope of ['other-session','project:other']){
+    assert.throws(()=>service.saveDraft(2,scope,{text:'x'}),error=>error instanceof Error && 'statusCode' in error && error.statusCode===403);
+    assert.throws(()=>service.deleteDraft(2,scope),error=>error instanceof Error && 'statusCode' in error && error.statusCode===403);
+  }
+  assert.deepEqual(changed,[]);
 });

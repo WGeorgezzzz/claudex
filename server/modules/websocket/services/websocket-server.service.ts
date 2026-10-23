@@ -1,8 +1,8 @@
 import type { Server as HttpServer } from 'node:http';
 
 import { WebSocket, WebSocketServer, type VerifyClientCallbackAsync } from 'ws';
-import { validateAccessBoundary, isLocalRequest, authSessionEvents } from '@/modules/auth/index.js';
 
+import { validateAccessBoundary, isLocalRequest, authSessionEvents } from '@/modules/auth/index.js';
 import { handleChatConnection } from '@/modules/websocket/services/chat-websocket.service.js';
 import { verifyWebSocketClient } from '@/modules/websocket/services/websocket-auth.service.js';
 import { handlePluginWsProxy } from '@/modules/websocket/services/plugin-websocket-proxy.service.js';
@@ -117,7 +117,8 @@ export function createWebSocketServer(
     const pathname = new URL(url, 'http://localhost').pathname;
 
     if (pathname === '/shell') {
-      handleShellConnection(ws, dependencies.shell);
+      if (incomingRequest.user?.id == null && incomingRequest.user?.userId == null) { ws.close(1008, 'Authentication required'); return; }
+      handleShellConnection(ws, dependencies.shell, incomingRequest.user?.id ?? incomingRequest.user?.userId);
       return;
     }
 

@@ -4,6 +4,7 @@ import path from 'node:path';
 
 import TOML from '@iarna/toml';
 
+import { getCurrentUserContext } from '@/modules/auth/index.js';
 import { McpProvider } from '@/modules/providers/shared/mcp/mcp.provider.js';
 import type { McpScope, ProviderMcpServer, UpsertProviderMcpServerInput } from '@/shared/types.js';
 import {
@@ -41,7 +42,7 @@ export class CodexMcpProvider extends McpProvider {
 
   protected async readScopedServers(scope: McpScope, workspacePath: string): Promise<Record<string, unknown>> {
     const filePath = scope === 'user'
-      ? path.join(os.homedir(), '.codex', 'config.toml')
+      ? path.join(getCurrentUserContext()?.codexHome ?? process.env.CODEX_HOME ?? path.join(os.homedir(), '.codex'), 'config.toml')
       : path.join(workspacePath, '.codex', 'config.toml');
     const config = await readTomlConfig(filePath);
     return readObjectRecord(config.mcp_servers) ?? {};
@@ -53,7 +54,7 @@ export class CodexMcpProvider extends McpProvider {
     servers: Record<string, unknown>,
   ): Promise<void> {
     const filePath = scope === 'user'
-      ? path.join(os.homedir(), '.codex', 'config.toml')
+      ? path.join(getCurrentUserContext()?.codexHome ?? process.env.CODEX_HOME ?? path.join(os.homedir(), '.codex'), 'config.toml')
       : path.join(workspacePath, '.codex', 'config.toml');
     const config = await readTomlConfig(filePath);
     config.mcp_servers = servers;

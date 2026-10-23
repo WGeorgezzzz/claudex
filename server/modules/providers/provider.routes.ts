@@ -1,4 +1,7 @@
+import { getSessionOwnerId, getOwnerUserId } from '@/modules/database/index.js';
+import { userContextMiddleware } from '@/modules/access-control/index.js';
 import express, { type Request, type Response } from 'express';
+import { requireSharedResourceAdministrator } from '@/modules/auth/index.js';
 
 import { providerAuthService } from '@/modules/providers/services/provider-auth.service.js';
 import { claudeSettingsPermissionsService } from '@/modules/providers/services/claude-settings-permissions.service.js';
@@ -22,6 +25,23 @@ import type {
 import { AppError, asyncHandler, createApiSuccessResponse } from '@/shared/utils.js';
 
 const router = express.Router();
+router.use((request, response, next) => {
+  // Models, skills, MCP definitions and provider settings are explicitly shared
+  // configuration. Session mutations remain available under ownership checks.
+  if (!['GET', 'HEAD'].includes(request.method) &&
+      (/^\/[^/]+\/(models|skills|mcp)(\/|$)/.test(request.path) ||
+       request.path === '/mcp/servers/global' || request.path === '/claude/settings-permissions')) {
+    requireSharedResourceAdministrator(request, response, next);
+    return;
+  }
+  next();
+});
+router.use(userContextMiddleware);
+router.param('sessionId', (_req, _res, next, id: string) => {
+  const owner = getSessionOwnerId(id);
+  if (owner !== null && owner !== getOwnerUserId()) return next(new AppError('无权访问此会话。', { statusCode: 403, code: 'SESSION_FORBIDDEN' }));
+  next();
+});
 
 const readPathParam = (value: unknown, name: string): string => {
   if (typeof value === 'string') {

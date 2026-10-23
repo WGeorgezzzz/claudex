@@ -37,7 +37,8 @@ test('Access SSO validates identity, binds expiry, and cannot renew a revoked de
     const req = (assertion: string, extra: Record<string, string> = {}) => ({ headers: {
       host: 'fixture.example.com', origin: 'https://fixture.example.com', 'cf-access-jwt-assertion': assertion, ...extra,
     }, socket: { remoteAddress: '127.0.0.1' } }) as unknown as IncomingMessage;
-    await assert.rejects(exchangeAccessIdentity(req(token())), /Configure/);
+    // Legacy SSO binds the administrator even without an independent remote password.
+    assert.equal((await exchangeAccessIdentity(req(token()))).user.id, user.id);
     authSessionsDb.configure(Number(user.id), 'remote-owner', 'unused', 'unused');
     const identity = await exchangeAccessIdentity(req(token()));
     assert.equal(identity.user.id, user.id);
@@ -46,6 +47,12 @@ test('Access SSO validates identity, binds expiry, and cannot renew a revoked de
     for (const bad of [token({ email: 'guest@example.com' }), token({ aud: ['other-app'] }), token({ iss: 'https://other.cloudflareaccess.com' }), token({ exp: now - 1 }), 'forged']) {
       await assert.rejects(exchangeAccessIdentity(req(bad)));
     }
+    const member=userDb.createUser('member-sso','unused-password-hash');
+    userDb.updateAccess(Number(member.id),path.join(root,'member'),[],'member@example.com',true);
+    const memberToken=token({email:'member@example.com'});
+    assert.equal((await exchangeAccessIdentity(req(memberToken))).user.id,member.id);
+    userDb.updateAccess(Number(member.id),path.join(root,'member'),[],'member@example.com',false);
+    await assert.rejects(exchangeAccessIdentity(req(memberToken)));
     const parts = token().split('.');
     const signature = Buffer.from(parts[2], 'base64url'); signature[0] ^= 1; parts[2] = signature.toString('base64url');
     await assert.rejects(exchangeAccessIdentity(req(parts.join('.'))));

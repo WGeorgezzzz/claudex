@@ -6,7 +6,7 @@ import { spawn } from 'cross-spawn';
 import { rgPath } from '@vscode/ripgrep';
 
 import { isClaudeNonTurnMessageRow, stripAnsiSequences } from '@/shared/utils.js';
-import { projectsDb, sessionsDb } from '@/modules/database/index.js';
+import { projectsDb, sessionsDb, getOwnerUserId } from '@/modules/database/index.js';
 
 type AnyRecord = Record<string, any>;
 type SearchableProvider = 'claude' | 'codex';
@@ -145,7 +145,7 @@ function chunkArray<TItem>(items: TItem[], size: number): TItem[][] {
 }
 
 function getSessionKey(session: Pick<SessionRepositoryRow, 'provider' | 'session_id'>): string {
-  return `${session.provider}:${session.session_id}`;
+  return `${getOwnerUserId()}:${session.provider}:${session.session_id}`;
 }
 
 function makeProjectKey(projectPath: string | null): string {

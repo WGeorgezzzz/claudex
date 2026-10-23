@@ -1,6 +1,7 @@
 import spawn from 'cross-spawn';
 
-import { sessionDraftsDb, userDb, userPreferencesDb } from '@/modules/database/index.js';
+import { getUserContext, withUserContext } from '@/modules/auth/index.js';
+import { getSessionOwnerId, projectsDb, sessionDraftsDb, userDb, userPreferencesDb } from '@/modules/database/index.js';
 
 import { createUserRouter } from './user.routes.js';
 import { createUserService } from './user.service.js';
@@ -54,6 +55,10 @@ const userService = createUserService({
     saveDraft: (userId, scope, draft) => sessionDraftsDb.saveDraft(userId, scope, draft),
     deleteDraft: (userId, scope) => sessionDraftsDb.deleteDraft(userId, scope),
   },
+  isAdmin: userId => getUserContext(userId).role==='admin',
+  ownsDraftScope: (userId,scope) => scope.startsWith('project:')
+    ? withUserContext(userId,()=>Boolean(projectsDb.getProjectById(scope.slice('project:'.length))))
+    : getSessionOwnerId(scope)===userId,
   readSystemGitConfig,
   applyGlobalGitConfig: async (gitName, gitEmail) => {
     await runGit(['config', '--global', 'user.name', gitName]);

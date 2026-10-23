@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test, { mock } from 'node:test';
 
-import { closeConnection, initializeDatabase, sessionsDb } from '@/modules/database/index.js';
+import { closeConnection, initializeDatabase, sessionsDb, getConnection } from '@/modules/database/index.js';
 import { handleChatConnection } from '@/modules/websocket/services/chat-websocket.service.js';
 import { chatRunRegistry } from '@/modules/websocket/services/chat-run-registry.service.js';
 import { connectedClients } from '@/modules/websocket/services/websocket-state.service.js';
@@ -40,6 +40,7 @@ async function withIsolatedDatabase(runTest: () => Promise<void>): Promise<void>
   closeConnection();
   process.env.DATABASE_PATH = path.join(tempDirectory, 'auth.db');
   await initializeDatabase();
+  getConnection().prepare("INSERT INTO users(id,username,password_hash,role) VALUES(1,'test-admin','test','admin')").run();
   try {
     sessionsDb.createAppSession(SESSION_ID, 'claude', tempDirectory);
     await runTest();

@@ -14,15 +14,23 @@ export function totpCode(secret:string,step:number):string {const count=Buffer.a
 
 /** Local setup and remote login share an independent credential mapped to the existing owner's data. */
 export const remoteIdentityService={
-  status(){const row=authSessionsDb.remote();return {configured:Boolean(row),username:row?.username};},
+  status(userId?:number){if(userId!==undefined&&userDb.getUserById(userId)?.role!=='admin')return {configured:false};const row=authSessionsDb.remote();return {configured:Boolean(row),username:row?.username};},
   async configure(userId:number,username:string,password:string){
+    if(userDb.getUserById(userId)?.role!=='admin')throw new AppError('Administrator required',{statusCode:403});
     if(authSessionsDb.remote())throw new AppError('A remote account is already configured.',{statusCode:409});
     if(!/^[a-zA-Z0-9_.-]{3,64}$/.test(username)||password.length<16||Buffer.byteLength(password,'utf8')>72)throw new AppError('Use a valid username and a password of at least 16 characters, up to 72 UTF-8 bytes.',{statusCode:400});
+    if(userDb.getUserByUsername(username)?.role==='member')throw new AppError('Username is already assigned to a member.',{statusCode:409});
     const secret=encode(randomBytes(20));const hash=await bcrypt.hash(password,12);
     authSessionsDb.configure(userId,username,hash,secret);
     return {username,secret,otpAuthUrl:`otpauth://totp/Claudex:${encodeURIComponent(username)}?secret=${secret}&issuer=Claudex&algorithm=SHA1&digits=6&period=30`};
   },
   async login(username:unknown,password:unknown,otp:unknown){
+    const member=typeof username==='string'?userDb.getUserByUsername(username):undefined;
+    if(member?.role==='member'&&username!==authSessionsDb.remote()?.username){
+      if(typeof password!=='string'||Buffer.byteLength(password,'utf8')>72||!await bcrypt.compare(password,member.password_hash))throw new AppError('Invalid username or password',{statusCode:401});
+      userDb.updateLastLogin(member.id);
+      return userDb.getUserById(member.id)!;
+    }
     const row=authSessionsDb.remote();
     const reject=()=>new AppError('Invalid remote username, password or verification code.',{statusCode:401});
     if(!row||username!==row.username||typeof password!=='string'||Buffer.byteLength(password,'utf8')>72||typeof otp!=='string'||!/^\d{6}$/.test(otp))throw reject();

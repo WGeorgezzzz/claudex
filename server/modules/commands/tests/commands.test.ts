@@ -1,3 +1,4 @@
+import { installAuthorizationFixture, authenticateTestRequest } from '../../access-control/tests/authorization-fixture.js';
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import type { AddressInfo } from 'node:net';
@@ -56,7 +57,7 @@ async function executeCommand(
       version: 'v22', platform: 'linux', pid: 1,
     },
   });
-  const app = express().use(express.json()).use('/api/commands', router);
+  const app = express().use(express.json()).use(authenticateTestRequest).use('/api/commands', router);
   const server = app.listen(0, '127.0.0.1');
   await once(server, 'listening');
   try {
@@ -71,6 +72,8 @@ async function executeCommand(
     await new Promise<void>((resolve) => server.close(() => resolve()));
   }
 }
+
+installAuthorizationFixture();
 
 test('models command returns models only for the active provider using injected catalog', async () => {
   const result = await executeCommand('/models', { provider: 'codex' });

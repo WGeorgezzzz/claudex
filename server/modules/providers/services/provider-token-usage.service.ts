@@ -5,6 +5,7 @@ import path from 'node:path';
 
 import Database from 'better-sqlite3';
 
+import { getCurrentUserContext } from '@/modules/auth/index.js';
 import { sessionsDb } from '@/modules/database/index.js';
 import type { AnyRecord } from '@/shared/types.js';
 import { AppError, getOpenCodeDatabasePath } from '@/shared/utils.js';
@@ -465,7 +466,7 @@ export function createProviderTokenUsageService(
           ? session.jsonl_path
           : null;
         const sessionFilePath = indexedFilePath ?? await findCodexSessionFile(
-          path.join(dependencies.getHomeDirectory(), '.codex', 'sessions'),
+          path.join(getCurrentUserContext()?.codexHome ?? process.env.CODEX_HOME ?? path.join(dependencies.getHomeDirectory(), '.codex'), 'sessions'),
           providerSessionId,
           dependencies,
         );

@@ -1,3 +1,5 @@
+import { userContextMiddleware, authorizeProjectParameter } from '@/modules/access-control/index.js';
+import { projectsDb } from '@/modules/database/index.js';
 import express from 'express';
 
 import { createProject, updateProjectDisplayName } from '@/modules/projects/services/project-management.service.js';
@@ -18,6 +20,8 @@ import { applyLegacyStarredProjectIds, toggleProjectStar } from '@/modules/proje
 const PENDING_CLONE_REQUEST_TTL_MS = 60_000;
 
 const router = express.Router();
+router.use(userContextMiddleware);
+router.param('projectId', authorizeProjectParameter(id => projectsDb.getProjectPathById(id)));
 
 function readQueryStringValue(value: unknown): string {
   if (typeof value === 'string') {

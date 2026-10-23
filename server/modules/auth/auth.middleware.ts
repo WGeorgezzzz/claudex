@@ -6,12 +6,15 @@ import { IS_PLATFORM } from '@/shared/index.js';
 import { userDb, appConfigDb, authSessionsDb } from '@/modules/database/index.js';
 import { isLocalRequest } from '@/modules/auth/access-boundary.js';
 
+import { withUserContext } from './user-context.js';
+
 /** Auth routes and websocket ingress immediately disconnect revoked device sessions. */
 export const authSessionEvents = new EventEmitter();
 authSessionEvents.setMaxListeners(0);
 
 // Use env var if set, otherwise auto-generate a unique secret per installation
-const JWT_SECRET = process.env.JWT_SECRET || appConfigDb.getOrCreateJwtSecret();
+// Resolve lazily: database ownership imports the auth barrel during module setup.
+const jwtSecret = () => process.env.JWT_SECRET || appConfigDb.getOrCreateJwtSecret();
 
 // Server composition uses this optional API-wide key check before authenticated feature routes.
 export const validateApiKey = (req, res, next) => {
@@ -29,15 +32,15 @@ export const validateApiKey = (req, res, next) => {
 
 // Server and Auth routes verify account and device ownership before entering feature services.
 export const authenticateToken = async (req, res, next) => {
-  // Platform mode:  use single database user
-  if (IS_PLATFORM) {
+  // Preserve tokenless platform compatibility only for an actual single-account install.
+  if (IS_PLATFORM && !req.headers.authorization && !req.query.token && userDb.listUsers().length === 1) {
     try {
       const user = userDb.getFirstUser();
       if (!user) {
         return res.status(500).json({ error: 'Platform mode: No user found in database' });
       }
       req.user = user;
-      return next();
+      return withUserContext(user.id, () => next());
     } catch (error) {
       console.error('Platform mode error:', error);
       return res.status(500).json({ error: 'Platform mode: Failed to fetch user' });
@@ -62,7 +65,7 @@ export const authenticateToken = async (req, res, next) => {
   }
 
   try {
-    const decoded = jwt.verify(token, JWT_SECRET);
+    const decoded = jwt.verify(token, jwtSecret());
     const device = decoded.sid ? authSessionsDb.get(decoded.sid) : null;
     if (decoded.sid && (!device || device.user_id !== decoded.userId)) throw new Error('Device session revoked.');
     if (process.env.CLAUDEX_PRIVATE_GATE === '1' && !isLocalRequest(req) && device?.kind !== 'remote') throw new Error('Remote password and MFA login required.');
@@ -88,7 +91,7 @@ export const authenticateToken = async (req, res, next) => {
     }
 
     req.user = {...user, authSessionId:decoded.sid, authKind:device?.kind ?? 'legacy'};
-    next();
+    return withUserContext(user.id, () => next());
   } catch (error) {
     if (error instanceof jwt.TokenExpiredError) {
       res.setHeader('X-Auth-Error', 'session-expired');
@@ -121,15 +124,15 @@ export const generateToken = (user) => {
       username: user.username,
       sid
     },
-    JWT_SECRET,
+    jwtSecret(),
     { expiresIn: Math.max(1,Math.floor((device.expires_at-Date.now())/1000)) }
   );
 };
 
 // WebSocket ingress reuses the same account/device lifetime validation as HTTP.
 export const authenticateWebSocket = (token) => {
-  // Platform mode: bypass token validation, return first user
-  if (IS_PLATFORM) {
+  // Multi-account platform sockets must carry an account-bound JWT too.
+  if (IS_PLATFORM && !token && userDb.listUsers().length === 1) {
     try {
       const user = userDb.getFirstUser();
       if (user) {
@@ -148,7 +151,7 @@ export const authenticateWebSocket = (token) => {
   }
 
   try {
-    const decoded = jwt.verify(token, JWT_SECRET);
+    const decoded = jwt.verify(token, jwtSecret());
     const device=decoded.sid?authSessionsDb.get(decoded.sid):null;
     if(decoded.sid&&(!device||device.user_id!==decoded.userId))return null;
     // Verify user actually exists in database (matches REST authenticateToken behavior)

@@ -23,7 +23,7 @@ const create=(user:number,id:string,mode:'queued'|'live'='queued')=>messageQueue
 test('pins and manual unread flags are account-scoped and survive database reopening',()=>fixture(async user=>{
   const pinned=sessionWorkspaceService.update(user,'session-one',{pinned:true,unread:true});
   assert.ok(pinned.pinnedAt);assert.equal(pinned.unread,true);
-  assert.equal(sessionWorkspaceService.get(user+1,'session-one').pinnedAt,null);
+  assert.throws(()=>sessionWorkspaceService.get(user+1,'session-one'),error=>error instanceof Error && 'statusCode' in error && error.statusCode===403);
   closeConnection();await initializeDatabase();
   assert.equal(sessionWorkspaceService.get(user,'session-one').pinnedAt,pinned.pinnedAt);
   getConnection().prepare('UPDATE sessions SET isArchived=1 WHERE session_id=?').run('session-one');
@@ -80,4 +80,11 @@ test('attention combines persisted queue blockers with only this user’s pendin
   chatRunRegistry.getRun('session-one')!.writer.send({kind:'text',role:'assistant',provider:'claude',content:'background result'});
   assert.equal(sessionWorkspaceService.get(user,'session-one').unread,true);
   assert.equal(sessionWorkspaceService.list(user+1).length,0);
+}));
+
+test('workspace rejects another owner and hides forged legacy organization rows',()=>fixture(user=>{
+  assert.throws(()=>sessionWorkspaceService.update(user+1,'session-one',{pinned:true}),error=>error instanceof Error && 'statusCode' in error && error.statusCode===403);
+  sessionWorkspaceDb.update(user+1,'session-one',{pinned:true});
+  assert.deepEqual(sessionWorkspaceService.list(user+1),[]);
+  assert.throws(()=>sessionWorkspaceService.get(user+1,'session-one'),error=>error instanceof Error && 'statusCode' in error && error.statusCode===403);
 }));

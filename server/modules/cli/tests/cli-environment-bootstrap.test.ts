@@ -32,6 +32,7 @@ async function runCliBootstrapFixture(isPlatform: boolean): Promise<BootstrapRes
 
   try {
     await mkdir(fixtureCliDirectory, { recursive: true });
+    await writeFile(path.join(fixtureRoot, 'package.json'), JSON.stringify({ type: 'module' }), 'utf8');
     await Promise.all([
       copyFile(
         path.join(applicationRoot, 'server', 'load-env.ts'),

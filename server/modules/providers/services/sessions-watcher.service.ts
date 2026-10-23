@@ -1,9 +1,10 @@
+import { getUserContext, withUserContext } from '@/modules/auth/index.js';
+import { getConnection } from '@/modules/database/index.js';
 import os from 'node:os';
 import path from 'node:path';
 import { promises as fsPromises } from 'node:fs';
 
 import chokidar, { type FSWatcher } from 'chokidar';
-import { getClaudeConfigDir } from '@/shared/index.js';
 
 import { sessionSynchronizerService } from '@/modules/providers/services/session-synchronizer.service.js';
 import { broadcastSessionUpsertedBatch } from '@/modules/websocket/index.js';
@@ -11,24 +12,24 @@ import type { LLMProvider } from '@/shared/types.js';
 
 type WatcherEventType = 'add' | 'change';
 
-const PROVIDER_WATCH_PATHS: Array<{ provider: LLMProvider; rootPath: string }> = [
-  {
-    provider: 'claude',
-    rootPath: path.join(getClaudeConfigDir(), 'projects'),
-  },
-  {
-    provider: 'cursor',
-    rootPath: path.join(os.homedir(), '.cursor', 'projects'),
-  },
-  {
-    provider: 'codex',
-    rootPath: path.join(os.homedir(), '.codex', 'sessions'),
-  },
-  {
-    provider: 'opencode',
-    rootPath: path.join(os.homedir(), '.local', 'share', 'opencode'),
-  },
-];
+function getProviderWatchPaths(): Array<{ provider: LLMProvider; rootPath: string; userId: number }> {
+  const users = getConnection().prepare('SELECT id FROM users WHERE is_active=1 ORDER BY id').all() as Array<{id: number}>;
+  return users.flatMap(user => {
+    const context = getUserContext(user.id);
+    const roots: Array<{ provider: LLMProvider; rootPath: string; userId: number }> = [
+      {provider: 'claude', rootPath: path.join(context.claudeConfigDir, 'projects'), userId: user.id},
+      {provider: 'codex', rootPath: path.join(context.codexHome, 'sessions'), userId: user.id},
+    ];
+    if (context.role === 'admin') roots.push(
+      {provider: 'cursor', rootPath: path.join(os.homedir(), '.cursor', 'projects'), userId: user.id},
+      {provider: 'opencode', rootPath: path.join(os.homedir(), '.local', 'share', 'opencode'), userId: user.id},
+    );
+    return roots;
+  });
+}
+const watchedRoots = new Set<string>();
+let refreshTimer: ReturnType<typeof setInterval> | null = null;
+let refreshInFlight = false;
 
 const WATCHER_IGNORED_PATTERNS = [
   '**/node_modules/**',
@@ -205,7 +206,18 @@ export async function initializeSessionsWatcher(): Promise<void> {
     failures: initialSync.failures,
   });
 
-  for (const { provider, rootPath } of PROVIDER_WATCH_PATHS) {
+  await refreshUserWatchers();
+  refreshTimer = setInterval(() => { void refreshUserWatchers().catch(error => console.error('User watcher refresh failed', error)); }, 30_000);
+  refreshTimer.unref();
+}
+
+async function refreshUserWatchers(): Promise<void> {
+  if (refreshInFlight) return;
+  refreshInFlight = true;
+  try {
+  for (const { provider, rootPath, userId } of getProviderWatchPaths()) {
+    const key = userId + ':' + provider + ':' + rootPath;
+    if (watchedRoots.has(key)) continue;
     try {
       await fsPromises.mkdir(rootPath, { recursive: true });
 
@@ -222,10 +234,10 @@ export async function initializeSessionsWatcher(): Promise<void> {
 
       watcher
         .on('add', (filePath: string) => {
-          void onUpdate('add', filePath, provider);
+          void Promise.resolve().then(() => withUserContext(userId, () => onUpdate('add', filePath, provider))).catch(error => console.error('User watcher event rejected', error));
         })
         .on('change', (filePath: string) => {
-          void onUpdate('change', filePath, provider);
+          void Promise.resolve().then(() => withUserContext(userId, () => onUpdate('change', filePath, provider))).catch(error => console.error('User watcher event rejected', error));
         })
         .on('error', (error: unknown) => {
           const message = error instanceof Error ? error.message : String(error);
@@ -233,6 +245,8 @@ export async function initializeSessionsWatcher(): Promise<void> {
         });
 
       watchers.push(watcher);
+      watchedRoots.add(key);
+      await withUserContext(userId, () => sessionSynchronizerService.synchronizeSessions());
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       console.error(`Failed to initialize session watcher for provider "${provider}"`, {
@@ -241,12 +255,16 @@ export async function initializeSessionsWatcher(): Promise<void> {
       });
     }
   }
+  } finally { refreshInFlight = false; }
 }
 
 /**
  * Stops all active provider session watchers.
  */
 export async function closeSessionsWatcher(): Promise<void> {
+  if (refreshTimer) clearInterval(refreshTimer);
+  refreshTimer = null;
+  watchedRoots.clear();
   clearPendingWatcherFlushTimer();
 
   await Promise.all(

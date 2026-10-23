@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 
-import { messageQueueDb, sessionsDb } from '@/modules/database/index.js';
+import { withUserContext } from '@/modules/auth/index.js';
+import { getSessionOwnerId, messageQueueDb, sessionsDb } from '@/modules/database/index.js';
 import { AppError } from '@/shared/utils.js';
 
 const conflict=()=>new AppError('The queued message changed or has already started. Refresh before editing.',{code:'QUEUE_CONFLICT',statusCode:409});
@@ -11,7 +12,9 @@ export const messageQueueService = {
     const sessionId=typeof input.sessionId==='string'?input.sessionId:'';
     const requestId=typeof input.requestId==='string'?input.requestId:'';
     const content=typeof input.content==='string'?input.content:'';
-    const session=sessionsDb.getSessionById(sessionId);
+    if (getSessionOwnerId(sessionId)!==userId) throw new AppError('Conversation belongs to another user or is unavailable.',{statusCode:403});
+    if (bridgeSourceSessionId && getSessionOwnerId(bridgeSourceSessionId)!==userId) throw new AppError('Conversation belongs to another user or is unavailable.',{statusCode:403});
+    const session=withUserContext(userId,()=>sessionsDb.getSessionById(sessionId));
     if (!session || session.isArchived || !/^[\w:-]{1,128}$/.test(requestId) || content.length>200_000) {
       throw new AppError('Choose an active conversation and supply a request ID and a bounded message.',{code:'INVALID_QUEUE_MESSAGE',statusCode:400});
     }
@@ -49,11 +52,13 @@ export const messageQueueService = {
   },
   list(userId: number, sessionId: string) {
     if (!sessionId) throw new AppError('A session ID is required.',{statusCode:400});
+    if (getSessionOwnerId(sessionId)!==userId) throw new AppError('Conversation belongs to another user or is unavailable.',{statusCode:403});
     return messageQueueDb.list(userId,sessionId);
   },
   update(userId: number, id: string, input: Record<string,unknown>) {
     const row=messageQueueDb.get(userId,id);
     if (!row) throw new AppError('Queued message was not found.',{code:'QUEUE_NOT_FOUND',statusCode:404});
+    if (getSessionOwnerId(row.session_id)!==userId) throw new AppError('Conversation belongs to another user or is unavailable.',{statusCode:403});
     if (!Number.isSafeInteger(input.revision)) throw conflict();
     if (input.action==='move-up'||input.action==='move-down') {
       if(!messageQueueDb.move(userId,id,Number(input.revision),input.action==='move-up'?'up':'down'))throw conflict();
@@ -73,7 +78,9 @@ export const messageQueueService = {
     return messageQueueDb.get(userId,id)!;
   },
   attempts(userId: number, id: string) {
-    if (!messageQueueDb.get(userId,id)) throw new AppError('Queued message was not found.',{statusCode:404});
+    const row=messageQueueDb.get(userId,id);
+    if (!row) throw new AppError('Queued message was not found.',{statusCode:404});
+    if (getSessionOwnerId(row.session_id)!==userId) throw new AppError('Conversation belongs to another user or is unavailable.',{statusCode:403});
     return messageQueueDb.attempts(userId,id);
   },
 };

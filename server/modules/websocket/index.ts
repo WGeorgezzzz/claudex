@@ -1,4 +1,4 @@
-export { WS_OPEN_STATE, connectedClients } from './services/websocket-state.service.js';
+export { WS_OPEN_STATE, connectedClients, clientUserIds } from './services/websocket-state.service.js';
 export { createWebSocketServer } from './services/websocket-server.service.js';
 export { chatRunRegistry } from './services/chat-run-registry.service.js';
 // Consumed by the providers module's sessions watcher, which announces the
@@ -9,3 +9,6 @@ export { broadcastSessionUpserted, broadcastSessionUpsertedBatch } from './servi
 // from a timer, with no socket to stream to or report errors on.
 export { runDetachedChatTurn } from './services/chat-websocket.service.js';
 export type { ProviderRuntimeGateway } from './services/chat-websocket.service.js';
+
+// Authorization integration tests exercise the authenticated terminal entrypoint.
+export { handleShellConnection } from './services/shell-websocket.service.js';

@@ -1,3 +1,5 @@
+import { withUserContext } from '@/modules/auth/index.js';
+import { AppError } from '@/shared/index.js';
 import express from 'express';
 
 import { browserUseService } from '@/modules/browser-use/browser-use.service.js';
@@ -13,13 +15,13 @@ function readBearerToken(header: unknown): string | null {
 }
 
 router.use((req, res, next) => {
-  const expected = browserUseService.getMcpToken();
   const token = readBearerToken(req.headers.authorization) || String(req.headers['x-browser-use-mcp-token'] || '');
-  if (!token || token !== expected) {
+  const userId = token ? browserUseService.resolveMcpUserId(token) : null;
+  if (!userId) {
     res.status(401).json({ success: false, error: 'Invalid Browser MCP token.' });
     return;
   }
-  next();
+  withUserContext(userId, () => next());
 });
 
 router.post('/tools/:toolName', async (req, res) => {
@@ -110,7 +112,7 @@ router.post('/tools/:toolName', async (req, res) => {
 
     res.json({ success: true, data: result });
   } catch (error) {
-    res.status(400).json({
+    res.status(error instanceof AppError ? error.statusCode : 400).json({
       success: false,
       error: error instanceof Error ? error.message : 'Browser MCP tool failed.',
     });

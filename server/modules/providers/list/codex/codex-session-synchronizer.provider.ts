@@ -1,6 +1,7 @@
 import os from 'node:os';
 import path from 'node:path';
 import { readFile } from 'node:fs/promises';
+import { getCurrentUserContext } from '@/modules/auth/index.js';
 
 import { sessionsDb } from '@/modules/database/index.js';
 import {
@@ -23,7 +24,7 @@ type ParsedSession = {
  */
 export class CodexSessionSynchronizer implements IProviderSessionSynchronizer {
   private readonly provider = 'codex' as const;
-  private readonly codexHome = path.join(os.homedir(), '.codex');
+  private get codexHome(): string { return getCurrentUserContext()?.codexHome ?? (process.env.CODEX_HOME || path.join(os.homedir(), '.codex')); }
 
   /**
    * Scans ~/.codex/sessions and upserts discovered sessions into DB.

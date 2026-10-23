@@ -1,4 +1,5 @@
 // @ts-nocheck -- temporary while Taskmaster workflows are extracted into the injected service.
+import { userContextMiddleware, authorizePaths, authorizeProjectParameter } from '@/modules/access-control/index.js';
 /**
  * TASKMASTER API ROUTES
  * ====================
@@ -10,10 +11,13 @@
  */
 
 import path from 'path';
+import { getCurrentUserContext } from '@/modules/auth/index.js';
 
 import express from 'express';
 
-import { WS_OPEN_STATE, connectedClients } from '@/modules/websocket/index.js';
+import { WS_OPEN_STATE, connectedClients, clientUserIds } from '@/modules/websocket/index.js';
+
+import { getOwnerUserId } from '@/modules/database/index.js';
 
 import type { createTaskmasterService } from './taskmaster.service.js';
 // cross-spawn: drop-in spawn with Windows .cmd/PATHEXT resolution — required
@@ -45,7 +49,7 @@ function broadcastTaskMasterUpdate(type, projectId, payloadKey, payload) {
         timestamp: new Date().toISOString(),
     });
     connectedClients.forEach((client) => {
-        if (client.readyState === WS_OPEN_STATE) client.send(message);
+        if (client.readyState === WS_OPEN_STATE && clientUserIds.get(client) === getOwnerUserId()) client.send(message);
     });
 }
 
@@ -80,6 +84,21 @@ export function createTaskmasterRouter(dependencies: TaskmasterRouterDependencie
         ? dependencies.resolveProjectPathById(projectId)
         : null;
     const router = express.Router();
+  router.use(userContextMiddleware);
+    router.param('projectId', authorizeProjectParameter(dependencies.resolveProjectPathById));
+    router.param('projectId', (req, res, next, id) => authorizePaths(() => {
+      const root = dependencies.resolveProjectPathById(id);
+      if (!root) return [];
+      const docs = path.join(root, '.taskmaster', 'docs');
+      const result = [path.join(root, '.taskmaster'), docs, path.join(root, '.taskmaster', 'tasks', 'tasks.json')];
+      const fileName = req.body?.fileName;
+      if (typeof fileName === 'string') result.push(path.resolve(docs, fileName));
+      return result;
+    })(req, res, next));
+    router.param('fileName', (req, res, next, fileName) => authorizePaths(() => {
+      const root = dependencies.resolveProjectPathById(req.params.projectId);
+      return root ? [path.resolve(root, '.taskmaster', 'docs', fileName)] : [];
+    })(req, res, next));
 
     function runTaskmasterProcess(command, args, options, onComplete) {
         const child = spawn(command, args, options);

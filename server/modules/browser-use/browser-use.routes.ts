@@ -1,9 +1,12 @@
+import { AppError } from '@/shared/index.js';
+import { userContextMiddleware } from '@/modules/access-control/index.js';
 import express from 'express';
 import type { Response } from 'express';
 
 import { browserUseService } from '@/modules/browser-use/browser-use.service.js';
 
 const router = express.Router();
+  router.use(userContextMiddleware);
 
 /**
  * Stable machine-readable error codes for the browser-use API.
@@ -50,7 +53,7 @@ router.get('/status', async (_req, res) => {
   } catch (error) {
     sendError(
       res,
-      500,
+      error instanceof AppError ? error.statusCode : 500,
       BROWSER_USE_ERROR_CODES.STATUS_LOAD_FAILED,
       'Failed to load Browser status.',
       error instanceof Error ? error.message : undefined,
@@ -64,7 +67,7 @@ router.get('/settings', async (_req, res) => {
   } catch (error) {
     sendError(
       res,
-      500,
+      error instanceof AppError ? error.statusCode : 500,
       BROWSER_USE_ERROR_CODES.SETTINGS_LOAD_FAILED,
       'Failed to load Browser settings.',
       error instanceof Error ? error.message : undefined,
@@ -79,7 +82,7 @@ router.put('/settings', async (req, res) => {
   } catch (error) {
     sendError(
       res,
-      400,
+      error instanceof AppError ? error.statusCode : 400,
       BROWSER_USE_ERROR_CODES.SETTINGS_SAVE_FAILED,
       'Failed to save Browser settings.',
       error instanceof Error ? error.message : undefined,
@@ -104,7 +107,7 @@ router.post('/runtime/install', async (_req, res) => {
   } catch (error) {
     sendError(
       res,
-      500,
+      error instanceof AppError ? error.statusCode : 500,
       BROWSER_USE_ERROR_CODES.RUNTIME_INSTALL_FAILED,
       'Failed to install Browser runtime.',
       error instanceof Error ? error.message : undefined,
@@ -118,7 +121,7 @@ router.get('/sessions', async (_req, res) => {
   } catch (error) {
     sendError(
       res,
-      401,
+      error instanceof AppError ? error.statusCode : 401,
       BROWSER_USE_ERROR_CODES.SESSIONS_LOAD_FAILED,
       'Failed to list browser sessions.',
       error instanceof Error ? error.message : undefined,
@@ -133,7 +136,7 @@ router.post('/sessions/:sessionId/stop', async (req, res) => {
   } catch (error) {
     sendError(
       res,
-      400,
+      error instanceof AppError ? error.statusCode : 400,
       BROWSER_USE_ERROR_CODES.SESSION_STOP_FAILED,
       'Failed to stop browser session.',
       error instanceof Error ? error.message : undefined,
@@ -148,7 +151,7 @@ router.delete('/sessions/:sessionId', async (req, res) => {
   } catch (error) {
     sendError(
       res,
-      400,
+      error instanceof AppError ? error.statusCode : 400,
       BROWSER_USE_ERROR_CODES.SESSION_DELETE_FAILED,
       'Failed to delete browser session.',
       error instanceof Error ? error.message : undefined,

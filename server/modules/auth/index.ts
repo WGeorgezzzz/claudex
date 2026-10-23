@@ -10,3 +10,8 @@ export { validateApiKey } from './auth.middleware.js';
 export { authSessionEvents } from '@/modules/auth/auth.middleware.js';
 export { accessBoundaryMiddleware, validateAccessBoundary, isLocalRequest } from '@/modules/auth/access-boundary.js';
 export { initializeLocalIdentity } from '@/modules/auth/local-identity.service.js';
+// System, Plugins and Providers restrict host-wide shared resources to administrators.
+export { requireSharedResourceAdministrator } from './shared-resource-access.service.js';
+
+// Runtime, filesystem and WebSocket consumers share isolated user configuration.
+export { getUserContext, assertUserPath, withUserContext, getCurrentUserContext } from './user-context.js';

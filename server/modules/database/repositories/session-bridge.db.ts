@@ -1,10 +1,11 @@
+import { ownerPredicate } from '../ownership.js';
 import { getConnection } from '@/modules/database/connection.js';
 
 /** Session Bridge searches the same local session index exposed by the ordinary session API; transcripts are read through Providers. */
 export const sessionBridgeDb = {
   search(query: string, limit: number, offset: number) {
     const pattern = `%${query.replace(/[\\%_]/g, '\\$&')}%`;
-    const where = `s.isArchived=0 AND (COALESCE(s.custom_name,'') LIKE ? ESCAPE '\\' OR COALESCE(s.project_path,'') LIKE ? ESCAPE '\\')`;
+    const where = `${ownerPredicate('s')} AND s.isArchived=0 AND (COALESCE(s.custom_name,'') LIKE ? ESCAPE '\\' OR COALESCE(s.project_path,'') LIKE ? ESCAPE '\\')`;
     const db = getConnection();
     const rows = db.prepare(`SELECT s.session_id AS sessionId,COALESCE(s.custom_name,'New conversation') AS title,
       s.provider,s.project_path AS projectPath,p.project_id AS projectId,s.updated_at AS updatedAt

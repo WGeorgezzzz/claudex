@@ -1,3 +1,6 @@
+import path from 'node:path';
+import { assertContextPath } from '@/modules/access-control/index.js';
+import { getCurrentUserContext } from '@/modules/auth/index.js';
 import { randomUUID } from 'node:crypto';
 import fs, { promises as fsPromises } from 'node:fs';
 import os from 'node:os';
@@ -33,27 +36,30 @@ function readFileSystemConcurrency(): number {
  * import Node's mutable filesystem APIs themselves.
  */
 const fileTreeFileSystem: FileTreeFileSystem = {
-  access: (candidatePath) => fsPromises.access(candidatePath),
-  stat: (candidatePath) => fsPromises.stat(candidatePath),
-  lstat: (candidatePath) => fsPromises.lstat(candidatePath),
+  access: (candidatePath) => { assertContextPath(candidatePath); return fsPromises.access(candidatePath); },
+  stat: (candidatePath) => { assertContextPath(candidatePath); return fsPromises.stat(candidatePath); },
+  lstat: (candidatePath) => { assertContextPath(candidatePath); return fsPromises.lstat(candidatePath); },
   // `opendir` streams entries in batches and the handle is closed by the
   // iterator protocol, including when the caller stops early at the entry cap.
   openDirectory: async function* (directoryPath) {
+    assertContextPath(directoryPath);
     yield* await fsPromises.opendir(directoryPath);
   },
-  realpath: (candidatePath) => fsPromises.realpath(candidatePath),
-  readTextFile: (filePath) => fsPromises.readFile(filePath, 'utf8'),
-  writeTextFile: (filePath, content) => fsPromises.writeFile(filePath, content, 'utf8'),
+  realpath: (candidatePath) => { assertContextPath(candidatePath); return fsPromises.realpath(candidatePath); },
+  readTextFile: (filePath) => { assertContextPath(filePath); return fsPromises.readFile(filePath, 'utf8'); },
+  writeTextFile: (filePath, content) => { assertContextPath(filePath); return fsPromises.writeFile(filePath, content, 'utf8'); },
   async makeDirectory(directoryPath, recursive) {
+    assertContextPath(directoryPath);
     await fsPromises.mkdir(directoryPath, { recursive });
   },
-  rename: (oldPath, newPath) => fsPromises.rename(oldPath, newPath),
+  rename: (oldPath, newPath) => { assertContextPath(oldPath); assertContextPath(newPath); return fsPromises.rename(oldPath, newPath); },
   async removeDirectory(directoryPath) {
+    assertContextPath(directoryPath);
     await fsPromises.rm(directoryPath, { recursive: true, force: true });
   },
-  unlink: (filePath) => fsPromises.unlink(filePath),
-  copyFile: (sourcePath, destinationPath) => fsPromises.copyFile(sourcePath, destinationPath),
-  createReadStream: (filePath) => fs.createReadStream(filePath),
+  unlink: (filePath) => { if (!/^cloudcli-file-upload-[\w-]+$/.test(path.basename(filePath)) || path.dirname(filePath) !== os.tmpdir()) assertContextPath(filePath); return fsPromises.unlink(filePath); },
+  copyFile: (sourcePath, destinationPath) => { assertContextPath(destinationPath); return fsPromises.copyFile(sourcePath, destinationPath); },
+  createReadStream: (filePath) => { assertContextPath(filePath); return fs.createReadStream(filePath); },
 };
 
 /**
@@ -71,8 +77,11 @@ const fileTreeProjects: FileTreeProjectGateway = {
  * the path policy explicit for every service instance.
  */
 const fileTreeWorkspace: FileTreeWorkspaceGateway = {
-  rootPath: WORKSPACES_ROOT,
-  validatePath: (candidatePath) => validateWorkspacePath(candidatePath),
+  get rootPath() { return getCurrentUserContext()?.workRoot || WORKSPACES_ROOT; },
+  validatePath: async (candidatePath) => {
+    assertContextPath(candidatePath);
+    return getCurrentUserContext()?.role === 'member' ? { valid: true, resolvedPath: candidatePath } : validateWorkspacePath(candidatePath);
+  },
   resolveReadOnlyRootPath: (candidatePath) => resolveReadOnlyRootPath(candidatePath),
 };
 

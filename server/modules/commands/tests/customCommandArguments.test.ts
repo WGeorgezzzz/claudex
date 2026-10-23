@@ -1,7 +1,9 @@
+import { installAuthorizationFixture, authenticateTestRequest } from '../../access-control/tests/authorization-fixture.js';
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import type { AddressInfo } from 'node:net';
 import test from 'node:test';
+import path from 'node:path';
 
 import express from 'express';
 
@@ -13,7 +15,8 @@ import { createCommandsRouter } from '../commands.routes.js';
  * and `$`-sequences in the typed text were expanded by `String#replace`.
  */
 
-const CUSTOM_COMMAND_PATH = '/home/test/.claude/commands/echo.md';
+process.env.CLAUDE_CONFIG_DIR = path.resolve('/home/test/.claude');
+const CUSTOM_COMMAND_PATH = path.join(process.env.CLAUDE_CONFIG_DIR, 'commands', 'echo.md');
 
 /**
  * Runs a custom command whose file holds `template`, posting `body` the way
@@ -26,6 +29,7 @@ async function executeCustomCommand(
 ): Promise<Record<string, unknown>> {
   const router = createCommandsRouter({
     fileSystem: {
+      realpath: async (filePath: string) => path.resolve(filePath),
       readFile: async (filePath: string) => {
         assert.equal(filePath, CUSTOM_COMMAND_PATH);
         return template;
@@ -41,7 +45,7 @@ async function executeCustomCommand(
       version: 'v22', platform: 'linux', pid: 1,
     },
   });
-  const app = express().use(express.json()).use('/api/commands', router);
+  const app = express().use(express.json()).use(authenticateTestRequest).use('/api/commands', router);
   const server = app.listen(0, '127.0.0.1');
   await once(server, 'listening');
   try {
@@ -56,6 +60,8 @@ async function executeCustomCommand(
     await new Promise<void>((resolve) => server.close(() => resolve()));
   }
 }
+
+installAuthorizationFixture();
 
 test('custom command $ARGUMENTS receives the raw argument text with line breaks and spacing kept', async () => {
   const rawArgs = 'first line\nsecond line\n  indented   third';

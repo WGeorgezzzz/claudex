@@ -3,6 +3,7 @@ import { AppError } from '@/shared/utils.js';
 type AuthUser = {
   id: number | bigint;
   username: string;
+  role?: string;
 };
 
 type AuthLoginUser = AuthUser & { password_hash: string };
@@ -68,7 +69,7 @@ export function createAuthService(dependencies: AuthDependencies) {
       dependencies.transaction.begin();
       try {
         if (dependencies.users.hasUsers()) {
-          throw new AppError('User already exists. This is a single-user system.', {
+          throw new AppError('Initial setup is complete. Ask an administrator to create an account.', {
             code: 'AUTH_USER_ALREADY_CONFIGURED',
             statusCode: 403,
           });
@@ -82,7 +83,7 @@ export function createAuthService(dependencies: AuthDependencies) {
 
         return {
           success: true,
-          user: { id: user.id, username: user.username },
+          user: { id: user.id, username: user.username, role: user.role },
           token,
         };
       } catch (error) {
@@ -121,7 +122,7 @@ export function createAuthService(dependencies: AuthDependencies) {
       dependencies.users.updateLastLogin(numericUserId(user.id));
       return {
         success: true,
-        user: { id: user.id, username: user.username },
+        user: { id: user.id, username: user.username, role: user.role },
         token: dependencies.generateToken(user),
       };
     },

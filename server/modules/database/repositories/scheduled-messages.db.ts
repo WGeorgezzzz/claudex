@@ -21,6 +21,10 @@ const COLUMNS =
   'id, user_id, session_id, content, options, scheduled_for, status, failure_reason, created_at, updated_at';
 
 export const scheduledMessagesDb = {
+  /** Scheduled-message cancellation validates both the record owner and its session owner. */
+  get(userId: number, id: string): ScheduledMessageRow | undefined {
+    return getConnection().prepare(`SELECT ${COLUMNS} FROM scheduled_messages WHERE user_id=? AND id=?`).get(userId,id) as ScheduledMessageRow | undefined;
+  },
   create(input: {
     userId: number;
     sessionId: string;

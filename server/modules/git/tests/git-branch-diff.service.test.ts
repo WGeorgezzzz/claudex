@@ -1,3 +1,4 @@
+import path from 'node:path';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -203,7 +204,7 @@ test('getBranchDiffForFile synthesizes an all-additions diff for an untracked fi
     },
   });
 
-  assert.deepEqual(readPaths, ['/repo/c.txt']);
+  assert.deepEqual(readPaths, [path.join('/repo', 'c.txt')]);
   assert.equal(result, '--- /dev/null\n+++ b/c.txt\n@@ -0,0 +1,2 @@\n+first\n+second');
   // No `git diff` is run for untracked files.
   assert.equal(calls.some((args) => args[0] === 'diff'), false);

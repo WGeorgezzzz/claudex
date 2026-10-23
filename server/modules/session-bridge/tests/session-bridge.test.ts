@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 
+import { withUserContext } from '@/modules/auth/index.js';
 import { closeConnection, initializeDatabase, messageQueueDb, sessionsDb, userDb } from '@/modules/database/index.js';
 import { sessionBridgeService } from '@/modules/session-bridge/session-bridge.service.js';
 import { executeSessionBridgeTool } from '@/modules/session-bridge/session-bridge.tools.js';
@@ -12,9 +13,9 @@ test('cross-session tools bind source identity, preserve queue semantics and rej
   const root=await mkdtemp(path.join(os.tmpdir(),'claudex-bridge-'));const old=process.env.DATABASE_PATH,oldProtected=process.env.CLOUDCLI_PROTECTED_SESSIONS_FILE;
   closeConnection();process.env.DATABASE_PATH=path.join(root,'test.db');delete process.env.CLOUDCLI_PROTECTED_SESSIONS_FILE;await initializeDatabase();
   try {
-    const user=Number(userDb.createUser('bridge','hash').id);for(const id of ['source','target','foreign'])sessionsDb.createAppSession(id,'claude',root,id+' title');
-    assert.ok(sessionBridgeService.list('target').sessions.some(row=>row.sessionId==='target'));
-    assert.deepEqual((await sessionBridgeService.read('target')).messages,[]);
+    const user=Number(userDb.createUser('bridge','hash').id);withUserContext(user, () => { for(const id of ['source','target','foreign'])sessionsDb.createAppSession(id,'claude',root,id+' title'); });
+    assert.ok(sessionBridgeService.list('target', 0, user).sessions.some(row=>row.sessionId==='target'));
+    assert.deepEqual((await sessionBridgeService.read('target', 0, user)).messages,[]);
     const args={sessionId:'target',content:'Read the existing state',requestId:'send-1'};
     const receipt=sessionBridgeService.send(user,'source',args);assert.equal(receipt.status,'queued');
     assert.equal(sessionBridgeService.send(user,'source',args).id,receipt.id);

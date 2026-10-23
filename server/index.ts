@@ -394,14 +394,19 @@ async function startServer() {
             await initializeSessionsWatcher();
             // Sends anything that came due while the server was not running,
             // then keeps polling.
-            initializeScheduledMessageDispatcher(providerRuntimeService);
-            initializeMonitors(providerRuntimeService);
-            initializeDot();
-            sideChatsDb.recover();
-            initializeMessageQueue(providerRuntimeService);
+            // A backup-based verification instance must never replay production jobs
+            // or compete with the production instance for plugin listening ports.
+            const passiveInstance = process.env.CLAUDEX_PASSIVE_INSTANCE === '1';
+            if (!passiveInstance) {
+                initializeScheduledMessageDispatcher(providerRuntimeService);
+                initializeMonitors(providerRuntimeService);
+                initializeDot();
+                sideChatsDb.recover();
+                initializeMessageQueue(providerRuntimeService);
+            }
 
             // Start server-side plugin processes for enabled plugins
-            startEnabledPluginServers().catch(err => {
+            if (!passiveInstance) startEnabledPluginServers().catch(err => {
                 console.error('[Plugins] Error during startup:', err.message);
             });
         });

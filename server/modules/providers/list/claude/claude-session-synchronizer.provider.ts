@@ -1,3 +1,4 @@
+import { getCurrentUserContext } from '@/modules/auth/index.js';
 import os from 'node:os';
 import path from 'node:path';
 import { readFile } from 'node:fs/promises';
@@ -24,7 +25,7 @@ type ParsedSession = {
  */
 export class ClaudeSessionSynchronizer implements IProviderSessionSynchronizer {
   private readonly provider = 'claude' as const;
-  private readonly claudeHome = getClaudeConfigDir();
+  private get claudeHome(): string { return getCurrentUserContext()?.claudeConfigDir ?? getClaudeConfigDir(); }
 
   /**
    * Returns true when a JSONL file is a subagent transcript or tool result

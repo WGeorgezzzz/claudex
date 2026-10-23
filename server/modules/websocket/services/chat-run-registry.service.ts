@@ -24,6 +24,7 @@ type ChatRunStatus = 'running' | 'completed';
  *   can replay exactly the events it missed via `chat.subscribe`.
  */
 type ChatRun = {
+  userId: string | number | null;
   appSessionId: string;
   provider: LLMProvider;
   providerSessionId: string | null;
@@ -216,6 +217,7 @@ export const chatRunRegistry = {
     }
 
     const run: ChatRun = {
+      userId: input.userId,
       appSessionId: input.appSessionId,
       provider: input.provider,
       providerSessionId: input.providerSessionId,

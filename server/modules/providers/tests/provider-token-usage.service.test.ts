@@ -14,6 +14,7 @@ import { AppError } from '@/shared/utils.js';
 
 function createSessionRow(overrides: Record<string, unknown> = {}) {
   return {
+    owner_id: 1,
     session_id: 'app-session',
     provider: 'claude',
     provider_session_id: 'provider-session',

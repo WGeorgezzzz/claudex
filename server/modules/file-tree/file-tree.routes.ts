@@ -1,3 +1,6 @@
+import path from 'node:path';
+import { projectsDb } from '@/modules/database/index.js';
+import { userContextMiddleware, authorizePaths, authorizeProjectParameter } from '@/modules/access-control/index.js';
 import express from 'express';
 import type { NextFunction, Request, RequestHandler, Response } from 'express';
 
@@ -114,6 +117,9 @@ export function createFileTreeRouter(
   logger: FileTreeLogger,
 ): express.Router {
   const router = express.Router();
+  router.use(userContextMiddleware);
+  router.param('projectId', authorizeProjectParameter(id => projectsDb.getProjectPathById(id)));
+  router.use(authorizePaths(req => [req.query.path, req.body?.path].filter((value): value is string => typeof value === 'string' && path.isAbsolute(value))));
 
   router.get('/browse-filesystem', createRouteHandler(async (request, response) => {
     response.json(await services.browseWorkspace(readOptionalString(request.query.path)));

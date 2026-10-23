@@ -8,7 +8,7 @@ import { liveInputService } from '@/modules/message-queue/live-input.service.js'
 /** Server composition mounts the queue transport behind authentication. */
 export const messageQueueRoutes=express.Router();
 messageQueueRoutes.get('/live',asyncHandler(async(req,res)=>{
-  res.json(createApiSuccessResponse(liveInputService.current(typeof req.query.sessionId==='string'?req.query.sessionId:'')));
+  res.json(createApiSuccessResponse(liveInputService.current(typeof req.query.sessionId==='string'?req.query.sessionId:'',requireAuthenticatedUserId(req))));
 }));
 messageQueueRoutes.post('/live',asyncHandler(async(req,res)=>{
   if (!req.body || typeof req.body!=='object' || Array.isArray(req.body)) throw new AppError('Expected an object.',{statusCode:400});

@@ -3,6 +3,8 @@ import type { IncomingMessage } from 'node:http';
 
 import type { RequestHandler } from 'express';
 
+import { userDb } from '@/modules/database/index.js';
+
 let cachedKeys:{expires:number;keys:Array<{kid:string;kty:string;[key:string]:unknown}>}|undefined;
 let keyFetch:Promise<void>|undefined;
 const loopback=new Set(['127.0.0.1','::1','::ffff:127.0.0.1']);
@@ -34,7 +36,10 @@ export async function validateAccessBoundary(req:IncomingMessage):Promise<boolea
     const now=Math.floor(Date.now()/1000);
     if(header.alg!=='RS256'||typeof header.kid!=='string'||claims.iss!==team||!Array.isArray(claims.aud)||!claims.aud.includes(audience)||typeof claims.exp!=='number'||claims.exp<=now||typeof claims.iat!=='number'||claims.iat>now+60||(claims.nbf&&claims.nbf>now+60)||typeof claims.email!=='string')return false;
     const allowed=(process.env.CLAUDEX_ACCESS_EMAILS??'').split(',').map(s=>s.trim().toLowerCase()).filter(Boolean);
-    if(!allowed.length||!allowed.includes(claims.email.toLowerCase()))return false;
+    const email=claims.email.trim().toLowerCase();
+    const binding=userDb.getSsoBinding(email);
+    // Explicit disabled bindings override the legacy environment allowlist too.
+    if(binding ? !binding.is_active : !allowed.includes(email)&&email!==process.env.CLAUDEX_ACCESS_SSO_EMAIL?.trim().toLowerCase())return false;
     if(!cachedKeys||cachedKeys.expires<Date.now()){
       if(!keyFetch)keyFetch=(async()=>{const response=await fetch(`${team}/cdn-cgi/access/certs`,{signal:AbortSignal.timeout(5000),redirect:'error'});if(!response.ok)throw Error('Access certificates unavailable');const data=await response.json() as {keys:Array<{kid:string;kty:string;[key:string]:unknown}>};if(!Array.isArray(data.keys)||data.keys.length>20)throw Error('Invalid Access keys');cachedKeys={keys:data.keys,expires:Date.now()+300000};})().finally(()=>{keyFetch=undefined;});
       await keyFetch;

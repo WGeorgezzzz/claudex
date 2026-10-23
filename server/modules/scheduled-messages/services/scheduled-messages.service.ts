@@ -1,5 +1,6 @@
-import { scheduledMessagesDb, sessionsDb } from '@/modules/database/index.js';
+import { getSessionOwnerId, scheduledMessagesDb, sessionsDb } from '@/modules/database/index.js';
 import type { ScheduledMessageRow } from '@/modules/database/index.js';
+import { withUserContext } from '@/modules/auth/index.js';
 import { AppError } from '@/shared/utils.js';
 
 /** How far ahead a message may be scheduled. Beyond this it is almost certainly a mistake. */
@@ -85,7 +86,8 @@ export const scheduledMessagesService = {
       });
     }
 
-    if (!sessionsDb.getSessionById(input.sessionId)) {
+    if (getSessionOwnerId(input.sessionId)!==input.userId) throw new AppError('Conversation belongs to another user or is unavailable.',{statusCode:403});
+    if (!withUserContext(input.userId,()=>sessionsDb.getSessionById(input.sessionId))) {
       throw new AppError(`Session "${input.sessionId}" was not found.`, {
         code: 'SESSION_NOT_FOUND',
         statusCode: 404,
@@ -102,15 +104,18 @@ export const scheduledMessagesService = {
   },
 
   listForSession(userId: number, sessionId: string): ScheduledMessage[] {
+    if (getSessionOwnerId(sessionId)!==userId) throw new AppError('Conversation belongs to another user or is unavailable.',{statusCode:403});
     return scheduledMessagesDb.listForSession(userId, sessionId).map(toScheduledMessage);
   },
 
   listPending(userId: number): ScheduledMessage[] {
-    return scheduledMessagesDb.listPendingForUser(userId).map(toScheduledMessage);
+    return scheduledMessagesDb.listPendingForUser(userId).filter(row=>getSessionOwnerId(row.session_id)===userId).map(toScheduledMessage);
   },
 
   /** Cancels a pending message, or dismisses a failed one. */
   cancel(userId: number, id: string): void {
+    const row=scheduledMessagesDb.get(userId,id);
+    if (row && getSessionOwnerId(row.session_id)!==userId) throw new AppError('Conversation belongs to another user or is unavailable.',{statusCode:403});
     if (!scheduledMessagesDb.cancel(userId, id)) {
       throw new AppError('That message has already been sent or cancelled.', {
         code: 'SCHEDULED_MESSAGE_NOT_PENDING',

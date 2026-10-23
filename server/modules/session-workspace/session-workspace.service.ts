@@ -1,13 +1,15 @@
-import { sessionWorkspaceDb, sessionsDb } from '@/modules/database/index.js';
+import { getSessionOwnerId, sessionWorkspaceDb, sessionsDb } from '@/modules/database/index.js';
 import { providerRuntimeService } from '@/modules/providers/index.js';
 import { chatRunRegistry } from '@/modules/websocket/index.js';
+import { withUserContext } from '@/modules/auth/index.js';
 import { AppError } from '@/shared/index.js';
 
 /** Routes expose organization and attention state without mutating provider sessions or interrupting a run. */
 export const sessionWorkspaceService={
   list(userId:number) {
-    const rows=new Map(sessionWorkspaceDb.list(userId).map(row=>[row.sessionId,row]));
+    const rows=new Map(sessionWorkspaceDb.list(userId).filter(row=>getSessionOwnerId(row.sessionId)===userId).map(row=>[row.sessionId,row]));
     for(const sessionId of chatRunRegistry.listOwnedSessionIds(userId)) {
+      if(getSessionOwnerId(sessionId)!==userId)continue;
       const approvals=providerRuntimeService.getPendingApprovalsForSession(sessionId).length;
       if(!approvals)continue;
       const entry=rows.get(sessionId)??sessionWorkspaceDb.get(userId,sessionId);
@@ -16,12 +18,14 @@ export const sessionWorkspaceService={
     return [...rows.values()];
   },
   get(userId:number,sessionId:string) {
+    if(getSessionOwnerId(sessionId)!==userId)throw new AppError('Conversation belongs to another user or is unavailable.',{statusCode:403});
     const entry=sessionWorkspaceDb.get(userId,sessionId);
     if(!entry)throw new AppError('Conversation was not found.',{statusCode:404});
     return entry;
   },
   update(userId:number,sessionId:string,input:Record<string,unknown>) {
-    const session=sessionsDb.getSessionById(sessionId);
+    if(getSessionOwnerId(sessionId)!==userId)throw new AppError('Conversation belongs to another user or is unavailable.',{statusCode:403});
+    const session=withUserContext(userId,()=>sessionsDb.getSessionById(sessionId));
     if(!session)throw new AppError('Conversation was not found.',{statusCode:404});
     const changes:{pinned?:boolean;unread?:boolean;queuePaused?:boolean;readThrough?:string|null}={};
     for(const key of ['pinned','unread','queuePaused'] as const) {

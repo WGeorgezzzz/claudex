@@ -200,6 +200,11 @@ const pluginAssetPath = (pluginName: string, assetFile: string) =>
 export const api = {
   // Auth endpoints (no token required)
   auth: {
+    users: () => get('/api/auth/users'),
+    createUser: (input: Record<string, unknown>) => post('/api/auth/users', input),
+    updateUser: (id: number, input: Record<string, unknown>) => patch('/api/auth/users/'+id, input),
+    resetPassword: (id: number, password: string) => post('/api/auth/users/'+id+'/password', {password}),
+    changePassword: (current_password: string, password: string) => post('/api/auth/password', {current_password,password}),
     exchangeAccess: () => fetch('/api/auth/access-exchange',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}),
     exchangeLocal: (ticket:string) => fetch('/api/auth/local-exchange',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ticket})}),
     logout: () => post('/api/auth/logout'),

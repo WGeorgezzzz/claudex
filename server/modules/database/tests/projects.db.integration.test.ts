@@ -7,6 +7,7 @@ import test from 'node:test';
 import { closeConnection } from '@/modules/database/connection.js';
 import { initializeDatabase } from '@/modules/database/init-db.js';
 import { projectsDb } from '@/modules/database/repositories/projects.db.js';
+import { userDb } from '@/modules/database/repositories/users.js';
 
 async function withIsolatedDatabase(runTest: () => void | Promise<void>): Promise<void> {
   const previousDatabasePath = process.env.DATABASE_PATH;
@@ -16,6 +17,7 @@ async function withIsolatedDatabase(runTest: () => void | Promise<void>): Promis
   closeConnection();
   process.env.DATABASE_PATH = databasePath;
   await initializeDatabase();
+  if (!userDb.hasUsers()) userDb.createUser('projects-test-admin', 'unused');
 
   try {
     await runTest();
@@ -36,7 +38,7 @@ test('projectsDb.createProjectPath returns created for fresh paths', async () =>
 
     assert.equal(created.outcome, 'created');
     assert.ok(created.project);
-    assert.equal(created.project?.project_path, '/workspace/new-project');
+    assert.equal(created.project?.project_path, path.normalize('/workspace/new-project'));
     assert.equal(created.project?.isArchived, 0);
   });
 });

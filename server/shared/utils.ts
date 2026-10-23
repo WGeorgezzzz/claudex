@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import {
@@ -20,6 +21,7 @@ import type { NextFunction, Request, RequestHandler, Response } from 'express';
 
 import { parseFrontMatter } from '@/shared/frontmatter.js';
 import type {
+  UserRuntimeContext,
   MonitorCalendarSchedule,
   AnyRecord,
   ApiSuccessShape,
@@ -32,6 +34,12 @@ import type {
   WorkspacePathValidationResult,
 } from '@/shared/types.js';
 
+//----------------- USER RUNTIME CONTEXT ------------
+/** Auth binds per-run identities; shared path and attachment helpers read them
+ * without importing auth middleware or opening its database during module evaluation. */
+export const userContextStorage = new AsyncLocalStorage<UserRuntimeContext>();
+
+// ---------------------------
 //----------------- ENVIRONMENT UTILITIES ------------
 /**
  * Indicates whether the backend is running in hosted Platform mode rather than
@@ -159,6 +167,7 @@ export const FORBIDDEN_WORKSPACE_PATHS = [
   '/lib64',
   '/opt',
   '/tmp',
+  os.tmpdir(),
   '/run',
   // Windows
   'C:\\Windows',
@@ -230,7 +239,8 @@ export async function resolvePathUnderRoots(targetPath: string, roots: string[])
       continue;
     }
 
-    if (resolvedPath === resolvedRoot || resolvedPath.startsWith(`${resolvedRoot}${path.sep}`)) {
+    const relative = path.relative(resolvedRoot, resolvedPath);
+    if (relative === '' || (!path.isAbsolute(relative) && relative !== '..' && !relative.startsWith(`..${path.sep}`))) {
       return resolvedPath;
     }
   }
@@ -1360,6 +1370,8 @@ export function findApplicationRoot(startDirectory: string): string {
 /** Used by providers, agents and session discovery. Resolves the SDK configuration
  * root at call time so explicit CLAUDE_CONFIG_DIR overrides are honored everywhere. */
 export function getClaudeConfigDir(): string {
+  const context = userContextStorage.getStore();
+  if (context) return context.claudeConfigDir;
   const override = process.env.CLAUDE_CONFIG_DIR?.trim();
   return override && path.isAbsolute(override) ? override : path.join(os.homedir(), '.claude');
 }
@@ -1367,6 +1379,8 @@ export function getClaudeConfigDir(): string {
 /** Used by Claude MCP discovery and runtime settings. The default CLI config is
  * in the home directory; isolated configurations keep it inside their own root. */
 export function getClaudeConfigFile(): string {
+  const context = userContextStorage.getStore();
+  if (context?.role === 'member') return path.join(context.claudeConfigDir, '.claude.json');
   const override = process.env.CLAUDE_CONFIG_DIR?.trim();
   return override && path.isAbsolute(override)
     ? path.join(getClaudeConfigDir(), '.claude.json')

@@ -501,6 +501,16 @@ export const runMigrations = (db: Database) => {
   try {
     const usersTableInfo = db.prepare('PRAGMA table_info(users)').all() as { name: string }[];
     const userColumnNames = usersTableInfo.map((column) => column.name);
+    db.transaction(() => {
+      const needsRole = !userColumnNames.includes('role');
+      addColumnToTableIfNotExists(db, 'users', userColumnNames, 'role', "TEXT NOT NULL DEFAULT 'member' CHECK(role IN ('admin','member'))");
+      addColumnToTableIfNotExists(db, 'users', userColumnNames, 'work_root', 'TEXT');
+      addColumnToTableIfNotExists(db, 'users', userColumnNames, 'allowed_folders', "TEXT NOT NULL DEFAULT '[]'");
+      addColumnToTableIfNotExists(db, 'users', userColumnNames, 'access_sso_email', 'TEXT');
+      // Promote the legacy owner once, without changing roles on subsequent startups.
+      if (needsRole) db.exec("UPDATE users SET role='admin' WHERE id=(SELECT MIN(id) FROM users)");
+      db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_access_sso_email ON users(lower(access_sso_email)) WHERE access_sso_email IS NOT NULL');
+    })();
 
     addColumnToTableIfNotExists(db, 'users', userColumnNames, 'git_name', 'TEXT');
     addColumnToTableIfNotExists(db, 'users', userColumnNames, 'git_email', 'TEXT');

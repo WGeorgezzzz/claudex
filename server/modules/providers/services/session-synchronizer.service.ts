@@ -1,7 +1,8 @@
+import { getCurrentUserContext, withUserContext } from '@/modules/auth/index.js';
 import path from 'node:path';
 import { access } from 'node:fs/promises';
 
-import { scanStateDb, sessionsDb } from '@/modules/database/index.js';
+import { scanStateDb, sessionsDb, getConnection } from '@/modules/database/index.js';
 import { providerRegistry } from '@/modules/providers/provider.registry.js';
 import type { LLMProvider } from '@/shared/types.js';
 
@@ -71,7 +72,7 @@ const pruneOrphanedSessions = async (): Promise<number> => {
  * sidebar sits on its loading screen. Callers that arrive while a scan is
  * already running now await that scan instead of starting another.
  */
-let inFlightSynchronization: Promise<SessionSynchronizeResult> | null = null;
+const inFlightSynchronizations = new Map<number, Promise<SessionSynchronizeResult>>();
 
 /**
  * Runs all provider synchronizers and updates scan_state.last_scanned_at.
@@ -88,7 +89,7 @@ async function runSessionSynchronization(): Promise<SessionSynchronizeResult> {
   const failures: string[] = [];
 
   const results = await Promise.allSettled(
-    providerRegistry.listProviders().map(async (provider) => ({
+    providerRegistry.listProviders().filter(provider => getCurrentUserContext()?.role !== 'member' || provider.id === 'claude' || provider.id === 'codex').map(async (provider) => ({
       provider: provider.id,
       processed: await provider.sessionSynchronizer.synchronize(lastScanAt ?? undefined),
     }))
@@ -132,15 +133,27 @@ export const sessionSynchronizerService = {
    * callers onto a single scan.
    */
   async synchronizeSessions(): Promise<SessionSynchronizeResult> {
-    if (inFlightSynchronization) {
-      return inFlightSynchronization;
+    const context = getCurrentUserContext();
+    if (!context) {
+      const users = getConnection().prepare('SELECT id FROM users WHERE is_active=1 ORDER BY id').all() as Array<{id: number}>;
+      if (users.length) {
+        const combined: SessionSynchronizeResult = { processedByProvider: {claude: 0, codex: 0, cursor: 0, opencode: 0}, prunedOrphans: 0, failures: [] };
+        const results = await Promise.allSettled(users.map(user => withUserContext(user.id, () => this.synchronizeSessions())));
+        for (const result of results) {
+          if (result.status === 'rejected') { combined.failures.push(String(result.reason)); continue; }
+          for (const provider of Object.keys(combined.processedByProvider) as LLMProvider[]) combined.processedByProvider[provider] += result.value.processedByProvider[provider];
+          combined.prunedOrphans += result.value.prunedOrphans;
+          combined.failures.push(...result.value.failures);
+        }
+        return combined;
+      }
     }
-
-    inFlightSynchronization = runSessionSynchronization().finally(() => {
-      inFlightSynchronization = null;
-    });
-
-    return inFlightSynchronization;
+    const key = context?.userId ?? 0;
+    const existing = inFlightSynchronizations.get(key);
+    if (existing) return existing;
+    const scan = runSessionSynchronization().finally(() => { inFlightSynchronizations.delete(key); });
+    inFlightSynchronizations.set(key, scan);
+    return scan;
   },
 
   /**

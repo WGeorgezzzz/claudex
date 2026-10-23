@@ -4,6 +4,7 @@ import path from 'node:path';
 
 import TOML from '@iarna/toml';
 
+import { getCurrentUserContext } from '@/modules/auth/index.js';
 import type { IProviderModels } from '@/shared/interfaces.js';
 import type {
   ProviderCurrentActiveModel,
@@ -143,7 +144,7 @@ export const CODEX_PREDEFINED_MODELS: ProviderModelsDefinition = {
   DEFAULT: 'gpt-5.6-sol',
 };
 
-const CODEX_CONFIG_PATH = path.join(os.homedir(), '.codex', 'config.toml');
+const getCodexConfigPath = () => path.join(getCurrentUserContext()?.codexHome ?? process.env.CODEX_HOME ?? path.join(os.homedir(), '.codex'), 'config.toml');
 
 /** Provider registry model adapter for Codex predefined models and active config. */
 export class CodexProviderModels implements IProviderModels {
@@ -153,7 +154,7 @@ export class CodexProviderModels implements IProviderModels {
 
   async getCurrentActiveModel(): Promise<ProviderCurrentActiveModel> {
     try {
-      const raw = await readFile(CODEX_CONFIG_PATH, 'utf8');
+      const raw = await readFile(getCodexConfigPath(), 'utf8');
       const parsed = readObjectRecord(TOML.parse(raw));
       const model = readOptionalString(parsed?.model);
       if (!model) {

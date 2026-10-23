@@ -1,3 +1,4 @@
+import { installAuthorizationFixture, authenticateTestRequest } from '../../access-control/tests/authorization-fixture.js';
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import type { AddressInfo } from 'node:net';
@@ -35,6 +36,7 @@ async function withFileTreeServer(
   run: (baseUrl: string) => Promise<void>,
 ): Promise<void> {
   const app = express();
+  app.use(authenticateTestRequest);
   app.use(express.json());
   app.use('/api/file-tree', createFileTreeRouter(
     services,
@@ -55,6 +57,8 @@ async function withFileTreeServer(
     });
   }
 }
+
+installAuthorizationFixture();
 
 test('project files route uses the File Tree API namespace and forwards the project id', async () => {
   const inputs: Parameters<FileTreeServices['listProjectFiles']>[] = [];

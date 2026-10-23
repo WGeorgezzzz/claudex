@@ -9,7 +9,8 @@ import test from 'node:test';
 
 import express from 'express';
 
-import { closeConnection, initializeDatabase, sessionsDb } from '@/modules/database/index.js';
+import { closeConnection, initializeDatabase, sessionsDb, userDb } from '@/modules/database/index.js';
+import { generateToken } from '@/modules/auth/auth.middleware.js';
 import { chatRunRegistry, connectedClients } from '@/modules/websocket/index.js';
 import type { NormalizedMessage } from '@/shared/types.js';
 import { createNormalizedMessage } from '@/shared/utils.js';
@@ -34,6 +35,7 @@ async function withIsolatedDatabase(run: () => Promise<void>): Promise<void> {
   closeConnection();
   process.env.DATABASE_PATH = path.join(tempDirectory, 'auth.db');
   await initializeDatabase();
+  if (!userDb.hasUsers()) userDb.createUser('agent-test-admin', 'unused');
   try {
     await run();
   } finally {
@@ -95,7 +97,7 @@ async function withAgentServer(dependencies: AgentDependencies, run: (baseUrl: s
 }
 
 const post = (baseUrl: string, body: Record<string, unknown>) =>
-  fetch(`${baseUrl}/api/agent`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  fetch(`${baseUrl}/api/agent`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer ' + generateToken(userDb.getFirstUser()) }, body: JSON.stringify(body) });
 
 const readEvents = async (response: Response): Promise<Array<Record<string, unknown>>> =>
   (await response.text())

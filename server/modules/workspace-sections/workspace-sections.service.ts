@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
-import { projectsDb, sessionsDb, workspaceSectionsDb } from '@/modules/database/index.js';
+import { withUserContext } from '@/modules/auth/index.js';
+import { getSessionOwnerId, projectsDb, sessionsDb, workspaceSectionsDb } from '@/modules/database/index.js';
 import { AppError } from '@/shared/index.js';
 
 const invalid = (message: string) => new AppError(message, { statusCode: 400 });
@@ -9,11 +10,12 @@ const invalid = (message: string) => new AppError(message, { statusCode: 400 });
 export const workspaceSectionsService = {
   list(userId: number) {
     const layout = workspaceSectionsDb.read(userId);
+    layout.assignments=layout.assignments.filter(item=>item.kind==='session' ? getSessionOwnerId(item.targetId)===userId : withUserContext(userId,()=>Boolean(projectsDb.getProjectById(item.targetId))));
     const sessionItems = layout.assignments.filter(item => item.kind === 'session').flatMap(item => {
-      const session = sessionsDb.getSessionById(item.targetId);
+      const session = withUserContext(userId,()=>sessionsDb.getSessionById(item.targetId));
       if (!session || session.isArchived) return [];
       return [{ sessionId: session.session_id, title: session.custom_name || 'New conversation', provider: session.provider,
-        projectPath: session.project_path, projectId: session.project_path ? projectsDb.getProjectPath(session.project_path)?.project_id ?? null : null }];
+        projectPath: session.project_path, projectId: session.project_path ? withUserContext(userId,()=>projectsDb.getProjectPath(session.project_path!))?.project_id ?? null : null }];
     });
     return { ...layout, sessionItems };
   },
@@ -29,7 +31,8 @@ export const workspaceSectionsService = {
       if (action === 'assign') {
         const kind = input.kind; const targetId = typeof input.targetId === 'string' ? input.targetId : '';
         if (!['project', 'session'].includes(String(kind))) throw invalid('Choose a project or session.');
-        const target = kind === 'project' ? projectsDb.getProjectById(targetId) : sessionsDb.getSessionById(targetId);
+        if (kind==='session' && getSessionOwnerId(targetId)!==userId) throw new AppError('Conversation belongs to another user or is unavailable.',{statusCode:403});
+        const target = withUserContext(userId,()=>kind === 'project' ? projectsDb.getProjectById(targetId) : sessionsDb.getSessionById(targetId));
         if (!target || target.isArchived) throw invalid('Choose an active project or session.');
         if (input.sectionId !== null && !layout.sections.some(row => row.id === input.sectionId)) throw invalid('Section does not exist.');
         layout.assignments = layout.assignments.filter(row => row.kind !== kind || row.targetId !== targetId);

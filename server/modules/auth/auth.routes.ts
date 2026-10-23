@@ -8,6 +8,8 @@ import { isLocalRequest } from '@/modules/auth/access-boundary.js';
 import { exchangeAccessIdentity, isAccessSsoEnabled } from '@/modules/auth/access-sso.service.js';
 import { authSessionsDb } from '@/modules/database/index.js';
 import { AppError, requireAuthenticatedUserId } from '@/shared/index.js';
+
+import { userManagementService } from './user-management.service.js';
 import type { createAuthService } from './auth.service.js';
 
 type AuthenticatedRequest = express.Request & { user?: unknown };
@@ -21,6 +23,11 @@ export function createAuthRouter(
   authenticateToken: RequestHandler,
 ): express.Router {
   const router = express.Router();
+  router.get('/users',authenticateToken,(req,res,next)=>{try{res.json(userManagementService.list(requireAuthenticatedUserId(req)));}catch(e){next(e);}});
+  router.post('/users',authenticateToken,async(req,res,next)=>{try{res.json(await userManagementService.create(requireAuthenticatedUserId(req),req.body??{}));}catch(e){next(e);}});
+  router.patch('/users/:id',authenticateToken,(req,res,next)=>{try{res.json(userManagementService.update(requireAuthenticatedUserId(req),Number(req.params.id),req.body??{}));}catch(e){next(e);}});
+  router.post('/users/:id/password',authenticateToken,async(req,res,next)=>{try{res.json(await userManagementService.reset(requireAuthenticatedUserId(req),Number(req.params.id),req.body??{}));}catch(e){next(e);}});
+  router.post('/password',authenticateToken,async(req,res,next)=>{try{res.json(await userManagementService.change(requireAuthenticatedUserId(req),req.body??{}));}catch(e){next(e);}});
   const attempts=new Map<string,{count:number;until:number}>();
   // Bound password/OTP guessing independently of the external Access gate.
   router.use(['/login','/local-ticket','/local-exchange','/access-exchange'],(req,res,next)=>{
@@ -39,7 +46,7 @@ export function createAuthRouter(
   }catch(e){next(e);}});
   router.get('/devices',authenticateToken,(req,res)=>res.json({devices:authSessionsDb.list(requireAuthenticatedUserId(req))}));
   router.delete('/devices/:id',authenticateToken,(req,res)=>{const userId=requireAuthenticatedUserId(req);const id=String(req.params.id);authSessionsDb.revoke(userId,id);authSessionEvents.emit('revoked',id);res.json({success:true});});
-  router.get('/remote-account',authenticateToken,(_req,res)=>res.json(remoteIdentityService.status()));
+  router.get('/remote-account',authenticateToken,(_req,res)=>res.json(remoteIdentityService.status(requireAuthenticatedUserId(_req))));
   router.post('/remote-account',authenticateToken,async(req,res,next)=>{try{
     if(!isLocalRequest(req))throw new AppError('Configure the remote account from the local device.',{statusCode:403});
     res.json(await remoteIdentityService.configure(requireAuthenticatedUserId(req),String(req.body?.username??''),String(req.body?.password??'')));

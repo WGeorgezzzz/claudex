@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 
-import { closeConnection, initializeDatabase, projectsDb, sessionsDb, userDb } from '@/modules/database/index.js';
+import { closeConnection, initializeDatabase, projectsDb, sessionsDb, userDb, workspaceSectionsDb } from '@/modules/database/index.js';
 import { workspaceSectionsService } from '@/modules/workspace-sections/workspace-sections.service.js';
 
 test('sections persist ordering, collapse and assignments with revision protection and account isolation', async () => {
@@ -26,4 +26,16 @@ test('sections persist ordering, collapse and assignments with revision protecti
     view=workspaceSectionsService.update(user,{revision:view.revision,action:'delete',id});assert.equal(view.assignments.length,0);
     assert.ok(sessionsDb.getSessionById('chat'));assert.ok(projectsDb.getProjectById(project.project_id));
   } finally {closeConnection();if(old===undefined)delete process.env.DATABASE_PATH;else process.env.DATABASE_PATH=old;assert.ok(path.resolve(root).startsWith(path.resolve(os.tmpdir())+path.sep));await rm(root,{recursive:true,force:true});}
+});
+
+test('section assignments reject foreign session IDs and omit stale saved references',async()=>{
+  const root=await mkdtemp(path.join(os.tmpdir(),'claudex-section-owners-'));const old=process.env.DATABASE_PATH;
+  closeConnection();process.env.DATABASE_PATH=path.join(root,'test.db');await initializeDatabase();
+  try{
+    const user=Number(userDb.createUser('sections-owner','hash').id);sessionsDb.createAppSession('owned','claude',root);
+    let layout=workspaceSectionsService.update(user+1,{revision:0,action:'create',name:'Other'});
+    assert.throws(()=>workspaceSectionsService.update(user+1,{revision:layout.revision,action:'assign',kind:'session',targetId:'owned',sectionId:layout.sections[0].id}),error=>error instanceof Error && 'statusCode' in error && error.statusCode===403);
+    workspaceSectionsDb.update(user+1,layout.revision,state=>{state.assignments.push({kind:'session',targetId:'owned',sectionId:state.sections[0].id});});
+    layout=workspaceSectionsService.list(user+1);assert.deepEqual(layout.assignments,[]);assert.deepEqual(layout.sessionItems,[]);
+  }finally{closeConnection();if(old===undefined)delete process.env.DATABASE_PATH;else process.env.DATABASE_PATH=old;await rm(root,{recursive:true,force:true});}
 });

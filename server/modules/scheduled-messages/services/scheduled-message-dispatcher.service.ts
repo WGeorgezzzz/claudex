@@ -1,4 +1,5 @@
-import { scheduledMessagesDb, sessionDraftsDb } from '@/modules/database/index.js';
+import { withUserContext } from '@/modules/auth/index.js';
+import { getSessionOwnerId, scheduledMessagesDb, sessionDraftsDb } from '@/modules/database/index.js';
 import type { QueuedSessionMessageRecord, ScheduledMessageRow } from '@/modules/database/index.js';
 import { chatRunRegistry, runDetachedChatTurn } from '@/modules/websocket/index.js';
 import type { ProviderRuntimeGateway } from '@/modules/websocket/index.js';
@@ -56,13 +57,14 @@ async function sendClaimedQueuedMessage(
   candidate: QueuedSessionMessageRecord,
   runtime: ProviderRuntimeGateway,
 ): Promise<void> {
+  if (getSessionOwnerId(candidate.sessionId)!==candidate.userId) return;
   const message = readQueuedMessage(candidate.queuedMessage);
   if (!message) {
     sessionDraftsDb.deleteEmptyDraft(candidate.userId, candidate.sessionId);
     return;
   }
 
-  const result = await runDetachedChatTurn(
+  const result = await withUserContext(candidate.userId,()=>runDetachedChatTurn(
     {
       sessionId: candidate.sessionId,
       userId: candidate.userId,
@@ -70,7 +72,7 @@ async function sendClaimedQueuedMessage(
       options: { ...message.options, attachments: message.attachments },
     },
     { runtime },
-  );
+  ));
 
   // The registry check and run reservation are separate operations. If a run
   // wins that tiny race, put the turn back so the next poll tries again.
@@ -100,7 +102,7 @@ export async function dispatchQueuedMessages(runtime: ProviderRuntimeGateway): P
   let claimed = 0;
 
   await Promise.all(candidates.map(async (candidate) => {
-    if (isSessionBusy(candidate.sessionId, runtime)) {
+    if (getSessionOwnerId(candidate.sessionId)!==candidate.userId || isSessionBusy(candidate.sessionId, runtime)) {
       return;
     }
     if (!sessionDraftsDb.claimQueuedMessage(candidate)) {
@@ -118,7 +120,8 @@ async function sendClaimedMessage(
   runtime: ProviderRuntimeGateway,
 ): Promise<void> {
   try {
-    const result = await runDetachedChatTurn(
+    if (getSessionOwnerId(row.session_id)!==row.user_id) throw new Error('Conversation owner no longer matches scheduled message.');
+    const result = await withUserContext(row.user_id,()=>runDetachedChatTurn(
       {
         sessionId: row.session_id,
         userId: row.user_id,
@@ -130,7 +133,7 @@ async function sendClaimedMessage(
         interruptActiveRun: true,
       },
       { runtime },
-    );
+    ));
 
     // Recorded rather than retried, and recorded whether the run never started
     // (deleted session, unavailable provider) or started and then failed.

@@ -1,3 +1,6 @@
+import { getSessionOwnerId } from '@/modules/database/index.js';
+import { AppError } from '@/shared/utils.js';
+import { withUserContext, assertUserPath } from '@/modules/auth/index.js';
 import { providerRegistry } from '@/modules/providers/provider.registry.js';
 import { providerModelsService } from '@/modules/providers/services/provider-models.service.js';
 import { sessionsService } from '@/modules/providers/services/sessions.service.js';
@@ -92,7 +95,23 @@ export function createProviderRuntimeService(
     const runtimeOptions=providerName==='claude'&&!options.toolsSettings&&(Array.isArray(options.allowedTools)||Array.isArray(options.disallowedTools))
       ? {...options,toolsSettings:{allowedTools:options.allowedTools??[],disallowedTools:options.disallowedTools??[],skipPermissions:false}}
       : options;
-    return provider.runtime.run(command, runtimeOptions, writer, context);
+    const execute = () => {
+      if (writer.userId != null) {
+        for (const candidate of [runtimeOptions.cwd, runtimeOptions.projectPath]) {
+          if (candidate != null && candidate !== '') {
+            if (typeof candidate !== 'string') throw new AppError('Invalid runtime path.', { statusCode: 400 });
+            assertUserPath(userId, candidate);
+          }
+        }
+        if (!runtimeOptions.cwd && !runtimeOptions.projectPath) assertUserPath(userId, process.cwd());
+        if (typeof runtimeOptions.sessionId === 'string') {
+          const owner = getSessionOwnerId(runtimeOptions.sessionId);
+          if (owner != null && owner !== userId) throw new AppError('Session belongs to another user.', { statusCode: 403 });
+        }
+      }
+      return provider.runtime.run(command, runtimeOptions, writer, context);
+    };
+    return writer.userId == null ? execute() : withUserContext(userId, execute);
   };
 
   return {

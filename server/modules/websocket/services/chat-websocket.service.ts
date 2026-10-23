@@ -1,3 +1,4 @@
+import { getCurrentUserContext, withUserContext } from '@/modules/auth/index.js';
 import path from 'node:path';
 
 import type { WebSocket } from 'ws';
@@ -5,7 +6,7 @@ import type { WebSocket } from 'ws';
 import { sessionsDb } from '@/modules/database/index.js';
 import { providerModelsService, sessionsService } from '@/modules/providers/index.js';
 import { chatRunRegistry } from '@/modules/websocket/services/chat-run-registry.service.js';
-import { connectedClients, WS_OPEN_STATE } from '@/modules/websocket/services/websocket-state.service.js';
+import { connectedClients, WS_OPEN_STATE, clientUserIds } from '@/modules/websocket/services/websocket-state.service.js';
 import {
   getGlobalImageAssetsDir,
   isImageAttachmentDescriptor,
@@ -442,6 +443,9 @@ async function handleChatAbort(
     return;
   }
 
+  if (!sessionsDb.getSessionById(sessionId)) {
+    sendProtocolError(ws, 'SESSION_NOT_FOUND', 'Session not found.', sessionId); return;
+  }
   const run = chatRunRegistry.getRun(sessionId);
   if (!run || run.status !== 'running') {
     sendProtocolError(ws, 'NO_ACTIVE_RUN', `Session "${sessionId}" has no active run.`, sessionId);
@@ -529,6 +533,9 @@ function handleChatSubscribe(
       continue;
     }
 
+    if (!sessionsDb.getSessionById(sessionId)) {
+      sendProtocolError(ws, 'SESSION_NOT_FOUND', 'Session not found.', sessionId); continue;
+    }
     const lastSeqRaw = (target as AnyRecord).lastSeq;
     const lastSeq = typeof lastSeqRaw === 'number' && Number.isFinite(lastSeqRaw)
       ? Math.max(0, Math.floor(lastSeqRaw))
@@ -582,6 +589,12 @@ function handlePermissionResponse(data: AnyRecord, dependencies: ChatWebSocketDe
     return;
   }
 
+  const ownsApproval = sessionsDb.getAllSessions().some(session =>
+    dependencies.runtime.getPendingApprovalsForSession(session.session_id).some(approval => {
+      const entry = approval as AnyRecord;
+      return entry?.requestId === data.requestId || entry?.id === data.requestId;
+    }));
+  if (!ownsApproval) throw new Error('Permission request not found for this user.');
   dependencies.runtime.resolveToolApproval(data.requestId, {
     allow: Boolean(data.allow),
     updatedInput: data.updatedInput,
@@ -633,6 +646,10 @@ export async function runDetachedChatTurn(
   },
   dependencies: ChatWebSocketDependencies,
 ): Promise<{ started: boolean; error: string | null }> {
+  if (input.userId === null) return { started: false, error: 'Authentication required.' };
+  if (getCurrentUserContext()?.userId !== Number(input.userId)) {
+    return withUserContext(input.userId, () => runDetachedChatTurn(input, dependencies));
+  }
   const session = sessionsDb.getSessionById(input.sessionId);
   if (!session) {
     return { started: false, error: 'The session no longer exists.' };
@@ -676,47 +693,50 @@ export function handleChatConnection(
   dependencies: ChatWebSocketDependencies
 ): void {
   console.log('[INFO] Chat WebSocket connected');
-  connectedClients.add(ws);
-
   const userId = readRequestUserId(request);
+  if (userId === null) { ws.close(4001, 'Authentication required'); return; }
+  connectedClients.add(ws);
+  clientUserIds.set(ws, Number(userId));
 
   ws.on('message', async (rawMessage) => {
     try {
-      const parsed = parseIncomingJsonObject(rawMessage);
-      if (!parsed) {
-        throw new Error('Invalid websocket payload');
-      }
+      await withUserContext(userId, async () => {
+        const parsed = parseIncomingJsonObject(rawMessage);
+        if (!parsed) {
+          throw new Error('Invalid websocket payload');
+        }
 
-      const data = parsed as AnyRecord;
-      const messageType = typeof data.type === 'string' ? data.type : '';
+        const data = parsed as AnyRecord;
+        const messageType = typeof data.type === 'string' ? data.type : '';
 
-      switch (messageType) {
-        case 'chat.edit-send':
-          await handleChatEditSend(ws, userId, data, dependencies);
-          return;
-        case 'chat.send':
-          await handleChatSend(ws, userId, data, dependencies);
-          return;
-        case 'chat.abort':
-          await handleChatAbort(ws, data, dependencies);
-          return;
-        case 'chat.stop-task':
-          await handleChatStopTask(ws, data, dependencies);
-          return;
-        case 'chat.subscribe':
-          handleChatSubscribe(ws, data, dependencies);
-          return;
-        case 'chat.permission-response':
-          handlePermissionResponse(data, dependencies);
-          return;
-        default:
-          sendProtocolError(ws, 'UNKNOWN_MESSAGE_TYPE', `Unknown message type "${messageType}".`);
-          return;
-      }
+        switch (messageType) {
+          case 'chat.edit-send':
+            await handleChatEditSend(ws, userId, data, dependencies);
+            return;
+          case 'chat.send':
+            await handleChatSend(ws, userId, data, dependencies);
+            return;
+          case 'chat.abort':
+            await handleChatAbort(ws, data, dependencies);
+            return;
+          case 'chat.stop-task':
+            await handleChatStopTask(ws, data, dependencies);
+            return;
+          case 'chat.subscribe':
+            handleChatSubscribe(ws, data, dependencies);
+            return;
+          case 'chat.permission-response':
+            handlePermissionResponse(data, dependencies);
+            return;
+          default:
+            sendProtocolError(ws, 'UNKNOWN_MESSAGE_TYPE', `Unknown message type "${messageType}".`);
+            return;
+        }
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       console.error('[ERROR] Chat WebSocket error:', message);
-      sendProtocolError(ws, 'INTERNAL_ERROR', message);
+      sendProtocolError(ws, 'REQUEST_REJECTED', message);
     }
   });
 

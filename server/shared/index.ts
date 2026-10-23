@@ -12,3 +12,6 @@ export type { MonitorCalendarSchedule } from './types.js';
 export type { DotMemory, DotThread, DotTask } from './types.js';
 // Auth retains the existing platform deployment mode alongside private local identity.
 export { IS_PLATFORM } from './utils.js';
+
+// Auth binds isolated execution contexts; Database and filesystem helpers read them.
+export { userContextStorage } from './utils.js';

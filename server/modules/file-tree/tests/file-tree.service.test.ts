@@ -518,7 +518,7 @@ test('reading through a symlink out of the temp directory is still refused', asy
   try {
     assert.equal(await resolveReadOnlyRootPath(outsideDirectory), null);
     await fsPromises.writeFile(path.join(outsideDirectory, 'secret.txt'), 'secret', 'utf8');
-    await fsPromises.symlink(outsideDirectory, path.join(temporaryDirectory, 'escape'));
+    await fsPromises.symlink(outsideDirectory, path.join(temporaryDirectory, 'escape'), process.platform === 'win32' ? 'junction' : 'dir');
 
     const service = createRealFileSystemService(projectRoot);
     await assert.rejects(

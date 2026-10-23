@@ -1,3 +1,6 @@
+import { installAuthorizationFixture } from '../../access-control/tests/authorization-fixture.js';
+import { generateToken } from '@/modules/auth/auth.middleware.js';
+import { userDb } from '@/modules/database/index.js';
 import assert from 'node:assert/strict';
 import * as nodeCrypto from 'node:crypto';
 import { EventEmitter, once } from 'node:events';
@@ -8,6 +11,8 @@ import test from 'node:test';
 import express from 'express';
 
 import { createAgentRouter } from '../agent.routes.js';
+
+installAuthorizationFixture();
 
 type AgentDependencies = Parameters<typeof createAgentRouter>[0];
 
@@ -77,7 +82,7 @@ test('Agent route rejects missing project input before invoking provider depende
   await withAgentServer(createDependencies(), async (baseUrl) => {
     const response = await fetch(`${baseUrl}/api/agent`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', authorization: 'Bearer ' + generateToken(userDb.getFirstUser()) },
       body: JSON.stringify({ message: 'Inspect this project', stream: false }),
     });
     const body = await response.json() as { error: string };
@@ -113,7 +118,7 @@ test('Agent route rejects GitHub lookalike hosts before cloning', async () => {
   await withAgentServer(createDependencies(), async (baseUrl) => {
     const response = await fetch(`${baseUrl}/api/agent`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', authorization: 'Bearer ' + generateToken(userDb.getFirstUser()) },
       body: JSON.stringify({
         githubUrl: 'https://github.com.evil.example/owner/repo',
         message: 'Run',
@@ -153,7 +158,7 @@ test('GitHub cloning keeps credentials out of arguments and remote URL', async (
   }), async (baseUrl) => {
     const response = await fetch(`${baseUrl}/api/agent`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', authorization: 'Bearer ' + generateToken(userDb.getFirstUser()) },
       body: JSON.stringify({
         githubUrl: 'https://github.com/owner/repo.git',
         message: 'Run',
@@ -205,7 +210,7 @@ test('Agent route reuses a matching checkout without cloning or deleting it', as
   }), async (baseUrl) => {
     const response = await fetch(`${baseUrl}/api/agent`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', authorization: 'Bearer ' + generateToken(userDb.getFirstUser()) },
       body: JSON.stringify({
         githubUrl: 'https://github.com/owner/repo.git',
         projectPath: '/home/test/.claude/external-projects/existing',
@@ -237,7 +242,7 @@ test('Agent route starts opencode on the catalog default when the request names 
   }), async (baseUrl) => {
     const response = await fetch(`${baseUrl}/api/agent`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', authorization: 'Bearer ' + generateToken(userDb.getFirstUser()) },
       body: JSON.stringify({
         projectPath: '/home/test/project',
         message: 'Run',
@@ -269,7 +274,7 @@ test('Agent route starts codex on the catalog default when the request names no 
   }), async (baseUrl) => {
     const response = await fetch(`${baseUrl}/api/agent`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', authorization: 'Bearer ' + generateToken(userDb.getFirstUser()) },
       body: JSON.stringify({
         projectPath: '/home/test/project',
         message: 'Run',
@@ -313,7 +318,7 @@ async function runWithoutModel(
   }), async (baseUrl) => {
     const response = await fetch(`${baseUrl}/api/agent`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', authorization: 'Bearer ' + generateToken(userDb.getFirstUser()) },
       body: JSON.stringify({
         projectPath: '/home/test/project',
         message: 'Run',
@@ -408,7 +413,7 @@ test('Agent route reads no model catalog for a continued session of an unregiste
   }), async (baseUrl) => {
     const response = await fetch(`${baseUrl}/api/agent`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', authorization: 'Bearer ' + generateToken(userDb.getFirstUser()) },
       body: JSON.stringify({
         projectPath: '/home/test/project',
         message: 'Run',

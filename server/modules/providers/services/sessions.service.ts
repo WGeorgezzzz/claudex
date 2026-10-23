@@ -211,7 +211,7 @@ export const sessionsService = {
       runningById.set(session.session_id, entries[entries.length - 1]);
     }
 
-    return entries;
+    return entries.filter(entry => sessionsDb.getSessionById(entry.sessionId) !== null);
   },
 
   /**

@@ -4,8 +4,10 @@ import path from 'node:path';
 
 import pty, { type IPty } from 'node-pty';
 import { WebSocket, type RawData } from 'ws';
-import { getClaudeConfigDir } from '@/shared/index.js';
 
+import { assertOwnedSession } from '@/modules/access-control/index.js';
+import { assertUserPath, getUserContext, getCurrentUserContext, withUserContext } from '@/modules/auth/index.js';
+import { getClaudeConfigDir } from '@/shared/index.js';
 import { parseIncomingJsonObject, stripAnsiSequences } from '@/shared/utils.js';
 
 type ShellIncomingMessage = {
@@ -169,7 +171,7 @@ const SAFE_SESSION_ID_PATTERN = /^[a-zA-Z0-9_.\-:]+$/;
 
 function resolveResumeSessionId(
   message: ShellIncomingMessage,
-  dependencies: ShellWebSocketDependencies
+  dependencies: ShellWebSocketDependencies,
 ): string {
   const hasSession = readBoolean(message.hasSession);
   const sessionId = readString(message.sessionId);
@@ -360,7 +362,7 @@ function readClaudeThemeFile(filePath: string, maxBytes: number): string | null 
  * they outrank `--settings`, so no flag could change their theme anyway.
  */
 function resolveClaudeTheme(projectPath: string): string {
-  const configDirOverride = process.env.CLAUDE_CONFIG_DIR;
+  const configDirOverride = getCurrentUserContext()?.claudeConfigDir || process.env.CLAUDE_CONFIG_DIR;
   const configHome = configDirOverride || getClaudeConfigDir();
   const legacyGlobalConfigPath = path.join(configHome, '.config.json');
   const configFiles: Array<[string, number]> = [
@@ -399,7 +401,9 @@ function ensureClaudeThemeSettingsFile(theme: string): string | null {
   const contents = `${JSON.stringify({ theme })}\n`;
   let tempPath: string | null = null;
   try {
-    const filePath = path.join(os.homedir(), '.cloudcli', `claude-shell-theme-${theme}.json`);
+    const context = getCurrentUserContext();
+    const themeRoot = context?.role === 'member' ? context.claudeConfigDir : path.join(os.homedir(), '.cloudcli');
+    const filePath = path.join(themeRoot, `claude-shell-theme-${theme}.json`);
     // Anything but the expected regular file is replaced; the rename never
     // opens what it replaces.
     if (readRegularConfigFile(filePath) !== contents) {
@@ -540,8 +544,11 @@ function prioritizeUserNpmGlobalBin(env: NodeJS.ProcessEnv): { key: string; valu
  */
 export function handleShellConnection(
   ws: WebSocket,
-  dependencies: ShellWebSocketDependencies
+  dependencies: ShellWebSocketDependencies,
+  authenticatedUserId?: string | number,
 ): void {
+  const userId = Number(authenticatedUserId);
+  if (!Number.isSafeInteger(userId) || userId <= 0) { ws.close(4001, 'Authentication required'); return; }
   console.log('[INFO] Shell websocket connected');
 
   let shellProcess: IPty | null = null;
@@ -560,6 +567,7 @@ export function handleShellConnection(
 
   ws.on('message', async (rawMessage) => {
     try {
+      await withUserContext(userId, async () => {
       const data = parseShellMessage(rawMessage);
       if (!data?.type) {
         throw new Error('Invalid websocket payload');
@@ -567,8 +575,11 @@ export function handleShellConnection(
 
       if (data.type === 'init') {
         inputReady = false;
-        const projectPath = readString(data.projectPath, process.cwd());
+        const userContext = userId == null ? undefined : getUserContext(userId);
+        const projectPath = readString(data.projectPath, userContext?.workRoot || process.cwd());
+        if (userId != null) assertUserPath(userId, projectPath);
         const sessionId = readString(data.sessionId) || null;
+        if (sessionId && readBoolean(data.hasSession)) assertOwnedSession(userId, sessionId);
         const hasSession = readBoolean(data.hasSession);
         const provider = readString(data.provider, 'claude');
         const initialCommand = readString(data.initialCommand);
@@ -592,7 +603,7 @@ export function handleShellConnection(
           isPlainShell && initialCommand
             ? `_cmd_${Buffer.from(initialCommand).toString('base64').slice(0, 16)}`
             : '';
-        ptySessionKey = `${projectPath}_${sessionId ?? 'default'}${commandSuffix}`;
+        ptySessionKey = JSON.stringify([userId, path.resolve(projectPath), sessionId ?? 'default', commandSuffix]);
 
         if (isLoginCommand || forceRestart) {
           const oldSession = ptySessionsMap.get(ptySessionKey);
@@ -670,7 +681,7 @@ export function handleShellConnection(
           : os.platform() === 'win32' ? ['-NoLogo', '-NoExit'] : ['-i'];
         const termCols = readNumber(data.cols, 80);
         const termRows = readNumber(data.rows, 24);
-        const prioritizedPath = prioritizeUserNpmGlobalBin(process.env);
+        const prioritizedPath = prioritizeUserNpmGlobalBin(userContext?.env ?? process.env);
 
         shellProcess = (dependencies.spawnPty ?? pty.spawn)(shell, shellArgs, {
           name: 'xterm-256color',
@@ -678,7 +689,7 @@ export function handleShellConnection(
           rows: termRows,
           cwd: resolvedProjectPath,
           env: {
-            ...process.env,
+            ...(userContext?.env ?? process.env),
             [prioritizedPath.key]: prioritizedPath.value,
             TERM: 'xterm-256color',
             COLORTERM: 'truecolor',
@@ -851,6 +862,7 @@ export function handleShellConnection(
           shellProcess.resize(readNumber(data.cols, 80), readNumber(data.rows, 24));
         }
       }
+      });
     } catch (error) {
       pendingInput = '';
       const message = error instanceof Error ? error.message : String(error);

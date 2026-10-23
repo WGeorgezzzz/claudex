@@ -1,3 +1,4 @@
+import { getCurrentUserContext } from '@/modules/auth/index.js';
 import fsp from 'node:fs/promises';
 
 import type { FetchHistoryResult } from '@/shared/types.js';
@@ -84,6 +85,8 @@ export function createSessionHistoryCache(
      * stat'ed) — the caller then falls back to a plain provider read.
      */
     async getFullHistory({ sessionId, transcriptPath, loadFull }: GetFullHistoryArgs): Promise<FetchHistoryResult | null> {
+      // Both completed entries and pending parses are private to their originating account.
+      sessionId = `${getCurrentUserContext()?.userId ?? 'legacy'}:${sessionId}`;
       if (!transcriptPath) {
         return null;
       }
@@ -142,7 +145,9 @@ export function createSessionHistoryCache(
 
     /** Forgets a session's entry so the next read re-parses its transcript. */
     invalidate(sessionId: string): void {
-      entries.delete(sessionId);
+      for (const key of entries.keys()) {
+        if (key.endsWith(`:${sessionId}`)) entries.delete(key);
+      }
     },
   };
 }

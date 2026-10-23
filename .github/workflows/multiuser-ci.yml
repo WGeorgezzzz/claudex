@@ -1,0 +1,31 @@
+name: Multiuser regression
+
+on:
+  push:
+    branches: [main, multiuser-20261023]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: windows-latest
+    timeout-minutes: 35
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      CLAUDEX_PASSIVE_INSTANCE: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm run test
+      - run: npm run test:client
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run build

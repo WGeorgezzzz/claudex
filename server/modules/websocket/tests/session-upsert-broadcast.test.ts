@@ -4,12 +4,12 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 
-import { closeConnection, initializeDatabase, sessionsDb } from '@/modules/database/index.js';
+import { closeConnection, initializeDatabase, sessionsDb, getConnection } from '@/modules/database/index.js';
 import {
   broadcastSessionUpserted,
   broadcastSessionUpsertedBatch,
 } from '@/modules/websocket/services/session-upsert-broadcast.service.js';
-import { connectedClients } from '@/modules/websocket/services/websocket-state.service.js';
+import { connectedClients, clientUserIds } from '@/modules/websocket/services/websocket-state.service.js';
 
 class FakeConnection {
   readyState = 1; // WS_OPEN_STATE
@@ -27,6 +27,7 @@ async function withIsolatedDatabase(runTest: () => void | Promise<void>): Promis
   closeConnection();
   process.env.DATABASE_PATH = path.join(tempDirectory, 'auth.db');
   await initializeDatabase();
+  getConnection().prepare("INSERT INTO users(id,username,password_hash,role) VALUES(1,'test-admin','test','admin')").run();
 
   try {
     await runTest();
@@ -49,6 +50,7 @@ test('an upsert always carries the provider session id', async () => {
 
     const connection = new FakeConnection();
     connectedClients.add(connection as never);
+    clientUserIds.set(connection as never, 1);
 
     await broadcastSessionUpserted('app-1');
 
@@ -66,6 +68,7 @@ test('the watcher path resolves a provider-native id to the same canonical event
 
     const connection = new FakeConnection();
     connectedClients.add(connection as never);
+    clientUserIds.set(connection as never, 1);
 
     // The sessions watcher only ever knows the id written in the transcript.
     await broadcastSessionUpsertedBatch(['native-2']);
@@ -82,6 +85,7 @@ test('a session with no provider id yet reports null rather than omitting the fi
 
     const connection = new FakeConnection();
     connectedClients.add(connection as never);
+    clientUserIds.set(connection as never, 1);
 
     await broadcastSessionUpserted('app-3');
 
@@ -95,6 +99,7 @@ test('an unresolvable id broadcasts nothing', async () => {
   await withIsolatedDatabase(async () => {
     const connection = new FakeConnection();
     connectedClients.add(connection as never);
+    clientUserIds.set(connection as never, 1);
 
     await broadcastSessionUpserted('does-not-exist');
     await broadcastSessionUpsertedBatch(['also-missing']);
@@ -110,6 +115,7 @@ test('a batch delivers every resolvable session and skips the rest', async () =>
 
     const connection = new FakeConnection();
     connectedClients.add(connection as never);
+    clientUserIds.set(connection as never, 1);
 
     await broadcastSessionUpsertedBatch(['app-4', 'missing', 'app-5']);
 
@@ -128,7 +134,9 @@ test('a closed socket is skipped', async () => {
     const closing = new FakeConnection();
     closing.readyState = 3;
     connectedClients.add(open as never);
+    clientUserIds.set(open as never, 1);
     connectedClients.add(closing as never);
+    clientUserIds.set(closing as never, 1);
 
     await broadcastSessionUpserted('app-6');
 

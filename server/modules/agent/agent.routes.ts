@@ -1,5 +1,6 @@
 // @ts-nocheck -- dynamic provider event payloads are normalized at the injected writer boundary.
 import path from 'path';
+import { authenticateToken, assertUserPath, withUserContext, getCurrentUserContext } from '@/modules/auth/index.js';
 
 import express from 'express';
 import { getClaudeConfigDir } from '@/shared/index.js';
@@ -55,7 +56,6 @@ export function createAgentRouter(dependencies: AgentRouterDependencies): expres
   const os = { homedir: dependencies.homeDirectory };
   const spawn = dependencies.spawnProcess;
   const IS_PLATFORM = dependencies.platformMode;
-  const userDb = dependencies.users;
   const apiKeysDb = dependencies.apiKeys;
   const githubTokensDb = dependencies.githubTokens;
   const projectsDb = dependencies.projects;
@@ -81,21 +81,9 @@ export function createAgentRouter(dependencies: AgentRouterDependencies): expres
    *    via API keys created in the UI. Keys are validated against the local database.
    */
   const validateExternalApiKey = (req, res, next) => {
-    // Platform mode: Authentication is handled externally (e.g., by a proxy layer).
-    // Trust the request and use the default user context.
-    if (IS_PLATFORM) {
-      try {
-        const user = userDb.getFirstUser();
-        if (!user) {
-          return res.status(500).json({ error: 'Platform mode: No user found in database' });
-        }
-        req.user = user;
-        return next();
-      } catch (error) {
-        console.error('Platform mode error:', error);
-        return res.status(500).json({ error: 'Platform mode: Failed to fetch user' });
-      }
-    }
+    if (IS_PLATFORM) return authenticateToken(req, res, () => {
+      try { return withUserContext(req.user.id, () => next()); } catch (error) { next(error); }
+    });
 
     // Self-hosted mode: Validate API key from header or query parameter
     const apiKey = req.headers['x-api-key'] || req.query.apiKey;
@@ -111,7 +99,7 @@ export function createAgentRouter(dependencies: AgentRouterDependencies): expres
     }
 
     req.user = user;
-    next();
+    try { withUserContext(user.id, () => next()); } catch (error) { next(error); }
   };
 
   /**
@@ -862,7 +850,12 @@ export function createAgentRouter(dependencies: AgentRouterDependencies): expres
    *     "cleanup": false
    *   }
    */
-  router.post('/', validateExternalApiKey, async (req, res) => {
+  router.post('/', validateExternalApiKey, (req, res, next) => {
+    try {
+      if (typeof req.body?.projectPath === 'string') assertUserPath(req.user.id, path.resolve(req.body.projectPath));
+      next();
+    } catch (error) { next(error); }
+  }, async (req, res) => {
     const { githubUrl, projectPath, message, model, githubToken, branchName } = req.body;
     // Transport input is typed here, before anything binds it to a query:
     // the lookup below runs outside the try, where a throw would be an
@@ -966,7 +959,7 @@ export function createAgentRouter(dependencies: AgentRouterDependencies): expres
 
       // A continued session runs where it lives, as a chat send does; a
       // request that resolved to another directory is not that session.
-      if (sessionRow && sessionRow.project_path && normalizeProjectPath(sessionRow.project_path) !== finalProjectPath) {
+      if (sessionRow && sessionRow.project_path && normalizeProjectPath(path.resolve(sessionRow.project_path)) !== finalProjectPath) {
         throw new Error(`Session "${sessionRow.session_id}" belongs to project ${sessionRow.project_path}, not ${finalProjectPath}`);
       }
 

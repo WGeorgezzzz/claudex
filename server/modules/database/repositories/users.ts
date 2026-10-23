@@ -2,13 +2,16 @@
  * User repository.
  *
  * Provides typed CRUD operations for the `users` table.
- * This is a single-user system, but the schema supports multiple
- * users for forward compatibility.
+ * Roles and per-account access metadata are persisted with each user.
  */
 
 import { getConnection } from '@/modules/database/connection.js';
 
 type UserRow = {
+  role: 'admin' | 'member';
+  work_root: string | null;
+  allowed_folders: string;
+  access_sso_email: string | null;
   id: number;
   username: string;
   password_hash: string;
@@ -20,7 +23,7 @@ type UserRow = {
   has_completed_onboarding: number;
 };
 
-type UserPublicRow = Pick<UserRow, 'id' | 'username' | 'created_at' | 'last_login'>;
+type UserPublicRow = Pick<UserRow, 'id' | 'username' | 'created_at' | 'last_login' | 'role' | 'work_root' | 'allowed_folders' | 'access_sso_email'>;
 
 type UserGitConfig = {
   git_name: string | null;
@@ -28,6 +31,7 @@ type UserGitConfig = {
 };
 
 type CreateUserResult = {
+  role: 'admin' | 'member';
   id: number | bigint;
   username: string;
 };
@@ -50,9 +54,9 @@ export const userDb = {
   createUser(username: string, passwordHash: string): CreateUserResult {
     const db = getConnection();
     const result = db
-      .prepare('INSERT INTO users (username, password_hash) VALUES (?, ?)')
+      .prepare("INSERT INTO users (username, password_hash, role) VALUES (?, ?, CASE WHEN EXISTS(SELECT 1 FROM users) THEN 'member' ELSE 'admin' END)")
       .run(username, passwordHash);
-    return { id: result.lastInsertRowid, username };
+    return { id: result.lastInsertRowid, username, role: this.getUserById(Number(result.lastInsertRowid))!.role };
   },
 
   /**
@@ -84,7 +88,7 @@ export const userDb = {
     const db = getConnection();
     return db
       .prepare(
-        'SELECT id, username, created_at, last_login FROM users WHERE id = ? AND is_active = 1'
+        'SELECT id, username, created_at, last_login, role, work_root, allowed_folders, access_sso_email FROM users WHERE id = ? AND is_active = 1'
       )
       .get(userId) as UserPublicRow | undefined;
   },
@@ -94,11 +98,31 @@ export const userDb = {
     const db = getConnection();
     return db
       .prepare(
-        'SELECT id, username, created_at, last_login FROM users WHERE is_active = 1 LIMIT 1'
+        "SELECT id, username, created_at, last_login, role, work_root, allowed_folders, access_sso_email FROM users WHERE is_active = 1 AND role='admin' ORDER BY id LIMIT 1"
       )
       .get() as UserPublicRow | undefined;
   },
 
+  /** User management returns public metadata only. */
+  listUsers() {
+    return getConnection().prepare('SELECT id, username, role, work_root, allowed_folders, access_sso_email, is_active FROM users ORDER BY id').all();
+  },
+  getUserBySsoEmail(email: string) {
+    const row = getConnection().prepare('SELECT id FROM users WHERE lower(access_sso_email)=lower(?) AND is_active=1').get(email) as {id:number} | undefined;
+    return row ? this.getUserById(row.id) : undefined;
+  },
+  getSsoBinding(email: string) {
+    return getConnection().prepare('SELECT is_active FROM users WHERE lower(access_sso_email)=lower(?)').get(email) as {is_active:number} | undefined;
+  },
+  hasSsoUsers(): boolean {
+    return Boolean(getConnection().prepare('SELECT 1 FROM users WHERE access_sso_email IS NOT NULL AND is_active=1 LIMIT 1').get());
+  },
+  updateAccess(userId: number, root: string, folders: string[], email: string | null, active: boolean) {
+    return getConnection().prepare('UPDATE users SET work_root=?, allowed_folders=?, access_sso_email=?, is_active=? WHERE id=?').run(root, JSON.stringify(folders), email, Number(active), userId);
+  },
+  setPassword(userId: number, hash: string) {
+    getConnection().prepare('UPDATE users SET password_hash=? WHERE id=?').run(hash, userId);
+  },
   /** Stores the user's preferred git name and email. */
   updateGitConfig(
     userId: number,

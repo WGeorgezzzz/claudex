@@ -1,3 +1,4 @@
+import { installAuthorizationFixture, authenticateTestRequest } from '../../access-control/tests/authorization-fixture.js';
 import assert from 'node:assert/strict';
 import { EventEmitter, once } from 'node:events';
 import type { AddressInfo } from 'node:net';
@@ -7,6 +8,8 @@ import test from 'node:test';
 import express from 'express';
 
 import { createGitRouter } from '@/modules/git/git.routes.js';
+
+installAuthorizationFixture();
 
 test('git init does not run when repository validation fails for an execution error', async () => {
   const commands: string[][] = [];
@@ -29,6 +32,7 @@ test('git init does not run when repository validation fails for an execution er
     queryCursor: unexpectedProvider,
   });
   const app = express();
+  app.use(authenticateTestRequest);
   app.use(express.json());
   app.use('/api/git', router);
   const server = app.listen(0, '127.0.0.1');
@@ -78,6 +82,7 @@ test('delete branch parses force and uses Git force deletion', async () => {
     queryCursor: unexpectedProvider,
   });
   const app = express();
+  app.use(authenticateTestRequest);
   app.use(express.json());
   app.use('/api/git', router);
   const server = app.listen(0, '127.0.0.1');
@@ -114,6 +119,7 @@ test('delete branch rejects a non-boolean force value before running Git', async
     queryCursor: unexpectedProvider,
   });
   const app = express();
+  app.use(authenticateTestRequest);
   app.use(express.json());
   app.use('/api/git', router);
   const server = app.listen(0, '127.0.0.1');

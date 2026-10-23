@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 
-import { closeConnection, initializeDatabase, dotDb, projectsDb, messageQueueDb, userDb } from '@/modules/database/index.js';
+import { closeConnection, initializeDatabase, getConnection, dotDb, projectsDb, messageQueueDb, userDb } from '@/modules/database/index.js';
 import { dotService } from '@/modules/dot/dot.service.js';
 import { executeDotTool } from '@/modules/dot/dot.tools.js';
 import { reportDotTasks } from '@/modules/dot/dot.reports.js';
@@ -14,7 +14,7 @@ test('Dot preserves ownership, memory revisions, durable delegation and exactly-
   const root=await mkdtemp(path.join(os.tmpdir(),'claudex-dot-'));const old=process.env.DATABASE_PATH,home=process.env.CLOUDCLI_HOME;
   closeConnection();process.env.DATABASE_PATH=path.join(root,'test.db');process.env.CLOUDCLI_HOME=root;await initializeDatabase();
   try{
-    const uid=Number(userDb.createUser('dot-owner','hash').id),other=uid+1;
+    const uid=Number(userDb.createUser('dot-owner','hash').id),other=Number(userDb.createUser('dot-other','hash').id);
     const thread=dotService.createThread(uid,'Personal assistant');
     assert.equal(dotDb.owns(other,thread.sessionId),false);
     const [memory]=dotService.saveMemory(uid,'Prefer concise reports');
@@ -49,6 +49,14 @@ test('Dot preserves ownership, memory revisions, durable delegation and exactly-
       await reportDotTasks();assert.equal(dotDb.tasks(uid).find(t=>t.id===later.id)!.reported,1);
       assert.ok(messageQueueDb.list(uid,thread.sessionId).some(q=>q.content.includes('RESULT_AFTER_FLUSH')));
     }finally{sessionsService.fetchHistory=originalRead;}
+    // An old task row is not authority to read a session after ownership changes.
+    getConnection().prepare('UPDATE sessions SET owner_id=? WHERE session_id=?').run(other,later.target_session_id);
+    assert.ok(!dotService.snapshot(uid).tasks.some(task=>task.id===later.id));
+    assert.throws(()=>dotService.cancelPending(uid,later.id),error=>error instanceof Error && 'statusCode' in error && error.statusCode===403);
+    getConnection().prepare('UPDATE dot_tasks SET reported=0 WHERE id=?').run(later.id);
+    const fetch=sessionsService.fetchHistory;let foreignReads=0;
+    try{sessionsService.fetchHistory=async()=>{foreignReads++;throw Error('must not read foreign history');};await reportDotTasks();assert.equal(foreignReads,0);}
+    finally{sessionsService.fetchHistory=fetch;}
     dotService.forget(uid,memory.id,1);assert.equal(dotDb.memories(uid).length,0);
   }finally{closeConnection();if(old===undefined)delete process.env.DATABASE_PATH;else process.env.DATABASE_PATH=old;if(home===undefined)delete process.env.CLOUDCLI_HOME;else process.env.CLOUDCLI_HOME=home;assert.ok(path.resolve(root).startsWith(path.resolve(os.tmpdir())+path.sep));await rm(root,{recursive:true,force:true});}
 });

@@ -62,7 +62,7 @@ export default function LoginForm() {
   return (
     <AuthScreenLayout
       title={remoteLogin?'远程登录 Claudex':t('login.title')}
-      description={remoteLogin?'使用独立远程账号和验证器中的动态验证码。':localIdentity?'从 Claudex 桌面端打开即可使用本机身份；浏览器也可使用原账号登录。':t('login.description')}
+      description={remoteLogin?'成员使用用户名和密码；管理员使用远程账号及动态验证码。':localIdentity?'从 Claudex 桌面端打开即可使用本机身份；浏览器也可使用原账号登录。':t('login.description')}
       footerText={t('login.footerText')}
     >
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -90,7 +90,7 @@ export default function LoginForm() {
         />
 
         <AuthErrorAlert errorMessage={errorMessage || sessionError || ''} />
-        {remoteLogin&&<label className="block space-y-2 text-sm"><span>二次验证码</span><input aria-label="二次验证码" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} required value={formState.otp} onChange={e=>updateField('otp',e.target.value)} className="w-full rounded-lg border bg-background p-3"/></label>}
+        {remoteLogin&&<label className="block space-y-2 text-sm"><span>二次验证码（仅管理员需要）</span><input aria-label="二次验证码" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} value={formState.otp} onChange={e=>updateField('otp',e.target.value)} className="w-full rounded-lg border bg-background p-3"/></label>}
 
         <button
           type="submit"

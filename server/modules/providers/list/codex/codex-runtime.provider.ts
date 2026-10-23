@@ -14,6 +14,7 @@
 import { Codex } from '@openai/codex-sdk';
 import type { ModelReasoningEffort, Thread, ThreadOptions } from '@openai/codex-sdk';
 
+import { getCurrentUserContext } from '@/modules/auth/index.js';
 import {
   appendFilesInputTag,
   buildCodexInputItems,
@@ -308,7 +309,8 @@ async function queryCodex(
   const sessionKey = () => sessionId || capturedSessionId || null;
 
   try {
-    codex = new Codex();
+    const env = getCurrentUserContext()?.env ?? process.env;
+    codex = new Codex({ env: Object.fromEntries(Object.entries(env).filter((entry): entry is [string, string] => entry[1] !== undefined)) });
 
     const threadOptions: ThreadOptions = {
       workingDirectory,

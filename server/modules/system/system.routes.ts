@@ -1,4 +1,5 @@
 import express from 'express';
+import { requireSharedResourceAdministrator } from '@/modules/auth/index.js';
 
 import type { createSystemUpdateService } from './system.service.js';
 
@@ -8,7 +9,7 @@ export function createSystemRouter(
 ): express.Router {
   const router = express.Router();
 
-  router.post('/update', async (_request, response, next) => {
+  router.post('/update', requireSharedResourceAdministrator, async (_request, response, next) => {
     try {
       const result = await systemUpdateService.updateSystem();
       response.status(result.success ? 200 : 500).json(result);

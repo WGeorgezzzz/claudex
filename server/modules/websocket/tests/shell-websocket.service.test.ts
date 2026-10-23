@@ -1,3 +1,5 @@
+import { installAuthorizationFixture, testUserId } from '../../access-control/tests/authorization-fixture.js';
+import { getConnection } from '@/modules/database/index.js';
 import assert from 'node:assert/strict';
 import { execFileSync, spawn } from 'node:child_process';
 import { EventEmitter } from 'node:events';
@@ -8,13 +10,26 @@ import test from 'node:test';
 
 import { WebSocket } from 'ws';
 
-import { handleShellConnection } from '@/modules/websocket/services/shell-websocket.service.js';
+import { handleShellConnection as handleAuthenticatedShellConnection } from '@/modules/websocket/services/shell-websocket.service.js';
+
+installAuthorizationFixture();
+function handleShellConnection(ws: Parameters<typeof handleAuthenticatedShellConnection>[0], deps: Parameters<typeof handleAuthenticatedShellConnection>[1]) {
+  handleAuthenticatedShellConnection(ws, deps, testUserId());
+}
 
 function createFakeSocket() {
   const socket = new EventEmitter() as EventEmitter & {
     readyState: number;
     frames: string[];
     send: (data: string) => void;
+  };
+  const emit = socket.emit.bind(socket);
+  socket.emit = (event: string | symbol, ...args: unknown[]) => {
+    if (event === 'message') {
+      const data = JSON.parse(String(args[0]));
+      if (data.hasSession && data.sessionId) getConnection().prepare('INSERT OR IGNORE INTO sessions(session_id,provider,owner_id) VALUES (?, ?, ?)').run(data.sessionId, data.provider || 'claude', testUserId());
+    }
+    return emit(event, ...args);
   };
   socket.readyState = WebSocket.OPEN;
   socket.frames = [];

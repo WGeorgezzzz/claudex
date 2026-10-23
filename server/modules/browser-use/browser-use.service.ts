@@ -1,5 +1,5 @@
 import { createRequire } from 'node:module';
-import { randomBytes, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -7,6 +7,9 @@ import path from 'node:path';
 // cross-spawn: drop-in spawn with Windows .cmd/PATHEXT resolution.
 import spawn from 'cross-spawn';
 
+import { getUserContext, getCurrentUserContext } from '@/modules/auth/index.js';
+import { issueBrowserMcpToken, resolveBrowserMcpToken, requireContextUserId } from '@/modules/access-control/index.js';
+import { AppError } from '@/shared/index.js';
 import { appConfigDb } from '@/modules/database/index.js';
 import { providerMcpService } from '@/modules/providers/index.js';
 import { getModuleDirectory, getCloudCliHomeDir } from '@/shared/utils.js';
@@ -18,7 +21,6 @@ const __dirname = getModuleDirectory(import.meta.url);
 const MAX_SESSIONS_PER_OWNER = Number.parseInt(process.env.CLOUDCLI_BROWSER_USE_MAX_SESSIONS_PER_OWNER || '3', 10);
 const SESSION_TTL_MS = Number.parseInt(process.env.CLOUDCLI_BROWSER_USE_SESSION_TTL_MS || String(30 * 60 * 1000), 10);
 const BROWSER_USE_SETTINGS_KEY = 'browser_use_settings';
-const BROWSER_USE_MCP_TOKEN_KEY = 'browser_use_mcp_token';
 
 type BrowserUseRuntime = ReturnType<typeof getBrowserUseRuntime>;
 type BrowserUseSessionStatus = 'ready' | 'stopped' | 'unavailable';
@@ -80,7 +82,11 @@ let runtimeProbeCache: { value: RuntimeProbe; updatedAt: number } | null = null;
 const DEFAULT_SETTINGS: BrowserUseSettings = {
   enabled: false,
 };
-const AGENT_OWNER_ID = 'agent';
+function agentOwnerId(): string { return String(requireContextUserId()); }
+function settingsKey(): string {
+  const user = getCurrentUserContext();
+  return user?.role === 'member' ? BROWSER_USE_SETTINGS_KEY + ':' + user.userId : BROWSER_USE_SETTINGS_KEY;
+}
 const PROFILE_ROOT = path.join(getCloudCliHomeDir(), 'browser-use', 'profiles');
 const MCP_SERVER_NAME = 'cloudcli-browser';
 const LEGACY_MCP_SERVER_NAMES = ['cloudcli-browser-use'];
@@ -88,7 +94,7 @@ const RUNTIME_READINESS_CACHE_TTL_MS = 30_000;
 
 function readSettings(): BrowserUseSettings {
   try {
-    const raw = appConfigDb.get(BROWSER_USE_SETTINGS_KEY);
+    const raw = appConfigDb.get(settingsKey());
     if (!raw) {
       return DEFAULT_SETTINGS;
     }
@@ -108,19 +114,11 @@ function writeSettings(settings: BrowserUseSettings): BrowserUseSettings {
     enabled: settings.enabled === true,
   };
 
-  appConfigDb.set(BROWSER_USE_SETTINGS_KEY, JSON.stringify(normalized));
+  appConfigDb.set(settingsKey(), JSON.stringify(normalized));
   return normalized;
 }
 
-function getOrCreateMcpToken(): string {
-  const existing = appConfigDb.get(BROWSER_USE_MCP_TOKEN_KEY);
-  if (existing) {
-    return existing;
-  }
-  const token = randomBytes(32).toString('hex');
-  appConfigDb.set(BROWSER_USE_MCP_TOKEN_KEY, token);
-  return token;
-}
+function getOrCreateMcpToken(): string { return issueBrowserMcpToken(requireContextUserId()); }
 
 function getSetupMessage(settings: BrowserUseSettings, readiness: RuntimeReadiness): string {
   if (!settings.enabled) {
@@ -189,7 +187,8 @@ function getProfilePath(profileName: string): string {
     .replace(/[^a-z0-9._-]+/g, '-')
     .replace(/^-+|-+$/g, '')
     .slice(0, 80) || 'default';
-  return path.join(PROFILE_ROOT, safeName);
+  const user = getCurrentUserContext();
+  return path.join(PROFILE_ROOT, ...(user?.role === 'member' ? [String(user.userId)] : []), safeName);
 }
 
 function probeRuntime(): RuntimeProbe {
@@ -448,7 +447,7 @@ export const browserUseService = {
       playwrightInstalled: readiness.playwrightInstalled,
       chromiumInstalled: readiness.chromiumInstalled,
       installInProgress: readiness.installInProgress,
-      sessionCount: sessions.size,
+      sessionCount: ownerSessions(agentOwnerId()).length,
       message: available
         ? 'Browser runtime is available.'
         : getSetupMessage(settings, readiness),
@@ -465,11 +464,17 @@ export const browserUseService = {
       command,
       args,
       env: {
-        CLOUDCLI_BROWSER_USE_MCP_TOKEN: getOrCreateMcpToken(),
         CLOUDCLI_BROWSER_USE_API_URL: getMcpApiUrl(),
       },
     });
     return { name: MCP_SERVER_NAME, command, args, results };
+  },
+
+  /** MCP ingress resolves a signed token to a live account; payload fields cannot choose the owner. */
+  resolveMcpUserId(token: string): number | null {
+    const id = resolveBrowserMcpToken(token);
+    if (!id) return null;
+    try { return getUserContext(id).userId; } catch { return null; }
   },
 
   getMcpToken() {
@@ -494,7 +499,7 @@ export const browserUseService = {
   async listSessions() {
     await expireStaleSessions();
     return [...sessions.values()]
-      .filter((session) => session.ownerId === AGENT_OWNER_ID)
+      .filter((session) => session.ownerId === agentOwnerId())
       .map(publicSession);
   },
 
@@ -510,7 +515,7 @@ export const browserUseService = {
     const now = new Date().toISOString();
     const session: BrowserUseSession = {
       id: randomUUID(),
-      ownerId: AGENT_OWNER_ID,
+      ownerId: agentOwnerId(),
       createdBy: 'agent',
       runtime: getBrowserUseRuntime(),
       status: 'unavailable',
@@ -526,7 +531,7 @@ export const browserUseService = {
       cursor: null,
     };
 
-    const activeOwnerSessions = ownerSessions(AGENT_OWNER_ID).filter((item) => item.status === 'ready');
+    const activeOwnerSessions = ownerSessions(agentOwnerId()).filter((item) => item.status === 'ready');
     if (activeOwnerSessions.length >= MAX_SESSIONS_PER_OWNER) {
       throw new Error(`Browser is limited to ${MAX_SESSIONS_PER_OWNER} active agent sessions.`);
     }
@@ -577,7 +582,7 @@ export const browserUseService = {
     }
     await expireStaleSessions();
     return [...sessions.values()]
-      .filter((session) => session.ownerId === AGENT_OWNER_ID)
+      .filter((session) => session.ownerId === agentOwnerId())
       .map(publicSession);
   },
 
@@ -587,8 +592,8 @@ export const browserUseService = {
       throw new Error('Browser agent tools are disabled.');
     }
     const session = sessions.get(sessionId);
-    if (!session || session.ownerId !== AGENT_OWNER_ID) {
-      throw new Error('Browser session not found.');
+    if (!session || session.ownerId !== agentOwnerId()) {
+      throw new AppError('无权访问此浏览器会话。', { statusCode: 403 });
     }
     return session;
   },
@@ -598,7 +603,7 @@ export const browserUseService = {
     await expireStaleSessions();
 
     const session = sessions.get(sessionId);
-    if (!session || session.ownerId !== AGENT_OWNER_ID) {
+    if (!session || session.ownerId !== agentOwnerId()) {
       throw new Error('Browser session not found.');
     }
 
@@ -788,8 +793,8 @@ export const browserUseService = {
 
   async stopSession(sessionId: string) {
     const session = sessions.get(sessionId);
-    if (!session || session.ownerId !== AGENT_OWNER_ID) {
-      return { stopped: false };
+    if (!session || session.ownerId !== agentOwnerId()) {
+      throw new AppError('无权访问此浏览器会话。', { statusCode: 403 });
     }
 
     await closeHandle(sessionId);
@@ -803,8 +808,8 @@ export const browserUseService = {
 
   async deleteSession(sessionId: string) {
     const session = sessions.get(sessionId);
-    if (!session || session.ownerId !== AGENT_OWNER_ID) {
-      return { deleted: false };
+    if (!session || session.ownerId !== agentOwnerId()) {
+      throw new AppError('无权访问此浏览器会话。', { statusCode: 403 });
     }
 
     await closeHandle(sessionId);
@@ -818,7 +823,8 @@ export const browserUseService = {
   },
 
   async stopAllSessions() {
-    await Promise.all([...sessions.keys()].map(async (sessionId) => {
+    const user = getCurrentUserContext();
+    await Promise.all([...sessions.keys()].filter(id => !user || sessions.get(id)?.ownerId === String(user.userId)).map(async (sessionId) => {
       await closeHandle(sessionId);
       const session = sessions.get(sessionId);
       if (session) {

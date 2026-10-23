@@ -1,4 +1,5 @@
-import { monitorsDb, sessionsDb } from '@/modules/database/index.js';
+import { assertOwnedSession } from '@/modules/access-control/index.js';
+import { monitorsDb } from '@/modules/database/index.js';
 import { AppError } from '@/shared/utils.js';
 import { parseMonitorCalendarSchedule } from '@/shared/index.js';
 
@@ -14,7 +15,7 @@ export const monitorsService = {
       typeof intervalMinutes!=='number' || !Number.isInteger(intervalMinutes) || intervalMinutes<1 || intervalMinutes>10_080) {
       throw new AppError('请填写名称、检查内容和 1–10080 分钟的整数间隔。',{code:'INVALID_MONITOR',statusCode:400});
     }
-    const session=sessionsDb.getSessionById(sessionId);
+    const session=assertOwnedSession(userId, sessionId);
     if (!session || session.provider!=='claude' || session.isArchived) {
       throw new AppError('请选择一个未归档的 Claude 会话。',{code:'INVALID_MONITOR_SESSION',statusCode:400});
     }
@@ -27,7 +28,7 @@ export const monitorsService = {
     safeOptions.permissionMode ??= 'default';
     return monitorsDb.create({userId,sessionId,name,content,intervalMinutes,schedule,options:safeOptions});
   },
-  list(userId: number,sessionId?: string) {return monitorsDb.list(userId,sessionId);},
+  list(userId: number,sessionId?: string) {if(sessionId) assertOwnedSession(userId,sessionId); return monitorsDb.list(userId,sessionId);},
   update(userId: number,id: string,input: Record<string,unknown>) {
     const row=this.require(userId,id);
     if(row.status==='stopped')throw new AppError('已停止的监测不能修改。',{code:'MONITOR_CONFLICT',statusCode:409});
@@ -45,6 +46,7 @@ export const monitorsService = {
   require(userId: number,id: string) {
     const row=monitorsDb.get(userId,id);
     if(!row) throw new AppError('监测任务不存在。',{code:'MONITOR_NOT_FOUND',statusCode:404});
+    assertOwnedSession(userId, row.session_id);
     return row;
   },
   action(userId: number,id: string,action: unknown) {

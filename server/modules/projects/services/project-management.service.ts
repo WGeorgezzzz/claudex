@@ -1,3 +1,4 @@
+import { getCurrentUserContext, assertUserPath } from '@/modules/auth/index.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
@@ -97,6 +98,8 @@ export async function createProject(
     });
   }
 
+  const context = getCurrentUserContext();
+  if (context) assertUserPath(context.userId, normalizedPath);
   const pathValidation = await dependencies.validatePath(normalizedPath);
   if (!pathValidation.valid || !pathValidation.resolvedPath) {
     throw new AppError('Invalid project path', {

@@ -8,7 +8,7 @@ import { AppError } from '@/shared/index.js';
 /** Auth routes advertise SSO only for the explicitly configured private remote entry. */
 export function isAccessSsoEnabled(req: IncomingMessage): boolean {
   return process.env.CLAUDEX_PRIVATE_GATE === '1'
-    && Boolean(process.env.CLAUDEX_ACCESS_SSO_EMAIL?.trim())
+    && (Boolean(process.env.CLAUDEX_ACCESS_SSO_EMAIL?.trim()) || userDb.hasSsoUsers())
     && !isLocalRequest(req);
 }
 
@@ -20,12 +20,10 @@ export async function exchangeAccessIdentity(req: IncomingMessage) {
   // Parse claims only after the full signature, issuer, audience, expiry and origin checks.
   const assertion = req.headers['cf-access-jwt-assertion'] as string;
   const claims = JSON.parse(Buffer.from(assertion.split('.')[1], 'base64url').toString()) as { email: string; exp: number };
-  if (claims.email.toLowerCase() !== process.env.CLAUDEX_ACCESS_SSO_EMAIL!.trim().toLowerCase()) {
-    throw new AppError('This identity is not mapped to the workspace owner.', { statusCode: 403 });
-  }
-  const remote = authSessionsDb.remote();
-  const user = remote && userDb.getUserById(remote.user_id);
-  if (!user) throw new AppError('Configure the workspace owner locally first.', { statusCode: 409 });
+  const email = typeof claims.email === 'string' ? claims.email.trim().toLowerCase() : '';
+  const user = email && email === process.env.CLAUDEX_ACCESS_SSO_EMAIL?.trim().toLowerCase()
+    ? userDb.getFirstUser() : email ? userDb.getUserBySsoEmail(email) : undefined;
+  if (!user) throw new AppError('This identity is not mapped to an active account.', { statusCode: 403 });
   // One session per signed Access credential: refresh cannot silently undo device revocation.
   const id = 'access-' + createHash('sha256').update(assertion).digest('hex');
   const expires = Math.min(claims.exp * 1000, Date.now() + 30 * 86400000);

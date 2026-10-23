@@ -15,7 +15,7 @@ type BcryptAdapter = {
 // composition root narrows its CommonJS runtime surface before injecting it.
 const require = createRequire(import.meta.url);
 const bcrypt = require('bcrypt') as BcryptAdapter;
-const databaseConnection = getConnection();
+// Connections are resolved on use to tolerate the auth/ownership module cycle.
 
 const authService = createAuthService({
   users: {
@@ -25,9 +25,9 @@ const authService = createAuthService({
     updateLastLogin: (userId) => userDb.updateLastLogin(userId),
   },
   transaction: {
-    begin: () => databaseConnection.prepare('BEGIN').run(),
-    commit: () => databaseConnection.prepare('COMMIT').run(),
-    rollback: () => databaseConnection.prepare('ROLLBACK').run(),
+    begin: () => getConnection().prepare('BEGIN').run(),
+    commit: () => getConnection().prepare('COMMIT').run(),
+    rollback: () => getConnection().prepare('ROLLBACK').run(),
   },
   hashPassword: (password) => bcrypt.hash(password, 12),
   comparePassword: (password, passwordHash) => bcrypt.compare(password, passwordHash),

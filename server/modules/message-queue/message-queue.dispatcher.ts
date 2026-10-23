@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 
-import { messageQueueDb, sessionDraftsDb, sessionsDb } from '@/modules/database/index.js';
+import { withUserContext } from '@/modules/auth/index.js';
+import { getSessionOwnerId, messageQueueDb, sessionDraftsDb, sessionsDb } from '@/modules/database/index.js';
 import { sessionsService } from '@/modules/providers/index.js';
 import { chatRunRegistry, runDetachedChatTurn } from '@/modules/websocket/index.js';
 import type { ProviderRuntimeGateway } from '@/modules/websocket/index.js';
@@ -34,7 +35,8 @@ export function importLegacyQueuedMessages(): void {
 async function executeClaim(row: QueuedTurnRecord, runtime: ProviderRuntimeGateway): Promise<void> {
   let terminal=false, providerError: string|null=null;
   try {
-    const session=sessionsDb.getSessionById(row.session_id);
+    if (getSessionOwnerId(row.session_id)!==row.user_id) throw new Error('Conversation owner no longer matches queued message.');
+    const session=withUserContext(row.user_id,()=>sessionsDb.getSessionById(row.session_id));
     if (!session || session.isArchived) throw new Error('Conversation was removed or archived before dispatch.');
     const observed: ProviderRuntimeGateway=Object.create(runtime);
     observed.run=async(provider,command,options,writer)=>runtime.run(provider,command,options,{
@@ -55,10 +57,10 @@ async function executeClaim(row: QueuedTurnRecord, runtime: ProviderRuntimeGatew
         writer.send(data);
       },
     });
-    const outcome=await runDetachedChatTurn({
+    const outcome=await withUserContext(row.user_id,()=>runDetachedChatTurn({
       sessionId:row.session_id,userId:row.user_id,content:row.content,
       options:JSON.parse(row.options),interruptActiveRun:false,
-    },{runtime:observed});
+    },{runtime:observed}));
     if (!outcome.started && /run (?:was |is )already in progress/i.test(outcome.error||'')) {
       messageQueueDb.defer(row);
     } else if (!terminal) {

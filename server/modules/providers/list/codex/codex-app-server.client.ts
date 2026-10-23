@@ -3,6 +3,7 @@ import { stat } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import readline from 'node:readline';
 
+import { getCurrentUserContext } from '@/modules/auth/index.js';
 import { AppError } from '@/shared/utils.js';
 
 /**
@@ -76,7 +77,7 @@ async function withAppServer<T>(
   const launcher = resolveCodexLauncher();
   const child = spawn(process.execPath, [launcher, 'app-server'], {
     windowsHide: true,
-    env: process.env,
+    env: getCurrentUserContext()?.env ?? process.env,
     stdio: ['pipe', 'pipe', 'pipe'],
   });
 

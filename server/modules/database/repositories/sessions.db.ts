@@ -1,8 +1,10 @@
+import { ownerPredicate } from '../ownership.js';
 import { getConnection } from '@/modules/database/connection.js';
 import { projectsDb } from '@/modules/database/repositories/projects.db.js';
 import { normalizeProjectPath } from '@/shared/utils.js';
 
 type SessionRow = {
+  owner_id: number | null;
   session_id: string;
   provider: string;
   provider_session_id: string | null;
@@ -26,7 +28,7 @@ type RecentSessionsPage = {
 };
 
 const SESSION_ROW_COLUMNS =
-  'session_id, provider, provider_session_id, project_path, jsonl_path, custom_name, model, effort, forked_from_session_id, isArchived, created_at, updated_at';
+  'owner_id, session_id, provider, provider_session_id, project_path, jsonl_path, custom_name, model, effort, forked_from_session_id, isArchived, created_at, updated_at';
 
 const SQLITE_UTC_TIMESTAMP_REGEX = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/;
 
@@ -101,7 +103,7 @@ export const sessionsDb = {
     const existing = db
       .prepare(
         `SELECT session_id FROM sessions
-         WHERE provider_session_id = ? AND provider = ?
+         WHERE ${ownerPredicate()} AND provider_session_id = ? AND provider = ?
          LIMIT 1`
       )
       .get(providerSessionId, provider) as { session_id: string } | undefined;
@@ -118,7 +120,7 @@ export const sessionsDb = {
              WHEN session_id <> provider_session_id AND custom_name IS NOT NULL THEN custom_name
              ELSE COALESCE(?, custom_name)
            END
-         WHERE session_id = ?`
+         WHERE ${ownerPredicate()} AND session_id = ?`
       ).run(
         provider,
         updatedAtValue,
@@ -150,7 +152,7 @@ export const sessionsDb = {
            WHEN sessions.session_id <> sessions.provider_session_id AND sessions.custom_name IS NOT NULL
              THEN sessions.custom_name
            ELSE COALESCE(excluded.custom_name, sessions.custom_name)
-         END`
+         END WHERE ${ownerPredicate('sessions')}`
     ).run(
       providerSessionId,
       provider,
@@ -222,7 +224,7 @@ export const sessionsDb = {
     // id is the provider-native one, which is what this row claims, so replace
     // it rather than leaving two sidebar entries for one conversation.
     db.transaction(() => {
-      db.prepare('DELETE FROM sessions WHERE session_id = ? AND session_id <> ?')
+      db.prepare(`DELETE FROM sessions WHERE ${ownerPredicate()} AND session_id = ? AND session_id <> ?`)
         .run(input.providerSessionId, input.sessionId);
       db.prepare(
         `INSERT INTO sessions (session_id, provider, provider_session_id, custom_name, project_path, jsonl_path, model, effort, forked_from_session_id, isArchived, created_at, updated_at)
@@ -259,21 +261,21 @@ export const sessionsDb = {
       const duplicate = db
         .prepare(
           `SELECT ${SESSION_ROW_COLUMNS} FROM sessions
-           WHERE (session_id = ? OR provider_session_id = ?)
+           WHERE ${ownerPredicate()} AND (session_id = ? OR provider_session_id = ?)
              AND session_id <> ?
            LIMIT 1`
         )
         .get(providerSessionId, providerSessionId, sessionId) as SessionRow | undefined;
 
       if (duplicate) {
-        db.prepare('DELETE FROM sessions WHERE session_id = ?').run(duplicate.session_id);
+        db.prepare(`DELETE FROM sessions WHERE ${ownerPredicate()} AND session_id = ?`).run(duplicate.session_id);
         db.prepare(
           `UPDATE sessions SET
              provider_session_id = ?,
              jsonl_path = COALESCE(jsonl_path, ?),
              custom_name = COALESCE(custom_name, ?),
              updated_at = CURRENT_TIMESTAMP
-           WHERE session_id = ?`
+           WHERE ${ownerPredicate()} AND session_id = ?`
         ).run(providerSessionId, duplicate.jsonl_path, duplicate.custom_name, sessionId);
         return;
       }
@@ -282,7 +284,7 @@ export const sessionsDb = {
         `UPDATE sessions SET
            provider_session_id = ?,
            updated_at = CURRENT_TIMESTAMP
-         WHERE session_id = ?`
+         WHERE ${ownerPredicate()} AND session_id = ?`
       ).run(providerSessionId, sessionId);
     });
 
@@ -309,14 +311,14 @@ export const sessionsDb = {
     const db = getConnection();
 
     db.transaction(() => {
-      db.prepare('DELETE FROM sessions WHERE session_id = ? AND session_id <> ?')
+      db.prepare(`DELETE FROM sessions WHERE ${ownerPredicate()} AND session_id = ? AND session_id <> ?`)
         .run(input.providerSessionId, sessionId);
       db.prepare(
         `UPDATE sessions SET
            provider_session_id = ?,
            jsonl_path = ?,
            updated_at = CURRENT_TIMESTAMP
-         WHERE session_id = ?`
+         WHERE ${ownerPredicate()} AND session_id = ?`
       ).run(input.providerSessionId, input.jsonlPath, sessionId);
     })();
   },
@@ -335,7 +337,7 @@ export const sessionsDb = {
          provider_session_id = NULL,
          jsonl_path = NULL,
          updated_at = CURRENT_TIMESTAMP
-       WHERE session_id = ?`
+       WHERE ${ownerPredicate()} AND session_id = ?`
     ).run(sessionId);
   },
 
@@ -369,7 +371,7 @@ export const sessionsDb = {
     const row = db
       .prepare(
         `SELECT 1 AS found FROM superseded_provider_sessions
-         WHERE provider_session_id = ? AND provider = ?
+         WHERE session_id IN (SELECT session_id FROM sessions WHERE ${ownerPredicate()}) AND provider_session_id = ? AND provider = ?
          LIMIT 1`
       )
       .get(providerSessionId, provider) as { found: number } | undefined;
@@ -389,7 +391,7 @@ export const sessionsDb = {
     const rows = db
       .prepare(
         `SELECT jsonl_path FROM superseded_provider_sessions
-         WHERE session_id = ? AND jsonl_path IS NOT NULL`
+         WHERE session_id IN (SELECT session_id FROM sessions WHERE ${ownerPredicate()}) AND session_id = ? AND jsonl_path IS NOT NULL`
       )
       .all(sessionId) as Array<{ jsonl_path: string }>;
 
@@ -405,7 +407,7 @@ export const sessionsDb = {
    */
   clearSupersededProviderSessions(sessionId: string): void {
     const db = getConnection();
-    db.prepare('DELETE FROM superseded_provider_sessions WHERE session_id = ?').run(sessionId);
+    db.prepare(`DELETE FROM superseded_provider_sessions WHERE session_id IN (SELECT session_id FROM sessions WHERE ${ownerPredicate()}) AND session_id = ?`).run(sessionId);
   },
 
   /**
@@ -420,7 +422,7 @@ export const sessionsDb = {
     db.prepare(
       `UPDATE sessions
        SET model = ?
-       WHERE session_id = ?`
+       WHERE ${ownerPredicate()} AND session_id = ?`
     ).run(model, sessionId);
   },
 
@@ -435,7 +437,7 @@ export const sessionsDb = {
     db.prepare(
       `UPDATE sessions
        SET effort = ?
-       WHERE session_id = ?`
+       WHERE ${ownerPredicate()} AND session_id = ?`
     ).run(effort, sessionId);
   },
 
@@ -444,7 +446,7 @@ export const sessionsDb = {
     db.prepare(
       `UPDATE sessions
        SET custom_name = ?
-       WHERE session_id = ?`
+       WHERE ${ownerPredicate()} AND session_id = ?`
     ).run(customName, sessionId);
   },
 
@@ -454,7 +456,7 @@ export const sessionsDb = {
       .prepare(
         `SELECT ${SESSION_ROW_COLUMNS}
          FROM sessions
-         WHERE session_id = ?
+         WHERE ${ownerPredicate()} AND session_id = ?
          ORDER BY updated_at DESC
          LIMIT 1`
       )
@@ -476,7 +478,7 @@ export const sessionsDb = {
       .prepare(
         `SELECT ${SESSION_ROW_COLUMNS}
          FROM sessions
-         WHERE provider_session_id = ?
+         WHERE ${ownerPredicate()} AND provider_session_id = ?
          ORDER BY updated_at DESC
          LIMIT 1`
       )
@@ -510,7 +512,7 @@ export const sessionsDb = {
       .prepare(
         `SELECT ${SESSION_ROW_COLUMNS}
          FROM sessions
-         WHERE provider = ?
+         WHERE ${ownerPredicate()} AND provider = ?
            AND project_path = ?
            AND provider_session_id IS NULL
            AND isArchived = 0
@@ -528,7 +530,7 @@ export const sessionsDb = {
       .prepare(
         `SELECT ${SESSION_ROW_COLUMNS}
          FROM sessions
-         WHERE isArchived = 0`
+         WHERE ${ownerPredicate()} AND isArchived = 0`
       )
       .all() as SessionRow[];
 
@@ -546,7 +548,7 @@ export const sessionsDb = {
   getRecentSessionsPage(limit: number, offset: number): RecentSessionsPage {
     const db = getConnection();
     const visibilityClause = `
-      sessions.isArchived = 0
+      ${ownerPredicate('sessions')} AND sessions.isArchived = 0
       AND NOT EXISTS (SELECT 1 FROM side_chats side WHERE side.child_session_id=sessions.session_id AND side.status<>'promoted')
       AND (projects.isArchived IS NULL OR projects.isArchived = 0)
     `;
@@ -586,7 +588,7 @@ export const sessionsDb = {
       .prepare(
         `SELECT ${SESSION_ROW_COLUMNS}
          FROM sessions
-         WHERE isArchived = 1
+         WHERE ${ownerPredicate()} AND isArchived = 1
          ORDER BY datetime(COALESCE(updated_at, created_at)) DESC, session_id DESC`
       )
       .all() as SessionRow[];
@@ -601,7 +603,7 @@ export const sessionsDb = {
       .prepare(
         `SELECT ${SESSION_ROW_COLUMNS}
          FROM sessions
-         WHERE project_path = ?
+         WHERE ${ownerPredicate()} AND project_path = ?
            AND isArchived = 0
            AND NOT EXISTS (SELECT 1 FROM side_chats side WHERE side.child_session_id=sessions.session_id AND side.status<>'promoted')`
       )
@@ -621,7 +623,7 @@ export const sessionsDb = {
       .prepare(
         `SELECT ${SESSION_ROW_COLUMNS}
          FROM sessions
-         WHERE project_path = ?`
+         WHERE ${ownerPredicate()} AND project_path = ?`
       )
       .all(normalizedProjectPath) as SessionRow[];
 
@@ -635,7 +637,7 @@ export const sessionsDb = {
       .prepare(
         `SELECT ${SESSION_ROW_COLUMNS}
          FROM sessions
-         WHERE project_path = ?
+         WHERE ${ownerPredicate()} AND project_path = ?
            AND isArchived = 0
            AND NOT EXISTS (SELECT 1 FROM side_chats side WHERE side.child_session_id=sessions.session_id AND side.status<>'promoted')
          ORDER BY datetime(COALESCE(updated_at, created_at)) DESC, session_id DESC
@@ -653,7 +655,7 @@ export const sessionsDb = {
       .prepare(
         `SELECT COUNT(*) AS count
          FROM sessions
-         WHERE project_path = ?
+         WHERE ${ownerPredicate()} AND project_path = ?
            AND isArchived = 0
            AND NOT EXISTS (SELECT 1 FROM side_chats side WHERE side.child_session_id=sessions.session_id AND side.status<>'promoted')`
       )
@@ -665,7 +667,7 @@ export const sessionsDb = {
   deleteSessionsByProjectPath(projectPath: string): void {
     const db = getConnection();
     const normalizedProjectPath = normalizeProjectPath(projectPath);
-    db.prepare(`DELETE FROM sessions WHERE project_path = ?`).run(normalizedProjectPath);
+    db.prepare(`DELETE FROM sessions WHERE ${ownerPredicate()} AND project_path = ?`).run(normalizedProjectPath);
   },
 
   getSessionName(sessionId: string, provider: string): string | null {
@@ -674,7 +676,7 @@ export const sessionsDb = {
       .prepare(
         `SELECT custom_name
          FROM sessions
-         WHERE session_id = ? AND provider = ?`
+         WHERE ${ownerPredicate()} AND session_id = ? AND provider = ?`
       )
       .get(sessionId, provider) as { custom_name: string | null } | undefined;
 
@@ -690,20 +692,20 @@ export const sessionsDb = {
     db.prepare(
       `UPDATE sessions
        SET isArchived = ?
-       WHERE session_id = ?`
+       WHERE ${ownerPredicate()} AND session_id = ?`
     ).run(isArchived ? 1 : 0, sessionId);
   },
 
   deleteSessionById(sessionId: string): boolean {
     const db = getConnection();
-    return db.prepare('DELETE FROM sessions WHERE session_id = ?').run(sessionId).changes > 0;
+    return db.prepare(`DELETE FROM sessions WHERE ${ownerPredicate()} AND session_id = ?`).run(sessionId).changes > 0;
   },
 
   /** Used by the OpenCode synchronizer to remove indexed child sessions by their native id. */
   deleteSessionByProviderSessionId(providerSessionId: string, provider: string): boolean {
     const db = getConnection();
     return db
-      .prepare('DELETE FROM sessions WHERE provider_session_id = ? AND provider = ?')
+      .prepare(`DELETE FROM sessions WHERE ${ownerPredicate()} AND provider_session_id = ? AND provider = ?`)
       .run(providerSessionId, provider).changes > 0;
   },
 
@@ -722,7 +724,7 @@ export const sessionsDb = {
       .prepare(
         `SELECT session_id, jsonl_path
          FROM sessions
-         WHERE jsonl_path IS NOT NULL AND jsonl_path <> ''`
+         WHERE ${ownerPredicate()} AND jsonl_path IS NOT NULL AND jsonl_path <> ''`
       )
       .all() as Array<{ session_id: string; jsonl_path: string }>;
   },

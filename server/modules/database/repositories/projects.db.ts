@@ -1,9 +1,11 @@
+import { getCurrentUserContext, assertUserPath } from '@/modules/auth/index.js';
+import { ownerPredicate } from '../ownership.js';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 
 import { getConnection } from '@/modules/database/connection.js';
 import type { CreateProjectPathResult, ProjectRepositoryRow } from '@/shared/types.js';
-import { normalizeProjectPath } from '@/shared/utils.js';
+import { AppError, normalizeProjectPath } from '@/shared/utils.js';
 
 function normalizeProjectDisplayName(projectPath: string, customProjectName: string | null): string {
     const trimmedCustomName = typeof customProjectName === 'string' ? customProjectName.trim() : '';
@@ -17,16 +19,20 @@ function normalizeProjectDisplayName(projectPath: string, customProjectName: str
 
 export const projectsDb = {
     createProjectPath(projectPath: string, customProjectName: string | null = null): CreateProjectPathResult {
+        const context = getCurrentUserContext();
+        if (context) assertUserPath(context.userId, projectPath);
         const db = getConnection();
         const normalizedProjectPath = normalizeProjectPath(projectPath);
         const normalizedProjectName = normalizeProjectDisplayName(normalizedProjectPath, customProjectName);
         const attemptedId = randomUUID();
+        const foreignOwner = db.prepare(`SELECT 1 FROM projects WHERE project_path=? AND NOT (${ownerPredicate()})`).get(normalizedProjectPath);
+        if (foreignOwner) throw new AppError('Project belongs to another user', {code: 'PROJECT_FORBIDDEN', statusCode: 403});
         const row = db.prepare(`
         INSERT INTO projects (project_id, project_path, custom_project_name, isArchived)
             VALUES (?, ?, ?, 0)
             ON CONFLICT(project_path) DO UPDATE SET
             isArchived = 0
-            WHERE projects.isArchived = 1
+            WHERE ${ownerPredicate('projects')} AND projects.isArchived = 1
             RETURNING project_id, project_path, custom_project_name, isStarred, isArchived
         `).get(attemptedId, normalizedProjectPath, normalizedProjectName) as ProjectRepositoryRow | undefined;
 
@@ -50,7 +56,7 @@ export const projectsDb = {
         const row = db.prepare(`
             SELECT project_id, project_path, custom_project_name, isStarred, isArchived
             FROM projects
-            WHERE project_path = ?
+            WHERE ${ownerPredicate()} AND project_path = ?
         `).get(normalizedProjectPath) as ProjectRepositoryRow | undefined;
 
         return row ?? null;
@@ -61,7 +67,7 @@ export const projectsDb = {
         const row = db.prepare(`
             SELECT project_id, project_path, custom_project_name, isStarred, isArchived
             FROM projects
-            WHERE project_id = ?
+            WHERE ${ownerPredicate()} AND project_id = ?
         `).get(projectId) as ProjectRepositoryRow | undefined;
 
         return row ?? null;
@@ -80,7 +86,7 @@ export const projectsDb = {
         const row = db.prepare(`
             SELECT project_path
             FROM projects
-            WHERE project_id = ?
+            WHERE ${ownerPredicate()} AND project_id = ?
         `).get(projectId) as Pick<ProjectRepositoryRow, 'project_path'> | undefined;
 
         return row?.project_path ?? null;
@@ -91,7 +97,7 @@ export const projectsDb = {
         return db.prepare(`
             SELECT project_id, project_path, custom_project_name, isStarred, isArchived
             FROM projects
-            WHERE isArchived = 0
+            WHERE ${ownerPredicate()} AND isArchived = 0
         `).all() as ProjectRepositoryRow[];
     },
 
@@ -104,7 +110,7 @@ export const projectsDb = {
         return db.prepare(`
             SELECT project_id, project_path, custom_project_name, isStarred, isArchived
             FROM projects
-            WHERE isArchived = 1
+            WHERE ${ownerPredicate()} AND isArchived = 1
         `).all() as ProjectRepositoryRow[];
     },
 
@@ -114,7 +120,7 @@ export const projectsDb = {
         const row = db.prepare(`
             SELECT custom_project_name
             FROM projects
-            WHERE project_path = ?
+            WHERE ${ownerPredicate()} AND project_path = ?
         `).get(normalizedProjectPath) as Pick<ProjectRepositoryRow, 'custom_project_name'> | undefined;
 
         return row?.custom_project_name ?? null;
@@ -126,7 +132,7 @@ export const projectsDb = {
         db.prepare(`
             INSERT INTO projects (project_id, project_path, custom_project_name)
             VALUES (?, ?, ?)
-            ON CONFLICT(project_path) DO UPDATE SET custom_project_name = excluded.custom_project_name
+            ON CONFLICT(project_path) DO UPDATE SET custom_project_name = excluded.custom_project_name WHERE ${ownerPredicate('projects')}
         `).run(randomUUID(), normalizedProjectPath, customProjectName);
     },
 
@@ -135,7 +141,7 @@ export const projectsDb = {
         db.prepare(`
             UPDATE projects
             SET custom_project_name = ?
-            WHERE project_id = ?
+            WHERE ${ownerPredicate()} AND project_id = ?
         `).run(customProjectName, projectId);
     },
 
@@ -145,7 +151,7 @@ export const projectsDb = {
         db.prepare(`
             UPDATE projects
             SET isStarred = ?
-            WHERE project_path = ?
+            WHERE ${ownerPredicate()} AND project_path = ?
         `).run(isStarred ? 1 : 0, normalizedProjectPath);
     },
 
@@ -154,7 +160,7 @@ export const projectsDb = {
         db.prepare(`
             UPDATE projects
             SET isStarred = ?
-            WHERE project_id = ?
+            WHERE ${ownerPredicate()} AND project_id = ?
         `).run(isStarred ? 1 : 0, projectId);
     },
 
@@ -164,7 +170,7 @@ export const projectsDb = {
         db.prepare(`
             UPDATE projects
             SET isArchived = ?
-            WHERE project_path = ?
+            WHERE ${ownerPredicate()} AND project_path = ?
         `).run(isArchived ? 1 : 0, normalizedProjectPath);
     },
 
@@ -173,7 +179,7 @@ export const projectsDb = {
         db.prepare(`
             UPDATE projects
             SET isArchived = ?
-            WHERE project_id = ?
+            WHERE ${ownerPredicate()} AND project_id = ?
         `).run(isArchived ? 1 : 0, projectId);
     },
 
@@ -182,7 +188,7 @@ export const projectsDb = {
         const normalizedProjectPath = normalizeProjectPath(projectPath);
         db.prepare(`
             DELETE FROM projects
-            WHERE project_path = ?
+            WHERE ${ownerPredicate()} AND project_path = ?
         `).run(normalizedProjectPath);
     },
 
@@ -190,7 +196,7 @@ export const projectsDb = {
         const db = getConnection();
         db.prepare(`
             DELETE FROM projects
-            WHERE project_id = ?
+            WHERE ${ownerPredicate()} AND project_id = ?
         `).run(projectId);
     },
 };

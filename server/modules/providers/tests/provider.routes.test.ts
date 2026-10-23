@@ -8,7 +8,7 @@ import test from 'node:test';
 
 import express, { type NextFunction, type Request, type Response } from 'express';
 
-import { closeConnection, initializeDatabase, sessionsDb } from '@/modules/database/index.js';
+import { closeConnection, initializeDatabase, sessionsDb, getConnection } from '@/modules/database/index.js';
 import providerRouter from '@/modules/providers/provider.routes.js';
 import { providerRegistry } from '@/modules/providers/provider.registry.js';
 import type { IProvider } from '@/shared/interfaces.js';
@@ -25,8 +25,9 @@ async function withProviderServer(
   process.env.DATABASE_PATH = path.join(tempDirectory, 'auth.db');
   await writeFile(process.env.DATABASE_PATH, '');
   await initializeDatabase();
+  getConnection().prepare("INSERT INTO users(id,username,password_hash,role) VALUES(1,'test-admin','test','admin')").run();
 
-  const app = express().use(express.json()).use('/api/providers', providerRouter);
+  const app = express().use(express.json()).use((req, _res, next) => { (req as Request & {user: {id: number}}).user = {id: 1}; next(); }).use('/api/providers', providerRouter);
   app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
     if (error instanceof AppError) {
       res.status(error.statusCode).json({

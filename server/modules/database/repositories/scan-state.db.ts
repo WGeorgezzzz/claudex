@@ -1,4 +1,12 @@
+import { getCurrentUserContext } from '@/modules/auth/index.js';
+import { getOwnerUserId } from '../ownership.js';
 import { getConnection } from '@/modules/database/connection.js';
+
+function scanTarget(): {table: string; key: string; id: number} {
+  return getCurrentUserContext()?.role === 'member'
+    ? {table: 'user_scan_state', key: 'user_id', id: getOwnerUserId()}
+    : {table: 'scan_state', key: 'id', id: 1};
+}
 
 type ScanStateRow = {
   last_scanned_at: string;
@@ -7,9 +15,10 @@ type ScanStateRow = {
 export const scanStateDb = {
     getLastScannedAt() {
         const db = getConnection();
+        const target = scanTarget();
 
         const row = db
-            .prepare(`SELECT last_scanned_at FROM scan_state WHERE id = 1`)
+            .prepare(`SELECT last_scanned_at FROM ${target.table} WHERE ${target.key} = ${target.id}`)
             .get() as ScanStateRow;
 
         if (!row) {
@@ -30,12 +39,13 @@ export const scanStateDb = {
 
     updateLastScannedAt(scannedAt: Date = new Date()) {
         const db = getConnection();
+        const target = scanTarget();
         const sqliteTimestamp = scannedAt.toISOString().slice(0, 19).replace('T', ' ');
 
         db.prepare(`
-            INSERT INTO scan_state (id, last_scanned_at)
-            VALUES (1, ?)
-            ON CONFLICT (id)
+            INSERT INTO ${target.table} (${target.key}, last_scanned_at)
+            VALUES (${target.id}, ?)
+            ON CONFLICT (${target.key})
             DO UPDATE SET last_scanned_at = excluded.last_scanned_at
         `).run(sqliteTimestamp);
     }

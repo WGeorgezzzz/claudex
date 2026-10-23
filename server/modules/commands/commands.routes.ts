@@ -1,4 +1,6 @@
 // @ts-nocheck -- temporary while command handlers are extracted into the injected service.
+import { getCurrentUserContext, assertUserPath } from '@/modules/auth/index.js';
+import { userContextMiddleware, authorizePaths } from '@/modules/access-control/index.js';
 import path from "path";
 
 import express from "express";
@@ -44,6 +46,8 @@ const APP_ROOT = dependencies.appRoot;
 const providerModelsService = dependencies.models;
 const process = dependencies.runtime;
 const router = express.Router();
+  router.use(userContextMiddleware);
+  router.use(authorizePaths(req => [req.body?.projectPath, req.body?.context?.projectPath].filter(value => typeof value === 'string')));
 
 const MODEL_PROVIDERS = ["claude", "cursor", "codex", "opencode"];
 
@@ -478,7 +482,7 @@ router.post("/list", async (req, res) => {
 
     // Scan user-level commands (~/.claude/commands/)
     const homeDir = os.homedir();
-    const userCommandsDir = path.join(homeDir, ".claude", "commands");
+    const userCommandsDir = path.join(getCurrentUserContext()?.claudeConfigDir || path.join(homeDir, ".claude"), "commands");
     const userCommands = await scanCommandsDirectory(
       userCommandsDir,
       userCommandsDir,
@@ -564,7 +568,7 @@ router.post("/execute", async (req, res) => {
     {
       const resolvedPath = path.resolve(commandPath);
       const userBase = path.resolve(
-        path.join(os.homedir(), ".claude", "commands"),
+        path.join(getCurrentUserContext()?.claudeConfigDir || path.join(os.homedir(), ".claude"), "commands"),
       );
       const projectBase = context?.projectPath
         ? path.resolve(path.join(context.projectPath, ".claude", "commands"))
@@ -580,7 +584,16 @@ router.post("/execute", async (req, res) => {
         });
       }
     }
-    const content = await fs.readFile(commandPath, "utf8");
+    const user = getCurrentUserContext();
+    const resolvedCommand = await fs.realpath(commandPath);
+    const configCommands = path.join(user.claudeConfigDir, 'commands');
+    let privateCommand = false;
+    try {
+      const relative = path.relative(await fs.realpath(configCommands), resolvedCommand);
+      privateCommand = relative !== '' && relative !== '..' && !relative.startsWith('..' + path.sep) && !path.isAbsolute(relative);
+    } catch {}
+    if (!privateCommand) assertUserPath(user.userId, resolvedCommand);
+    const content = await fs.readFile(resolvedCommand, "utf8");
     const { data: metadata, content: commandContent } =
       parseFrontMatter(content);
     // `$ARGUMENTS` gets the raw text typed after the command name (line breaks

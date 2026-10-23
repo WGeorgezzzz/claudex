@@ -133,7 +133,8 @@
     "browser": "Browser",
     "notifications": "Notifications",
     "plugins": "Plugins",
-    "about": "About"
+    "about": "About",
+    "users": "Accounts"
   },
   "notifications": {
     "title": "Notifications",
@@ -847,5 +848,26 @@
     "teamManagementDescription": "Multiple users, role-based access, and shared projects for your team.",
     "licensed": "Licensed under AGPL-3.0",
     "proCta": "Available with CloudCLI Pro"
+  },
+  "users": {
+    "create": "Create user",
+    "username": "Username",
+    "initialPassword": "Initial password",
+    "currentPassword": "Current password",
+    "newPassword": "New password",
+    "changePassword": "Change my password",
+    "root": "Work root",
+    "defaultRoot": "Default: D:\\claudex-users\\<username>",
+    "folders": "Additional allowed folders (one absolute path per line)",
+    "email": "Access SSO email",
+    "save": "Save access",
+    "reset": "Reset password",
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "admin": "Administrator",
+    "member": "Member",
+    "saved": "Saved",
+    "failed": "Account operation failed",
+    "remoteNote": "Members sign in with username and password. Administrator remote login keeps its existing password and TOTP. Password changes require signing in again; password resets do not change the separate remote administrator credential."
   }
 }
