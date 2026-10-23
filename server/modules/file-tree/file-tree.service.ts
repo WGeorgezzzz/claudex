@@ -10,6 +10,7 @@ import type {
   FileTreeUploadedFile,
 } from '@/shared/types.js';
 import { AppError, FORBIDDEN_WORKSPACE_PATHS, normalizeProjectPath } from '@/shared/utils.js';
+import { matchesEllipsisPattern, splitEllipsisPattern } from '@/modules/file-tree/ellipsis-pattern.js';
 
 const HARD_EXCLUDED_DIRECTORY_NAMES = new Set([
   'node_modules', '.git', '.svn', '.hg',
@@ -37,6 +38,30 @@ const COMMON_WORKSPACE_DIRECTORY_NAMES = [
 // broad workspace (for example, a user's home directory) cannot exhaust the
 // server heap before the browser has a chance to switch to a narrower project.
 const MAXIMUM_FILE_TREE_ENTRIES = 10_000;
+
+// Abbreviated-filename lookup reads one directory only; these caps keep a huge
+// directory or an over-broad pattern from turning into a directory listing.
+const MAXIMUM_PATTERN_SCAN_ENTRIES = 20_000;
+const MAXIMUM_PATTERN_MATCHES = 20;
+
+/** Parses one `bytes=` range; multi-range and malformed headers fall back to the full file. */
+export function parseByteRange(header: string, size: number): { start: number; end: number } | 'unsatisfiable' | null {
+  const match = /^bytes=(\d*)-(\d*)$/.exec(header.trim());
+  if (!match || (!match[1] && !match[2])) return null;
+  let start: number;
+  let end: number;
+  if (!match[1]) {
+    const suffix = Number(match[2]);
+    if (suffix === 0) return 'unsatisfiable';
+    start = Math.max(0, size - suffix);
+    end = size - 1;
+  } else {
+    start = Number(match[1]);
+    end = match[2] ? Math.min(Number(match[2]), size - 1) : size - 1;
+  }
+  if (start >= size || start > end) return 'unsatisfiable';
+  return { start, end };
+}
 
 type FileTreeEntryFilter = (entryPath: string, isDirectory: boolean) => boolean;
 
@@ -463,19 +488,68 @@ export function createFileTreeService(dependencies: FileTreeServiceDependencies)
       }
     },
 
-    async openFile(projectId, filePath) {
+    async openFile(projectId, filePath, rangeHeader) {
       const projectRoot = await resolveProjectRoot(projectId);
       const resolvedPath = await resolveReadablePath(projectRoot, filePath);
+      let size: number;
       try {
-        await fileSystem.access(resolvedPath);
-      } catch {
+        const stats = await fileSystem.stat(resolvedPath);
+        if (stats.isDirectory()) throw createFileTreeError('Path is a directory, not a file', 400, 'PATH_IS_DIRECTORY');
+        size = stats.size;
+      } catch (error) {
+        if (error instanceof AppError) throw error;
         throw createFileTreeError('File not found', 404, 'FILE_NOT_FOUND');
+      }
+
+      // Media elements seek with Range requests; honor one satisfiable byte range.
+      const range = rangeHeader ? parseByteRange(rangeHeader, size) : null;
+      if (range === 'unsatisfiable') {
+        throw createFileTreeError('Requested range not satisfiable', 416, 'RANGE_NOT_SATISFIABLE');
       }
 
       return {
         contentType: dependencies.resolveMimeType(resolvedPath),
-        stream: fileSystem.createReadStream(resolvedPath),
+        stream: range ? fileSystem.createReadStream(resolvedPath, range) : fileSystem.createReadStream(resolvedPath),
+        size,
+        range,
       };
+    },
+
+    async resolveFilePattern(projectId, patternPath) {
+      const normalized = patternPath.replace(/\\/g, '/');
+      const slash = normalized.lastIndexOf('/');
+      const basename = normalized.slice(slash + 1);
+      const parts = splitEllipsisPattern(basename);
+      if (!parts) throw createFileTreeError('Path does not contain an abbreviated filename', 400, 'NOT_A_FILE_PATTERN');
+      let directoryPart = slash < 0 ? '.' : normalized.slice(0, slash) || '/';
+      if (/^[a-z]:$/i.test(directoryPart)) directoryPart += '/';
+
+      const projectRoot = await resolveProjectRoot(projectId);
+      // The project root itself is listable; everything else uses the same
+      // project/read-only-root policy as opening a file.
+      const directory = path.resolve(projectRoot, directoryPart) === path.resolve(projectRoot)
+        ? path.resolve(projectRoot)
+        : await resolveReadablePath(projectRoot, directoryPart);
+
+      const matches: string[] = [];
+      let scanned = 0;
+      let truncated = false;
+      try {
+        for await (const entry of fileSystem.openDirectory(directory)) {
+          if (++scanned > MAXIMUM_PATTERN_SCAN_ENTRIES) { truncated = true; break; }
+          if (entry.isDirectory() || !matchesEllipsisPattern(entry.name, parts)) continue;
+          if (matches.length >= MAXIMUM_PATTERN_MATCHES) { truncated = true; break; }
+          matches.push(path.join(directory, entry.name));
+        }
+      } catch (error) {
+        mapFileSystemError(error, {
+          ENOENT: { message: 'Directory not found', statusCode: 404 },
+          ENOTDIR: { message: 'Directory not found', statusCode: 404 },
+          EACCES: { message: 'Permission denied', statusCode: 403 },
+        });
+      }
+      matches.sort((left, right) => left.localeCompare(right));
+      return { matches, truncated };
     },
 
     async saveTextFile(projectId, filePath, content, expectedContent) {

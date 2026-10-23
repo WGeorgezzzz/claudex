@@ -59,7 +59,7 @@ const fileTreeFileSystem: FileTreeFileSystem = {
   },
   unlink: (filePath) => { if (!/^cloudcli-file-upload-[\w-]+$/.test(path.basename(filePath)) || path.dirname(filePath) !== os.tmpdir()) assertContextPath(filePath); return fsPromises.unlink(filePath); },
   copyFile: (sourcePath, destinationPath) => { assertContextPath(destinationPath); return fsPromises.copyFile(sourcePath, destinationPath); },
-  createReadStream: (filePath) => { assertContextPath(filePath); return fs.createReadStream(filePath); },
+  createReadStream: (filePath, range) => { assertContextPath(filePath); return fs.createReadStream(filePath, range); },
 };
 
 /**

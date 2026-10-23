@@ -37,3 +37,20 @@ export function parseLocalFileLink(reference: string): {path:string;line:number|
   const suffix=value.match(/:(\d+)(?::\d+)?$/);
   return {path:suffix?value.slice(0,-suffix[0].length):value,line:suffix?Number(suffix[1]):fragmentLine};
 }
+
+/**
+ * True when the basename abbreviates part of a filename with an ellipsis
+ * (`02-left-…-clutter10.mp4`, `run...final.log`). Leading `./` and `../`
+ * segments are directories, never abbreviations; such names resolve on the server.
+ */
+export function isAbbreviatedFilePath(path:string): boolean {
+  const basename=path.replace(/\\/g,'/').split('/').pop() ?? '';
+  if(/^\.+$/.test(basename))return false;
+  const parts=basename.split(/…|\.{3,}/g);
+  return parts.length>1 && parts.join('').length>=3;
+}
+
+/** Link components use this on raw references; remote or malformed file URLs are never abbreviations. */
+export function isAbbreviatedFileReference(reference:string): boolean {
+  try {return isAbbreviatedFilePath(parseLocalFileLink(reference).path);} catch {return false;}
+}

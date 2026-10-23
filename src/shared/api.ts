@@ -367,6 +367,8 @@ export const api = {
   // media call sites fetch a blob through here instead of using a bare `src`.
   readFileBlob: (projectId: string, filePath: string, options: ApiRequestOptions = {}) =>
     get(fileContentPath(projectId, filePath), options),
+  resolveFilePattern: (projectId: string, patternPath: string, options: ApiRequestOptions = {}) =>
+    get(`/api/file-tree/projects/${projectId}/files/resolve-pattern${query({ path: patternPath })}`, options),
   saveFile: (projectId: string, filePath: string, content: string, expectedContent?: string) =>
     put(`/api/file-tree/projects/${projectId}/file`, { filePath, content, ...(expectedContent !== undefined ? {expectedContent} : {}) }),
   getFiles: (projectId: string, options: ApiRequestOptions = {}) =>

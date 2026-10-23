@@ -138,8 +138,22 @@ export function createFileTreeRouter(
 
   router.get('/projects/:projectId/files/content', createRouteHandler(async (request, response) => {
     const filePath = readRequiredString(request.query.path, 'path', 'Invalid file path');
-    const file = await services.openFile(readProjectId(request), filePath);
+    const rangeHeader = typeof request.headers.range === 'string' ? request.headers.range : undefined;
+    const file = await services.openFile(readProjectId(request), filePath, rangeHeader);
     response.setHeader('Content-Type', file.contentType);
+    response.setHeader('Accept-Ranges', 'bytes');
+    if (file.range) {
+      response.status(206);
+      response.setHeader('Content-Range', `bytes ${file.range.start}-${file.range.end}/${file.size}`);
+      response.setHeader('Content-Length', String(file.range.end - file.range.start + 1));
+    } else {
+      response.setHeader('Content-Length', String(file.size));
+    }
+    if (request.method === 'HEAD') {
+      file.stream.destroy();
+      response.end();
+      return;
+    }
     file.stream.pipe(response);
     file.stream.on('error', (error) => {
       logger.error('Error streaming File Tree content', error);
@@ -147,6 +161,13 @@ export function createFileTreeRouter(
         response.status(500).json({ error: 'Error reading file' });
       }
     });
+  }, logger));
+
+  // Resolves an ellipsis-abbreviated filename inside one directory. `path` is
+  // authorized by the router-level path guard like every other file read.
+  router.get('/projects/:projectId/files/resolve-pattern', createRouteHandler(async (request, response) => {
+    const patternPath = readRequiredString(request.query.path, 'path', 'Invalid file path');
+    response.json(await services.resolveFilePattern(readProjectId(request), patternPath));
   }, logger));
 
   router.put('/projects/:projectId/file', createRouteHandler(async (request, response) => {

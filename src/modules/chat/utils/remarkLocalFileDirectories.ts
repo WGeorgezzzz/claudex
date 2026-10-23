@@ -15,6 +15,9 @@ function paragraphFileDirectories(node: RootContent): string[] {
     const reference=child.type==='inlineCode'?child.value:child.type==='link'?child.url:undefined;
     const directory=reference?absoluteFileDirectory(reference):undefined;
     if(directory)result.add(directory);
+    // An explicitly named directory (`D:\out\`) is context for abbreviated names beside it.
+    const named=child.type==='inlineCode'?child.value.replace(/\\/g,'/'):'';
+    if(/^(?:[a-z]:\/|\/)/i.test(named)&&named.endsWith('/'))result.add(named);
     if('children' in child)for(const nested of child.children)visit(nested);
   };
   visit(node);return [...result];

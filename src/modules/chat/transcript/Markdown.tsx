@@ -12,7 +12,7 @@ import { MarkdownImage } from '@/modules/chat/transcript/MarkdownImage';
 import { LocalFileLink } from '@/modules/chat/transcript/LocalFileLink';
 import { remarkLocalFileDirectories } from '@/modules/chat/utils/remarkLocalFileDirectories';
 import { normalizeInlineCodeFences } from '@/modules/chat/utils/chatFormatting';
-import { isInlineFileReference, localFileUrlTransform, parseLocalFileLink } from '@/modules/chat/utils/localFileLink';
+import { isAbbreviatedFileReference, isInlineFileReference, localFileUrlTransform, parseLocalFileLink } from '@/modules/chat/utils/localFileLink';
 import { normalizeLatexDelimiters } from '@/modules/chat/utils/latexDelimiters';
 import { copyTextToClipboard } from '@/shared/utils';
 import { SyntaxHighlighter } from '@/shared/syntaxHighlighter';
@@ -307,6 +307,8 @@ function MarkdownBodyRenderer({ children, breaks = false }: Omit<MarkdownProps, 
           return (
             <LocalFileLink fileReference={fileRef}
               href={href || fileRef}
+              // An abbreviated name must be resolved before the editor can open it.
+              onPreview={isAbbreviatedFileReference(fileRef) ? openFileInEditor : undefined}
               className="cursor-pointer text-blue-600 hover:underline dark:text-blue-400"
               onClick={(event) => {
                 event.preventDefault();

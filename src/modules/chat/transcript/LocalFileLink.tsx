@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Copy, ExternalLink, FileText } from 'lucide-react';
 
 import { MarkdownWorkspaceContext } from '@/modules/chat/context/MarkdownWorkspaceContext';
-import { parseLocalFileLink } from '@/modules/chat/utils/localFileLink';
+import { isAbbreviatedFileReference, parseLocalFileLink } from '@/modules/chat/utils/localFileLink';
 import { copyTextToClipboard } from '@/shared/utils';
 import { api } from '@/shared/api';
 
@@ -16,7 +16,7 @@ type LocalFileLinkProps = AnchorHTMLAttributes<HTMLAnchorElement> & {
 };
 
 /** Markdown uses this for explicit links and inline file references, preserving left-click preview. */
-export function LocalFileLink({ fileReference, directories = [], onPreview, children, onClick, ...props }: LocalFileLinkProps) {
+export function LocalFileLink({ fileReference, directories = [], onPreview, children, onClick, title, ...props }: LocalFileLinkProps) {
   const { t } = useTranslation('chat');
   const { projectPath, projectId } = useContext(MarkdownWorkspaceContext);
   const linkRef = useRef<HTMLAnchorElement>(null);
@@ -27,6 +27,12 @@ export function LocalFileLink({ fileReference, directories = [], onPreview, chil
   const [error, setError] = useState<string | null>(null);
   // Prevent duplicate OS launches while the desktop bridge is handling a request.
   const [opening, setOpening] = useState(false);
+  // An ellipsis-abbreviated name resolves to real files on the server; the tooltip then shows the full path.
+  const [resolvedTitle, setResolvedTitle] = useState<string | null>(null);
+  // Several files can match one abbreviation; the user picks one for the pending action.
+  const [choices, setChoices] = useState<{ paths: string[]; action: (path: string) => unknown } | null>(null);
+  const hoverResolving = useRef(false);
+  const abbreviated = isAbbreviatedFileReference(fileReference);
 
   useEffect(() => {
     if (!position) return;
@@ -74,6 +80,32 @@ export function LocalFileLink({ fileReference, directories = [], onPreview, chil
     // Resolve against this message's project, never the desktop process working directory.
     return `${projectPath.replace(/\\/g, '/').replace(/\/$/, '')}/${path}`;
   };
+  const resolveAbbreviated = async (): Promise<string[]> => {
+    const { path } = parseLocalFileLink(fileReference);
+    if (!projectId) throw new Error(t('fileLink.noProject', 'The project path is unavailable. Open this conversation in its project first.'));
+    const absolute = /^(?:[a-z]:\/|\/)/i.test(path);
+    const bases = absolute ? [''] : directories.length ? directories : projectPath ? [projectPath] : [];
+    if (!bases.length) throw new Error(t('fileLink.noProject', 'The project path is unavailable. Open this conversation in its project first.'));
+    if (bases.length > 32) throw new Error('目录过多，无法确定文件位置，请使用绝对路径。');
+    const candidates = [...new Set(bases.map(base => absolute ? path : base.replace(/\\/g, '/').replace(/\/$/, '') + '/' + path))];
+    const failures: string[] = [];
+    const results = await Promise.all(candidates.map(async candidate => {
+      const response = await api.resolveFilePattern(projectId, candidate, { signal: AbortSignal.timeout(8000) });
+      if (response.ok) return ((await response.json()) as { matches?: string[] }).matches ?? [];
+      if (response.status !== 404) failures.push(`无法解析省略的文件名 (${response.status}): ${candidate}`);
+      return [];
+    }));
+    const matches = [...new Set(results.flat().map(match => match.replace(/\\/g, '/')))];
+    if (!matches.length) throw new Error(failures[0] ?? '未找到与省略文件名匹配的文件：' + path);
+    setResolvedTitle(matches.length === 1 ? matches[0] : `找到 ${matches.length} 个匹配文件：\n${matches.join('\n')}`);
+    return matches;
+  };
+  /** Runs an action on the referenced file, asking the user to choose when an abbreviation matches several files. */
+  const withResolvedPath = async (action: (path: string) => unknown) => {
+    const paths = abbreviated ? await resolveAbbreviated() : [await resolvedPath()];
+    if (paths.length === 1) { await action(paths[0]); return; }
+    setChoices({ paths, action });
+  };
   const openLocally = async () => {
     if (opening) return;
     setPosition(null);
@@ -86,7 +118,7 @@ export function LocalFileLink({ fileReference, directories = [], onPreview, chil
       };
       const open = bridge.cloudcliDesktopNotifications?.openLocalPath ?? bridge.cloudcliDesktop?.openLocalPath;
       if (!open) throw new Error(t('fileLink.desktopOnly', 'Open this link in the Claudex desktop app to use a local program.'));
-      await open(await resolvedPath());
+      await withResolvedPath(path => open(path));
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : String(reason));
     } finally { setOpening(false); }
@@ -95,15 +127,25 @@ export function LocalFileLink({ fileReference, directories = [], onPreview, chil
     setPosition(null);
     setError(null);
     try {
-      if (!await copyTextToClipboard(await resolvedPath())) throw new Error(t('fileLink.copyFailed', 'Unable to copy the file path.'));
+      await withResolvedPath(async path => {
+        if (!await copyTextToClipboard(path)) throw new Error(t('fileLink.copyFailed', 'Unable to copy the file path.'));
+      });
     } catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)); }
   };
   const menuClass = 'flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm hover:bg-accent focus:bg-accent focus:outline-none disabled:opacity-50';
   return <>
-    <a {...props} ref={linkRef} onClick={event => {
+    <a {...props} title={resolvedTitle ?? title} ref={linkRef} onMouseEnter={() => {
+      if (!abbreviated || resolvedTitle || hoverResolving.current || !projectId) return;
+      hoverResolving.current = true;
+      void resolveAbbreviated().catch(() => { hoverResolving.current = false; });
+    }} onClick={event => {
       if (!onPreview) { onClick?.(event); return; }
-      event.preventDefault(); setError(null);
+      event.preventDefault(); setError(null); setChoices(null);
       const reference = parseLocalFileLink(fileReference);
+      if (abbreviated) {
+        void withResolvedPath(path => onPreview(path, reference.line)).catch(reason => setError(reason instanceof Error ? reason.message : String(reason)));
+        return;
+      }
       // Preserve immediate preview for exact paths and callers outside a workspace.
       if (/^(?:[a-z]:\/|\/)/i.test(reference.path) || (!projectPath && !directories.length)) {
         onPreview(reference.path, reference.line); return;
@@ -122,6 +164,15 @@ export function LocalFileLink({ fileReference, directories = [], onPreview, chil
           setPosition({ x: Math.max(8, Math.min(bounds.left, window.innerWidth - 248)), y: Math.max(8, Math.min(bounds.bottom, window.innerHeight - 150)) });
         }
       }}>{children}</a>
+    {choices && <span role="group" aria-label="匹配的文件" className="ml-2 inline-flex flex-wrap items-center gap-1 align-middle text-xs">
+      <span className="text-muted-foreground">找到 {choices.paths.length} 个匹配文件：</span>
+      {choices.paths.map(path => <button key={path} type="button" title={path}
+        className="rounded border border-border px-1.5 py-0.5 font-mono hover:bg-accent"
+        onClick={() => {
+          const { action } = choices; setChoices(null);
+          void Promise.resolve().then(() => action(path)).catch(reason => setError(reason instanceof Error ? reason.message : String(reason)));
+        }}>{path.split('/').pop()}</button>)}
+    </span>}
     {error && <span role="alert" className="ml-2 text-xs text-red-600 dark:text-red-400">{error}</span>}
     {position && createPortal(<div ref={menuRef} role="menu" aria-label={t('fileLink.menu', 'File actions')}
       className="fixed z-[10000] w-60 max-w-[calc(100vw-16px)] rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-lg"

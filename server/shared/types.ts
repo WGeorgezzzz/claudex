@@ -1385,7 +1385,8 @@ export type FileTreeFileSystem = {
   removeDirectory(directoryPath: string): Promise<void>;
   unlink(filePath: string): Promise<void>;
   copyFile(sourcePath: string, destinationPath: string): Promise<void>;
-  createReadStream(filePath: string): Readable;
+  /** `range` is inclusive on both ends, matching HTTP byte ranges. */
+  createReadStream(filePath: string, range?: { start: number; end: number }): Readable;
 };
 
 /**
@@ -1470,7 +1471,15 @@ export type FileTreeServices = {
   }>;
   createWorkspaceFolder(folderPath: string): Promise<{ success: true; path: string }>;
   readTextFile(projectId: string, filePath: string): Promise<{ content: string; path: string }>;
-  openFile(projectId: string, filePath: string): Promise<{ contentType: string; stream: Readable }>;
+  /** `rangeHeader` is the raw HTTP Range header; a satisfiable single range streams only that slice. */
+  openFile(projectId: string, filePath: string, rangeHeader?: string): Promise<{
+    contentType: string;
+    stream: Readable;
+    size: number;
+    range: { start: number; end: number } | null;
+  }>;
+  /** Resolves an ellipsis-abbreviated basename (`02-left-…-clutter10.mp4`) to the existing files it names. */
+  resolveFilePattern(projectId: string, patternPath: string): Promise<{ matches: string[]; truncated: boolean }>;
   /** expectedContent is the exact last-read text; when supplied, reject external edits rather than overwrite them. */
   saveTextFile(projectId: string, filePath: string, content: string, expectedContent?: string): Promise<{
     success: true;
