@@ -338,7 +338,7 @@ type SessionActivity = {
 
 const IDLE: SessionActivity = { activeSessions: NO_IDS, backgroundSessionIds: NO_IDS };
 
-const renderController = (onSessionDelete = vi.fn(), initialActivity: SessionActivity = IDLE) =>
+const renderController = (onSessionDelete = vi.fn(), initialActivity: SessionActivity = IDLE, onLoadMoreSessions = vi.fn()) =>
   renderHook(
     ({ activeSessions, backgroundSessionIds }: SessionActivity) =>
       useSidebarController({
@@ -354,7 +354,7 @@ const renderController = (onSessionDelete = vi.fn(), initialActivity: SessionAct
         onProjectSelect: noop,
         onSessionSelect: noop,
         onSessionDelete,
-        onLoadMoreSessions: noop,
+        onLoadMoreSessions,
         onProjectDelete: noop,
         setCurrentProject: noop,
         setSidebarVisible: noop,
@@ -584,4 +584,36 @@ test('an empty selection opens no confirmation', () => {
   });
 
   assert.equal(result.current.pendingDeletion, null);
+});
+
+test('pagination starts after a prior sidebar state update and unlocks for the next page', async () => {
+  const load = vi.fn().mockResolvedValue(undefined);
+  const { result } = renderController(vi.fn(), IDLE, load);
+  await act(async () => {});
+  act(() => result.current.setProjectSessionSelection({ projectId: 'project-1', sessionIds: new Set() }));
+  await act(async () => { await result.current.loadMoreSessionsForProject('project-1'); });
+  assert.equal(load.mock.calls.length, 1);
+  assert.equal(result.current.loadingMoreProjects.has('project-1'), false);
+  await act(async () => { await result.current.loadMoreSessionsForProject('project-1'); });
+  assert.equal(load.mock.calls.length, 2);
+});
+
+test('pagination ignores duplicate taps and unlocks after a failed request', async () => {
+  let rejectPage: (reason: Error) => void = () => {};
+  const load = vi.fn().mockImplementationOnce(() => new Promise((_resolve, reject) => { rejectPage = reject; })).mockResolvedValue(undefined);
+  const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+  try {
+    const { result } = renderController(vi.fn(), IDLE, load);
+    await act(async () => {});
+    let pending: Promise<void>;
+    act(() => {
+      pending = result.current.loadMoreSessionsForProject('project-1');
+      void result.current.loadMoreSessionsForProject('project-1');
+    });
+    assert.equal(load.mock.calls.length, 1);
+    await act(async () => { rejectPage(new Error('offline')); await pending; });
+    assert.equal(result.current.loadingMoreProjects.has('project-1'), false);
+    await act(async () => { await result.current.loadMoreSessionsForProject('project-1'); });
+    assert.equal(load.mock.calls.length, 2);
+  } finally { error.mockRestore(); }
 });
