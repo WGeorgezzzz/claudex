@@ -32,6 +32,7 @@ type AuthSessionPayload = {
 };
 
 type AuthStatusPayload = {
+  accessSso?: boolean;
   needsSetup?: boolean;
   remoteLogin?:boolean;
   localIdentity?:boolean;
@@ -105,6 +106,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
   // The server selects the login method from the verified entry, never from a browser assertion.
   const [remoteLogin,setRemoteLogin]=useState(false);
   const [localIdentity,setLocalIdentity]=useState(false);
+  // Remember the verified entry's sign-out path without adding UI state.
+  const accessSsoRef = useRef(false);
 
   const clearSession = useCallback(() => {
     setUser(null);
@@ -219,6 +222,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const statusPayload = await parseJsonSafely<AuthStatusPayload>(statusResponse);
       setRemoteLogin(Boolean(statusPayload?.remoteLogin));
       setLocalIdentity(Boolean(statusPayload?.localIdentity));
+      accessSsoRef.current = Boolean(statusPayload?.accessSso);
+      if (accessSsoRef.current) {
+        const response = await api.auth.exchangeAccess();
+        const payload = await parseJsonSafely<AuthSessionPayload>(response);
+        if (!response.ok || !payload?.token || !payload.user) {
+          clearSession();
+          setError(tRef.current(AUTH_ERROR_MESSAGES.authStatusCheckFailed));
+          return;
+        }
+        persistToken(payload.token);
+        setToken(payload.token);
+      }
 
       if (statusPayload?.needsSetup) {
         setNeedsSetup(true);
@@ -368,7 +383,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
   );
 
   const logout = useCallback(() => {
-    void api.auth.logout().catch(()=>undefined);
+    void api.auth.logout().catch(()=>undefined).finally(() => {
+      if (accessSsoRef.current) window.location.assign('/cdn-cgi/access/logout');
+    });
     clearSession();
   }, [clearSession]);
 

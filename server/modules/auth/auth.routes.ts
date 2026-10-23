@@ -5,6 +5,7 @@ import { consumeLocalTicket, issueLocalTicket } from '@/modules/auth/local-ident
 import { remoteIdentityService } from '@/modules/auth/remote-identity.service.js';
 import { authSessionEvents, generateToken } from '@/modules/auth/auth.middleware.js';
 import { isLocalRequest } from '@/modules/auth/access-boundary.js';
+import { exchangeAccessIdentity, isAccessSsoEnabled } from '@/modules/auth/access-sso.service.js';
 import { authSessionsDb } from '@/modules/database/index.js';
 import { AppError, requireAuthenticatedUserId } from '@/shared/index.js';
 import type { createAuthService } from './auth.service.js';
@@ -22,7 +23,7 @@ export function createAuthRouter(
   const router = express.Router();
   const attempts=new Map<string,{count:number;until:number}>();
   // Bound password/OTP guessing independently of the external Access gate.
-  router.use(['/login','/local-ticket','/local-exchange'],(req,res,next)=>{
+  router.use(['/login','/local-ticket','/local-exchange','/access-exchange'],(req,res,next)=>{
     const key=String(process.env.CLAUDEX_PRIVATE_GATE==='1'&&!isLocalRequest(req)?req.headers['cf-connecting-ip']||req.socket.remoteAddress:req.socket.remoteAddress||'unknown');
     const now=Date.now();for(const [id,row] of attempts)if(row.until<now)attempts.delete(id);
     const row=attempts.get(key)??{count:0,until:now+60000};
@@ -31,6 +32,11 @@ export function createAuthRouter(
   });
   router.post('/local-ticket',(req,res,next)=>{try{res.json({ticket:issueLocalTicket(req,req.headers['x-claudex-local-key'])});}catch(e){next(e);}});
   router.post('/local-exchange',(req,res,next)=>{try{const user=consumeLocalTicket(req,req.body?.ticket);res.json({success:true,user,token:generateToken({...user,authKind:'local'})});}catch(e){next(e);}});
+  router.post('/access-exchange',async(req,res,next)=>{try{
+    const {user,authSessionId}=await exchangeAccessIdentity(req);
+    res.setHeader('Cache-Control','no-store');
+    res.json({success:true,user,token:generateToken({...user,authKind:'remote',authSessionId})});
+  }catch(e){next(e);}});
   router.get('/devices',authenticateToken,(req,res)=>res.json({devices:authSessionsDb.list(requireAuthenticatedUserId(req))}));
   router.delete('/devices/:id',authenticateToken,(req,res)=>{const userId=requireAuthenticatedUserId(req);const id=String(req.params.id);authSessionsDb.revoke(userId,id);authSessionEvents.emit('revoked',id);res.json({success:true});});
   router.get('/remote-account',authenticateToken,(_req,res)=>res.json(remoteIdentityService.status()));
@@ -41,7 +47,8 @@ export function createAuthRouter(
 
   router.get('/status', (_req, res, next) => {
     try {
-      res.json({...service.getStatus(),remoteLogin:process.env.CLAUDEX_PRIVATE_GATE==='1'&&!isLocalRequest(_req),localIdentity:process.env.CLAUDEX_LOCAL_IDENTITY==='1'&&isLocalRequest(_req)});
+      res.setHeader('Cache-Control','no-store');
+      res.json({...service.getStatus(),accessSso:isAccessSsoEnabled(_req),remoteLogin:process.env.CLAUDEX_PRIVATE_GATE==='1'&&!isLocalRequest(_req),localIdentity:process.env.CLAUDEX_LOCAL_IDENTITY==='1'&&isLocalRequest(_req)});
     } catch (error) {
       next(error);
     }

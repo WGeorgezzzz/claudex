@@ -41,6 +41,26 @@ requests. Keep `HOST=127.0.0.1`; preserve the public Host header through the tun
 Missing or invalid Access configuration fails closed. Do not expose the origin
 port directly or replace the boundary with a trusted-header-only check.
 
+## Mobile single sign-on
+
+After configuring the owner's remote account below, optionally set
+`CLAUDEX_ACCESS_SSO_EMAIL=<exact owner email>`. This explicitly maps a signed
+Cloudflare Access identity to that account. Keep the exact-email Allow policy and
+independent MFA enabled in Cloudflare. Once Access succeeds, the browser opens
+the workspace without asking for another password or Claudex TOTP.
+
+The exchange revalidates the JWT signature and every boundary check. Each Access
+credential maps to one revocable device session, capped at the earlier of its
+signed expiry or 30 days. Refresh cannot resurrect a revoked device. Signing out
+also opens Cloudflare's logout endpoint; a revoked device must authenticate with
+Cloudflare again. Local identity and deployments without this opt-in are unchanged.
+
+For personal phones, set this application's session duration and its owner's
+policy session/MFA durations to `720h` (30 days). Preserve other applications and
+global settings. Existing cookies keep their original expiry until the next
+Cloudflare login. Browser data removal or explicit sign-out requires login again.
+See [Cloudflare session durations](https://developers.cloudflare.com/cloudflare-one/access-controls/access-settings/session-management/).
+
 ## Independent remote account
 
 From an authenticated local connection, `POST /api/auth/remote-account` accepts
@@ -50,7 +70,7 @@ enrollment secret and an `otpauth://` URI once; store them privately and enroll 
 authenticator. Never put credentials in Git, logs or a public guide. The endpoint
 refuses to overwrite an existing remote account.
 
-At the public entry, login requires this password and a six-digit TOTP code after
+Without the SSO opt-in, login requires this password and a six-digit TOTP code after
 Cloudflare Access succeeds. OTP steps cannot be replayed. Authentication attempts
 are rate limited. Existing local password credentials are not the remote password.
 

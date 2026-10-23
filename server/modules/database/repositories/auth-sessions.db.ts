@@ -12,6 +12,8 @@ export function initializeAuthSessionTables(db:Database.Database) {
 
 /** Auth owns device lifetime and remote credentials; callers never receive password or OTP secret readbacks. */
 export const authSessionsDb={
+  // Access SSO keeps the upstream credential's expiry and never resurrects a revoked row.
+  createAccessSession(id:string,userId:number,expires:number){getConnection().prepare('INSERT OR IGNORE INTO auth_sessions(id,user_id,kind,created_at,expires_at) VALUES(?,?,?,?,?)').run(id,userId,'remote',Date.now(),expires);},
   create(userId:number,kind:string){const id=randomUUID(),now=Date.now();getConnection().prepare('INSERT INTO auth_sessions(id,user_id,kind,created_at,expires_at) VALUES(?,?,?,?,?)').run(id,userId,kind,now,now+7*86400000);return id;},
   get(id:string){return getConnection().prepare('SELECT * FROM auth_sessions WHERE id=? AND revoked=0 AND expires_at>?').get(id,Date.now()) as {id:string;user_id:number;kind:string;expires_at:number}|undefined;},
   list(userId:number){return getConnection().prepare('SELECT id,kind,created_at,expires_at FROM auth_sessions WHERE user_id=? AND revoked=0 AND expires_at>? ORDER BY created_at DESC').all(userId,Date.now());},

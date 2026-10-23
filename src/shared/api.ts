@@ -200,6 +200,7 @@ const pluginAssetPath = (pluginName: string, assetFile: string) =>
 export const api = {
   // Auth endpoints (no token required)
   auth: {
+    exchangeAccess: () => fetch('/api/auth/access-exchange',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}),
     exchangeLocal: (ticket:string) => fetch('/api/auth/local-exchange',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ticket})}),
     logout: () => post('/api/auth/logout'),
     devices: () => get('/api/auth/devices'),

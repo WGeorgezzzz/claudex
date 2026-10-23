@@ -30,6 +30,8 @@ let requestedPaths: string[] = [];
 let nextRefreshedToken: string | null = null;
 let hasCompletedOnboarding = true;
 let onboardingStatusDelayMs = 0;
+let accessSso = false;
+let accessExchangeDenied = false;
 
 const stubServer = () => {
   vi.stubGlobal('fetch', vi.fn(async (url: string) => {
@@ -42,15 +44,15 @@ const stubServer = () => {
       await new Promise((resolve) => setTimeout(resolve, onboardingStatusDelayMs));
     }
     const body = url === '/api/auth/status'
-      ? { needsSetup: false }
+      ? { needsSetup: false, accessSso }
       : url === '/api/auth/user'
         ? { user: { id: 1, username: 'triage' } }
-        : url === '/api/auth/login'
+        : url === '/api/auth/login' || url === '/api/auth/access-exchange'
           ? { token: makeToken(nowSeconds()), user: { id: 1, username: 'triage' } }
           : url === '/api/user/onboarding-status'
             ? { hasCompletedOnboarding }
             : {};
-    return new Response(JSON.stringify(body), { status: 200, headers });
+    return new Response(JSON.stringify(body), { status: url === '/api/auth/access-exchange' && accessExchangeDenied ? 403 : 200, headers });
   }));
 };
 
@@ -100,6 +102,8 @@ beforeEach(() => {
   nextRefreshedToken = null;
   hasCompletedOnboarding = true;
   onboardingStatusDelayMs = 0;
+  accessSso = false;
+  accessExchangeDenied = false;
   workspaceMounts = 0;
   loadingPasses = 0;
   seenToken = null;
@@ -112,6 +116,25 @@ afterEach(async () => {
   cleanup();
   await i18n.changeLanguage('en');
   vi.unstubAllGlobals();
+});
+
+test('verified Access automatically opens a fresh browser without a second login form', async () => {
+  accessSso = true;
+  renderApp();
+  await screen.findByText('workspace');
+  assert.ok(localStorage.getItem('auth-token'));
+  assert.equal(requestedPaths.filter((path) => path === '/api/auth/access-exchange').length, 1);
+  assert.equal(requestedPaths.includes('/api/auth/login'), false);
+  assert.equal(workspaceMounts, 1);
+});
+
+test('failed Access exchange clears an old credential and does not enter the workspace', async () => {
+  accessSso = true; accessExchangeDenied = true;
+  localStorage.setItem('auth-token', makeToken(nowSeconds()));
+  renderApp();
+  await screen.findByText('login');
+  assert.equal(localStorage.getItem('auth-token'), null);
+  assert.equal(workspaceMounts, 0);
 });
 
 test('a refreshed token on the initial auth check does not run a second loading pass', async () => {
