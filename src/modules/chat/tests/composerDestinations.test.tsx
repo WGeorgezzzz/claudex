@@ -29,7 +29,7 @@ function props(overrides:Partial<ComponentProps<typeof ChatComposer>>={}):Compon
 test('running empty input keeps stop and shows no destination row',()=>{
   render(<ChatComposer {...props({input:''})}/>);
   assert.equal(screen.queryByRole('group',{name:'Message destination while running'}),null);
-  assert.ok(screen.getByRole('button',{name:'Stop',exact:true}));
+  assert.ok(screen.getByRole('button',{name:/^Stop$/}));
 });
 
 test('plain text shows the selected destination without a footer select or duplicate queue action',()=>{
@@ -44,7 +44,7 @@ for(const [name,overrides,reason] of [
   ['attachments',{attachedFiles:[new File(['data'],'note.txt')]},'Attachments send next turn'],
   ['slash command',{input:'/compact'},'Commands send next turn'],
   ['editing a sent message',{isEditingSentMessage:true},'Edited messages send next turn'],
-] as const){
+] satisfies Array<[string,Partial<ComponentProps<typeof ChatComposer>>,string]>){
   test(`${name} visibly disables insertion and selects next turn`,()=>{
     render(<ChatComposer {...props(overrides)}/>);
     const buttons=screen.getByRole('group',{name:'Message destination while running'}).querySelectorAll('button');
