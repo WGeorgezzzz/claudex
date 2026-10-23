@@ -24,3 +24,10 @@ test('Codex questions map display answers back to native question IDs', () => {
   bridge.resolve(event.requestId, { allow: true, updatedInput: { answers: { 'Which color?': 'Blue' } } });
   assert.deepEqual(reply, { answers: { color: { answers: ['Blue'] } } });
 });
+
+test('Codex denial respects a native request whose only negative decision is cancellation', () => {
+  const bridge = new CodexPermissionBridge(); let id = ''; let reply;
+  bridge.request('s', { id: 1, method: 'item/commandExecution/requestApproval', params: { availableDecisions: ['accept', 'cancel'] } },
+    { send: event => { id = (event as AnyRecord).requestId; } }, result => { reply = result; });
+  bridge.resolve(id, { allow: false }); assert.deepEqual(reply, { decision: 'cancel' });
+});

@@ -239,6 +239,7 @@ export async function* runCodexAppServerTurn(options: CodexAppServerTurnOptions)
           push({ type: 'turn.failed', error: { message: turn.error?.message ?? 'Turn failed' } });
         } else if (turn.status === 'interrupted') {
           settleSteered({ status: 'interrupted', error: 'The Codex turn was interrupted before this addition was answered.' });
+          push({ type: 'turn.interrupted' });
         } else {
           settleSteered({ status: 'succeeded', error: null });
           push({

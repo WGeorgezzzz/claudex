@@ -302,6 +302,7 @@ async function queryCodex(
   let capturedSessionId = providerSessionId;
   let sessionCreatedSent = false;
   let terminalFailure: { message: string } | null = null;
+  let terminalInterrupted = false;
   // Codex surfaces API failures as streamed error items/turn.failed events, and
   // then the SDK also throws "Codex Exec exited with code N: <stderr>" once the
   // process dies. Showing both means the rendered error is followed by a raw
@@ -381,6 +382,7 @@ async function queryCodex(
       });
 
     for await (const event of events) {
+      if (event.type === 'turn.interrupted') { terminalInterrupted = true; continue; }
       // Capture thread/session id lazily from the stream (Codex emits this asynchronously).
       if (event.type === 'thread.started') {
         const discoveredSessionId: string | null = event.thread_id || null;
@@ -469,8 +471,9 @@ async function queryCodex(
         sessionId: capturedSessionId || sessionId || null,
         actualSessionId: capturedSessionId || thread.id || sessionId || null,
         exitCode: terminalFailure ? 1 : 0,
+        aborted: terminalInterrupted,
       }));
-      if (!terminalFailure) {
+      if (!terminalFailure && !terminalInterrupted) {
         notifyRunStopped({
           userId: ws?.userId || null,
           provider: 'codex',

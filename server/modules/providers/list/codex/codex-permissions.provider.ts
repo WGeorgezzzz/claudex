@@ -31,7 +31,9 @@ export class CodexPermissionBridge {
     const request = this.pending.get(requestId);
     if (!request) return;
     this.pending.delete(requestId);
-    let result: AnyRecord = { decision: decision.allow ? 'accept' : 'decline' };
+    const available = Array.isArray(request.params.availableDecisions) ? request.params.availableDecisions : [];
+    const denied = available.includes('cancel') && !available.includes('decline') ? 'cancel' : 'decline';
+    let result: AnyRecord = { decision: decision.allow ? 'accept' : denied };
     if (request.method === 'item/permissions/requestApproval') {
       result = { permissions: decision.allow ? request.params.permissions ?? {} : {}, scope: 'turn' };
     } else if (request.method === 'item/tool/requestUserInput') {
