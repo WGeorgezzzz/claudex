@@ -3,7 +3,8 @@ import { useTranslation } from 'react-i18next';
 import type { ReactNode } from 'react';
 
 import { IS_PLATFORM } from '@/shared/utils';
-import { api, readApiErrorMessage } from '@/shared/api';
+import { readAuthErrorMessage } from '@/modules/auth/utils/authErrorMessage';
+import { api } from '@/shared/api';
 import { AUTH_SESSION_EXPIRED_EVENT, AUTH_TOKEN_REFRESHED_EVENT, getAuthTokenRefreshDelay, isValidRefreshedToken, storeAuthToken } from '@/shared/authToken';
 import { hydrateChatDrafts, resetChatDrafts } from '@/shared/chatDrafts';
 import { hydrateUserPreferences, resetUserPreferences } from '@/shared/userSettings';
@@ -342,7 +343,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         if (!response.ok || !payload?.token || !payload.user) {
           // Most auth failures arrive as the structured AppError envelope; passing its
           // `error` object on would render it as a React child and blank the screen.
-          const message = readApiErrorMessage(payload) ?? t(AUTH_ERROR_MESSAGES.loginFailed);
+          const message = readAuthErrorMessage(payload) ?? t(AUTH_ERROR_MESSAGES.loginFailed);
           setError(message);
           return { success: false, error: message };
         }
@@ -366,7 +367,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         const payload = await parseJsonSafely<AuthSessionPayload>(response);
 
         if (!response.ok || !payload?.token || !payload.user) {
-          const message = readApiErrorMessage(payload) ?? t(AUTH_ERROR_MESSAGES.registrationFailed);
+          const message = readAuthErrorMessage(payload) ?? t(AUTH_ERROR_MESSAGES.registrationFailed);
           setError(message);
           return { success: false, error: message };
         }

@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { KeyRound } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-import { useAuth } from '@/modules/auth';
-import { api, readApiErrorMessage } from '@/shared/api';
+import { readAuthErrorMessage, useAuth } from '@/modules/auth';
+import { api } from '@/shared/api';
 import { Button } from '@/shared/ui';
 import SettingsCard from '@/modules/settings/SettingsCard';
 import SettingsSection from '@/modules/settings/SettingsSection';
@@ -31,7 +31,7 @@ export function UsersSettingsTab() {
       <SettingsCard className="p-4">
         <form className="space-y-3" onSubmit={e=>{e.preventDefault();const form=e.currentTarget;const data=new FormData(form);setBusy(true);setError('');
           void (async()=>{try{const response=await api.auth.changePassword(String(data.get('current_password')),String(data.get('password')));
-            const body=await response.json().catch(()=>({}));if(!response.ok)throw Error(readApiErrorMessage(body)||t('users.failed'));form.reset();logout();}
+            const body=await response.json().catch(()=>({}));if(!response.ok)throw Error(readAuthErrorMessage(body)||t('users.failed'));form.reset();logout();}
             catch(err){setError(err instanceof Error?err.message:String(err));}finally{setBusy(false);}})();}}>
           <label className="block space-y-1.5"><span className="text-sm font-medium text-foreground">{t('users.currentPassword')}</span>
             <input className={settingsInputClass} name="current_password" type="password" autoComplete="current-password" required/></label>

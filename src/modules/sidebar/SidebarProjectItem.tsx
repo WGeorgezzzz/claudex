@@ -162,7 +162,7 @@ function SidebarProjectItem({
     <div className={cn('sidebar-project-item md:space-y-0.5', isDeleting && 'opacity-50 pointer-events-none')}>
       <div className="md:group group sticky top-0 z-10">
         {isCompact && (
-        <div className="bg-background">
+        <div className="bg-[var(--workspace-sidebar)]">
           <div
             className={cn(
               'p-3 mx-3 my-1 rounded-lg bg-card border border-border/50 active:scale-[0.98] transition-all duration-150',

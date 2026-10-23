@@ -1,3 +1,4 @@
 export { AuthProvider, useAuth } from '@/modules/auth/context/AuthContext';
 export { default as ProtectedRoute } from '@/modules/auth/ProtectedRoute';
 export { AccountSecurity } from '@/modules/auth/AccountSecurity';
+export { readAuthErrorMessage } from '@/modules/auth/utils/authErrorMessage';

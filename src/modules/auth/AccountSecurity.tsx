@@ -2,11 +2,12 @@ import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Shield, X } from 'lucide-react';
 
-import { api, readApiErrorMessage } from '@/shared/api';
+import { readAuthErrorMessage } from '@/modules/auth/utils/authErrorMessage';
+import { api } from '@/shared/api';
 import { useAuth } from '@/modules/auth/context/AuthContext';
 
 type Device={id:string;kind:string;created_at:number;expires_at:number};
-async function read(response:Response){const b=await response.json();if(!response.ok)throw Error(readApiErrorMessage(b)||'账号操作失败');return b;}
+async function read(response:Response){const b=await response.json();if(!response.ok)throw Error(readAuthErrorMessage(b)||'账号操作失败');return b;}
 
 /** Sidebar exposes device revocation and the local/remote account boundary without revealing secrets. */
 export function AccountSecurity(){
