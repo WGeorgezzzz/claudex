@@ -1,5 +1,5 @@
 {
-  "workbuddy": {"localLogin": "Open WorkBuddy on this Windows computer and sign in. Then refresh to reuse that local login in GACI. This connection currently supports conversations only."},
+  "workbuddy": {"localLogin": "Open WorkBuddy on this Windows computer and sign in. Then refresh to reuse that local login in Nexcode. This connection currently supports conversations only."},
   "buttons": {
     "save": "Save",
     "cancel": "Cancel",
@@ -89,7 +89,7 @@
     "openInEditor": "Open in Editor"
   },
   "mainContent": {
-    "loading": "Loading GACI",
+    "loading": "Loading Nexcode",
     "settingUpWorkspace": "Setting up your workspace...",
     "chooseProject": "Choose Your Project",
     "selectProjectDescription": "Select a project from the sidebar to work with your agents. Each project contains your conversations and files.",

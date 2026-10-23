@@ -136,7 +136,7 @@ export function LocalFileLink({ fileReference, directories = [], onPreview, chil
         cloudcliDesktop?: { openLocalPath?: (path: string) => Promise<unknown> };
       };
       const open = bridge.cloudcliDesktopNotifications?.openLocalPath ?? bridge.cloudcliDesktop?.openLocalPath;
-      if (!open) throw new Error(t('fileLink.desktopOnly', 'Open this link in the GACI desktop app to use a local program.'));
+      if (!open) throw new Error(t('fileLink.desktopOnly', 'Open this link in the Nexcode desktop app to use a local program.'));
       await withResolvedPath(path => open(path));
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : String(reason));
@@ -205,7 +205,7 @@ export function LocalFileLink({ fileReference, directories = [], onPreview, chil
         buttons[next]?.focus();
       }}>
       <button type="button" role="menuitem" className={menuClass} disabled={opening} onClick={() => void openLocally()}><ExternalLink size={15}/>{t('fileLink.openLocally', 'Open locally')}</button>
-      <button type="button" role="menuitem" className={menuClass} onClick={() => { setPosition(null); linkRef.current?.click(); }}><FileText size={15}/>{t('fileLink.preview', 'Preview in GACI')}</button>
+      <button type="button" role="menuitem" className={menuClass} onClick={() => { setPosition(null); linkRef.current?.click(); }}><FileText size={15}/>{t('fileLink.preview', 'Preview in Nexcode')}</button>
       <button type="button" role="menuitem" className={menuClass} onClick={() => void copyPath()}><Copy size={15}/>{t('fileLink.copyPath', 'Copy file path')}</button>
     </div>, document.body)}
   </>;

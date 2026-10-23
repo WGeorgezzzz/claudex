@@ -14,7 +14,7 @@ import { openLocalPath } from './localPath.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const workbenchProfile = loadWorkbenchProfile(app.getAppPath());
-const APP_NAME = workbenchProfile?.productName || 'GACI';
+const APP_NAME = workbenchProfile?.productName || 'Nexcode';
 const APP_USER_MODEL_ID = workbenchProfile?.appId || 'ai.cloudcli.desktop';
 const CALLBACK_PROTOCOL = workbenchProfile?.protocol || 'cloudcli';
 if (workbenchProfile) {
@@ -258,7 +258,7 @@ async function copyDiagnostics() {
   await dialog.showMessageBox(desktopWindow?.getMainWindow() || undefined, {
     type: 'info',
     title: 'Diagnostics copied',
-    message: 'GACI desktop diagnostics were copied to the clipboard.',
+    message: 'Nexcode desktop diagnostics were copied to the clipboard.',
   });
 }
 
@@ -270,15 +270,15 @@ async function refreshCloudEnvironments({ showErrors = false } = {}) {
   } catch (error) {
     const authState = cloud.getAuthState();
     if (authState === 'expired') {
-      const expiredError = new Error('Your GACI session expired. Reconnect your account.');
+      const expiredError = new Error('Your Nexcode session expired. Reconnect your account.');
       if (showErrors) {
-        await showError('GACI login required', expiredError);
+        await showError('Nexcode login required', expiredError);
         return [];
       }
       throw expiredError;
     }
     if (showErrors) {
-      await showError('Could not load GACI environments', error);
+      await showError('Could not load Nexcode environments', error);
       return [];
     }
     throw error;
@@ -310,13 +310,13 @@ async function handleDeepLink(url) {
   }
 
   if (!pendingCloudConnectStartedAt || Date.now() - pendingCloudConnectStartedAt > AUTH_CALLBACK_TTL_MS) {
-    await showError('GACI account connection failed', new Error('No recent GACI account connection was started from this app.'));
+    await showError('Nexcode account connection failed', new Error('No recent Nexcode account connection was started from this app.'));
     return;
   }
 
   const apiKey = parsed.searchParams.get('api_key');
   if (!apiKey) {
-    await showError('GACI account connection failed', new Error('The callback did not include an API key.'));
+    await showError('Nexcode account connection failed', new Error('The callback did not include an API key.'));
     return;
   }
 
@@ -329,8 +329,8 @@ async function handleDeepLink(url) {
 
   dialog.showMessageBox(desktopWindow?.getMainWindow() || undefined, {
     type: 'info',
-    title: 'GACI account connected',
-    message: cloud.getAccount()?.email ? `Connected as ${cloud.getAccount().email}.` : 'GACI account connected.',
+    title: 'Nexcode account connected',
+    message: cloud.getAccount()?.email ? `Connected as ${cloud.getAccount().email}.` : 'Nexcode account connected.',
   }).catch(() => {});
 }
 
@@ -340,7 +340,7 @@ async function copyLocalWebUrl() {
   const localUrl = localServer.getLocalServerUrl();
 
   if (!shareableUrl) {
-    throw new Error('Local GACI URL is not available yet.');
+    throw new Error('Local Nexcode URL is not available yet.');
   }
 
   clipboard.writeText(shareableUrl);
@@ -351,7 +351,7 @@ async function copyLocalWebUrl() {
     message: isLanUrl ? 'LAN web URL copied.' : 'Local web URL copied.',
     detail: isLanUrl
       ? `${shareableUrl}\n\nUse this URL from another device on the same network.`
-      : `${shareableUrl}\n\nThis URL works on this computer. Enable LAN access before starting Local GACI to copy a phone-accessible URL.`,
+      : `${shareableUrl}\n\nThis URL works on this computer. Enable LAN access before starting Local Nexcode to copy a phone-accessible URL.`,
   });
 
   return getDesktopState();
@@ -361,7 +361,7 @@ async function openLocalWebUi() {
   await localServer.ensureLocalServer();
   const url = localServer.getShareableWebUrl() || localServer.getLocalServerUrl();
   if (!url) {
-    throw new Error('Local GACI URL is not available yet.');
+    throw new Error('Local Nexcode URL is not available yet.');
   }
 
   await openExternalUrl(url);
@@ -377,7 +377,7 @@ async function updateDesktopSetting(key, value) {
       type: 'info',
       title: 'Restart local server to apply',
       message: 'LAN access changes apply the next time the local server starts.',
-      detail: 'Quit GACI and stop the local server, then open Local GACI again.',
+      detail: 'Quit Nexcode and stop the local server, then open Local Nexcode again.',
     });
   }
 
@@ -397,7 +397,7 @@ async function showEnvironmentPicker() {
     }
   }
 
-  const choices = ['Local GACI', ...environments.map((environment) => {
+  const choices = ['Local Nexcode', ...environments.map((environment) => {
     const status = environment.status === 'running' ? '' : ` (${environment.status})`;
     return `${environment.name || environment.subdomain}${status}`;
   })];
@@ -407,7 +407,7 @@ async function showEnvironmentPicker() {
     buttons: [...choices, 'Cancel'],
     defaultId: 0,
     cancelId: choices.length,
-    title: 'Switch GACI Environment',
+    title: 'Switch Nexcode Environment',
     message: 'Choose where this desktop window should connect.',
     detail: refreshError ? `Cloud environments could not be refreshed. Showing cached environments.\n\n${refreshError.message || refreshError}` : undefined,
   });
@@ -605,7 +605,7 @@ async function openEnvironmentInDesktop(environment) {
       cancelId: 1,
       title: 'Start environment?',
       message: `${pendingTarget.name} is ${environment.status}.`,
-      detail: 'GACI can start it before opening the remote app.',
+      detail: 'Nexcode can start it before opening the remote app.',
     });
 
     if (response.response !== 0) {
@@ -713,7 +713,7 @@ function getRemoteEnvironmentMenuItems() {
   const environments = cloud.getEnvironments();
 
   if (!cloudAccount?.apiKey) {
-    return [{ label: 'Connect GACI Account...', click: () => void connectCloudAccount() }];
+    return [{ label: 'Connect Nexcode Account...', click: () => void connectCloudAccount() }];
   }
 
   if (!environments.length) {
@@ -762,7 +762,7 @@ function registerIpcHandlers() {
   ipcMain.handle('cloudcli-desktop:open-local-path', async (event, filePath) => {
     const origin=new URL(event.senderFrame?.url || 'about:blank');
     if (origin.protocol!=='file:' && !(origin.protocol==='http:' && ['127.0.0.1','localhost'].includes(origin.hostname))) {
-      throw new Error('Open local files from a local GACI window.');
+      throw new Error('Open local files from a local Nexcode window.');
     }
     return openLocalPath(filePath, candidate=>shell.openPath(candidate));
   });
@@ -894,7 +894,7 @@ function registerSingleInstance() {
 
   app.on('second-instance', (_event, argv) => {
     if (argv.includes('--local') && localServer && desktopWindow) {
-      void openLocalInDesktop().catch((error) => showError('本地 GACI 启动失败', error));
+      void openLocalInDesktop().catch((error) => showError('本地 Nexcode 启动失败', error));
     }
     const deepLink = argv.find((arg) => arg.startsWith(`${CALLBACK_PROTOCOL}://`));
     if (deepLink) {
@@ -922,7 +922,7 @@ async function bootstrap() {
   app.setAboutPanelOptions({
     applicationName: APP_NAME,
     applicationVersion: app.getVersion(),
-    copyright: 'GACI contributors; based on CloudCLI UI',
+    copyright: 'Nexcode contributors; based on CloudCLI UI',
   });
 
   localServer = new LocalServerController({
@@ -964,14 +964,14 @@ async function bootstrap() {
   await createDesktopWindow();
   if (workbenchProfile || process.argv.includes('--local')) {
     // Show the window immediately and let the local tab display startup progress/errors.
-    void openLocalInDesktop().catch((error) => showError('本地 GACI 启动失败', error));
+    void openLocalInDesktop().catch((error) => showError('本地 Nexcode 启动失败', error));
   }
   // The desktop launcher exposes local and private connections only.
 }
 
 if (registerSingleInstance()) {
   bootstrap().catch(async (error) => {
-    await showError('GACI failed to start', error);
+    await showError('Nexcode failed to start', error);
     app.quit();
   });
 }

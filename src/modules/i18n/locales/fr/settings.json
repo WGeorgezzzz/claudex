@@ -521,7 +521,7 @@
     "docs": "Docs",
     "sections": {
       "officialTitle": "Plugins officiels",
-      "officialDescription": "Maintenus par l'équipe GACI et prêts à être installés directement.",
+      "officialDescription": "Maintenus par l'équipe Nexcode et prêts à être installés directement.",
       "unofficialTitle": "Autres plugins",
       "unofficialDescription": "Plugins non officiels et intégrations d'autres utilisateurs. Examinez le code source avant d'installer."
     },
@@ -544,9 +544,9 @@
       "install": "Installer"
     },
     "prismClaudex": {
-      "name": "PRISM GACI",
+      "name": "PRISM Nexcode",
       "badge": "non officiel",
-      "description": "Intelligence de session pour Claude Code, dans GACI. Voyez pourquoi vos sessions consomment des tokens sans quitter le navigateur.",
+      "description": "Intelligence de session pour Claude Code, dans Nexcode. Voyez pourquoi vos sessions consomment des tokens sans quitter le navigateur.",
       "install": "Installer"
     },
     "sessionManagerPlugin": {

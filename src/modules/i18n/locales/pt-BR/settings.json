@@ -549,7 +549,7 @@
     },
     "managed": {
       "badge": "Gerenciado",
-      "hint": "Gerenciado pelo GACI."
+      "hint": "Gerenciado pelo Nexcode."
     },
     "help": {
       "title": "Sobre MCP do Codex",
@@ -581,7 +581,7 @@
     "docs": "Docs",
     "sections": {
       "officialTitle": "Plugins oficiais",
-      "officialDescription": "Mantidos pela equipe do GACI e prontos para instalação direta.",
+      "officialDescription": "Mantidos pela equipe do Nexcode e prontos para instalação direta.",
       "unofficialTitle": "Outros plugins",
       "unofficialDescription": "Plugins e integrações não oficiais de outros usuários. Revise o código-fonte antes de instalar."
     },
@@ -604,9 +604,9 @@
       "install": "Instalar"
     },
     "prismClaudex": {
-      "name": "PRISM GACI",
+      "name": "PRISM Nexcode",
       "badge": "não oficial",
-      "description": "Inteligência de sessão para o Claude Code, dentro do GACI. Veja por que suas sessões estão queimando tokens sem sair do navegador.",
+      "description": "Inteligência de sessão para o Claude Code, dentro do Nexcode. Veja por que suas sessões estão queimando tokens sem sair do navegador.",
       "install": "Instalar"
     },
     "sessionManagerPlugin": {
@@ -823,7 +823,7 @@
   "mcpTeamCard": {
     "title": "Configs MCP da equipe",
     "description": "Compartilhe configurações de servidores MCP com sua equipe. Todos ficam em sincronia automaticamente.",
-    "proLink": "Disponível com GACI Pro"
+    "proLink": "Disponível com Nexcode Pro"
   },
   "mcpServersAddErrors": {
     "loadFailedProvider": "Falha ao carregar servidores MCP do {{provider}}",
@@ -840,15 +840,15 @@
     "tagline": "Your agents, one workspace.",
     "starOnGitHub": "Dar estrela no GitHub",
     "docs": "Docs",
-    "hostedTitle": "Experimente o GACI hospedado",
+    "hostedTitle": "Experimente o Nexcode hospedado",
     "hostedDescription": "Colaboração em equipe, configs MCP compartilhados, sincronização de configurações entre ambientes e infraestrutura gerenciada.",
     "learnMore": "Saiba mais",
-    "proFeaturesTitle": "Recursos do GACI Pro",
+    "proFeaturesTitle": "Recursos do Nexcode Pro",
     "syncSettingsTitle": "Sincronizar configurações",
     "syncSettingsDescription": "Mantenha suas preferências, configs MCP e tema em sincronia em todos os seus ambientes.",
     "teamManagementTitle": "Gerenciamento de equipe",
     "teamManagementDescription": "Múltiplos usuários, acesso baseado em funções e projetos compartilhados para sua equipe.",
     "licensed": "Licenciado sob AGPL-3.0",
-    "proCta": "Disponível com GACI Pro"
+    "proCta": "Disponível com Nexcode Pro"
   }
 }

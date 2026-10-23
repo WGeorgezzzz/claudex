@@ -55,19 +55,19 @@ await fs.writeFile(path.join(stage,'build-provenance.json'),JSON.stringify({
 },null,2));
 await fs.writeFile(path.join(stage,'package.json'),JSON.stringify({
   name:'claudex-desktop',version:profile.version,productName:profile.productName,
-  description:'GACI independent desktop distribution',
+  description:'Nexcode independent desktop distribution',
   author:sourcePackage.author,license:sourcePackage.license,type:'module',main:'electron/main.js',
   dependencies:sourcePackage.dependencies,optionalDependencies:sourcePackage.optionalDependencies,
   build:{
     appId:profile.appId,productName:profile.productName,asar:false,electronVersion,
     npmRebuild:false,nodeGypRebuild:false,
-    artifactName:'GACI-${version}-win-${arch}.${ext}',
+    artifactName:'Nexcode-${version}-win-${arch}.${ext}',
     directories:{output:'../../release/workbench'},
     files:['electron/**','public/**','dist/**','server/**','runtime/**','node_modules/**',
       'workbench-profile.json','build-provenance.json','package.json','LICENSE','NOTICE'],
     protocols:[{name:profile.productName,schemes:[profile.protocol]}],
     win:{target:[{target:'nsis',arch:['x64']}],icon:'electron/assets/logo-windows.ico',
-      executableName:'GACI',signAndEditExecutable:true},
+      executableName:'Nexcode',signAndEditExecutable:true},
     nsis:{oneClick:false,perMachine:false,allowToChangeInstallationDirectory:true,runAfterFinish:false,
       deleteAppDataOnUninstall:false,createDesktopShortcut:true,shortcutName:profile.productName},
   },

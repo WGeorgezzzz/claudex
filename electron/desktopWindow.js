@@ -431,9 +431,9 @@ export class DesktopWindowManager {
           },
           { type: 'separator' },
           {
-            label: 'Open Local GACI',
+            label: 'Open Local Nexcode',
             accelerator: 'CmdOrCtrl+L',
-            click: () => void this.actions.openLocalInDesktop().catch((error) => this.actions.showError('Could not open local GACI', error)),
+            click: () => void this.actions.openLocalInDesktop().catch((error) => this.actions.showError('Could not open local Nexcode', error)),
           },
           {
             label: 'Open Local Web UI in Browser',
@@ -536,8 +536,8 @@ export class DesktopWindowManager {
         label: 'Local',
         submenu: [
           {
-            label: localState.localServerRunning ? 'Open Local in GACI' : 'Start Local in GACI',
-            click: () => void this.actions.openLocalInDesktop().catch((error) => this.actions.showError('Could not open local GACI', error)),
+            label: localState.localServerRunning ? 'Open Local in Nexcode' : 'Start Local in Nexcode',
+            click: () => void this.actions.openLocalInDesktop().catch((error) => this.actions.showError('Could not open local Nexcode', error)),
           },
           {
             label: 'Open Local in Browser',

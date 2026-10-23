@@ -1,6 +1,6 @@
 ﻿# Feature integration — 2026-10-24
 
-The integration starts from `origin/main` at `a3ded10e`. It retains the GACI product identity already on main; Claudex remains the repository/package lineage.
+The integration starts from `origin/main` at `a3ded10e`. It retains the Nexcode product identity already on main; Claudex remains the repository/package lineage.
 
 ## Included features
 
@@ -11,7 +11,7 @@ The integration starts from `origin/main` at `a3ded10e`. It retains the GACI pro
 | WorkBuddy | `b9fab006`, `522c92e6`, `55f815da`, `f114c2a7` | Local login, free catalog, approvals, tool rendering and rejection of leaked tool markup |
 | Mobile navigation | `7e3a7be4`, `6080858f`, `244f2330` | Menus stay in the visible viewport, history navigation and dialogs survive menu closure |
 | Native controls and usage | `78ac9f55`, `dce57d8c` | Provider controls, quota monitoring and native Codex cancellation |
-| Product identity | `1f348dfc`, `8bcc6a74` | GACI branding and WorkBuddy logo |
+| Product identity | `1f348dfc`, `8bcc6a74` | Nexcode branding and WorkBuddy logo |
 | Contextual replies | `580c22cd` | Conversation-grounded suggestions, stale-result protection and draft-only insertion |
 | Shell output | Previously uncommitted shell-collapse changes | PowerShell uses the same collapsible command/output row as Bash, including errors |
 | Browser quota bridge | `cc55e5a3` | Receive quota snapshots from an authenticated Chrome page through the optional local bridge |

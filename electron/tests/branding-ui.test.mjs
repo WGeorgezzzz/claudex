@@ -11,8 +11,8 @@ test('launcher keeps local controls without hosted account or environment UI, ev
     dom.window.document.dispatchEvent(new dom.window.Event('DOMContentLoaded'));
     await new Promise(resolve => setTimeout(resolve, 20));
     const body = dom.window.document.body;
-    assert.match(body.textContent, /GACI/);
-    assert.match(body.textContent, /Open Local GACI/);
+    assert.match(body.textContent, /Nexcode/);
+    assert.match(body.textContent, /Open Local Nexcode/);
     assert.doesNotMatch(body.textContent, /CloudCLI|Cloud environments|you@cloudcli|not connected/);
     assert.equal(body.querySelector('[data-cc-action="connect"]'), null);
     assert.equal(body.querySelector('[data-cc-action="logout"]'), null);
@@ -30,7 +30,7 @@ test('native app and tray menus expose local controls without CloudCLI cloud men
     .replace(/^import .*;\r?\n/gm, '').replace('export class DesktopWindowManager', 'class DesktopWindowManager');
   vm.runInContext(source + '\nglobalThis.Manager = DesktopWindowManager;', context);
   const manager = Object.create(context.Manager.prototype);
-  Object.assign(manager, { mainWindow: {}, appName: 'GACI',
+  Object.assign(manager, { mainWindow: {}, appName: 'Nexcode',
     tray: { setToolTip: () => {}, setContextMenu: () => {} },
     getLocalState: () => ({ localServerRunning: true, desktopSettings: {} }),
     getCloudState: () => { throw new Error('UI must not read the removed cloud account'); },
@@ -38,6 +38,6 @@ test('native app and tray menus expose local controls without CloudCLI cloud men
   });
   manager.buildAppMenu();
   const serialized = JSON.stringify(menus);
-  assert.match(serialized, /Open Local GACI/);
+  assert.match(serialized, /Open Local Nexcode/);
   assert.doesNotMatch(serialized, /CloudCLI|cloudcli.ai|Cloud Environments|"Cloud"|Logout|Connect.*Account/);
 });

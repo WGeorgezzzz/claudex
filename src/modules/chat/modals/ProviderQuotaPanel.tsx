@@ -23,7 +23,7 @@ export function ProviderQuotaPanel() {
     try {
       const response = await api.providers.openUsageLogin(provider);
       if (!response.ok) throw new Error('暂时无法打开登录窗口，可能已有检查或登录正在进行。');
-      setLoginNotice('请在运行 GACI 的电脑上完成专用浏览器登录，然后关闭该窗口；定时任务会复用登录状态。');
+      setLoginNotice('请在运行 Nexcode 的电脑上完成专用浏览器登录，然后关闭该窗口；定时任务会复用登录状态。');
     } catch (reason) { setLoginNotice(reason instanceof Error ? reason.message : '打开登录窗口失败。'); }
   };
   useEffect(() => {

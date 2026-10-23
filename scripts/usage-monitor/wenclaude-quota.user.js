@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         GACI wenClaude 用量同步
+// @name         Nexcode wenClaude 用量同步
 // @namespace    gaci.local.quota
 // @version      1.0.0
-// @description  每 30 分钟读取当前 wenClaude 网页的官方额度，仅回传本机 GACI。
+// @description  每 30 分钟读取当前 wenClaude 网页的官方额度，仅回传本机 Nexcode。
 // @match        https://wenclaude.com/app*
 // @grant        GM_xmlhttpRequest
 // @grant        GM_registerMenuCommand
@@ -67,8 +67,8 @@
         onload: response => response.status === 200 ? resolve() : reject(Error('本机接收端拒绝了数据。')),
         onerror: () => reject(Error('本机用量接收端未运行。')), ontimeout: () => reject(Error('本机用量接收超时。')),
       }));
-      console.info('[GACI 用量] 网页额度已同步。');
-    } catch (error) { console.warn('[GACI 用量]', error.message); }
+      console.info('[Nexcode 用量] 网页额度已同步。');
+    } catch (error) { console.warn('[Nexcode 用量]', error.message); }
     finally { busy = false; }
   }
   GM_registerMenuCommand('立即同步 wenClaude 额度', sync);

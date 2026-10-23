@@ -1,15 +1,15 @@
-# GACI 0.8.0 — Windows x64
+# Nexcode 0.8.0 — Windows x64
 
-GACI is an independently maintained Windows desktop project,
+Nexcode is an independently maintained Windows desktop project,
 based on upstream CloudCLI 1.37.5. It retains the upstream AGPL-3.0-or-later
 license and notices.
 
-GACI means **General Agent Cloud Integration**: **Your agents, one workspace.**
-The display-name change preserves existing Claudex profiles, accounts, and sessions.
+Nexcode (Chinese name 麻薯, "code nexus"): **Your agents, one workspace.**
+The display-name change preserves existing GACI/Claudex profiles, accounts, and sessions.
 
 ## Install alongside an existing client
 
-New builds use `GACI-<version>-win-x64.exe` and `SHA256SUMS.txt`.
+New builds use `Nexcode-<version>-win-x64.exe` and `SHA256SUMS.txt`.
 Only install artifacts that have passed the installer checks and appear on the release page; older published releases may retain the Claudex name. The installer is currently **unsigned**. The package includes its own
 Node.js 22 runtime and backend dependencies; a global Node.js installation is
 not required to start the desktop app.
@@ -17,7 +17,7 @@ not required to start the desktop app.
 The application name, installer identity, protocol, browser storage and backend
 data are separate from an existing CloudCLI installation:
 
-- Application: **GACI**
+- Application: **Nexcode**
 - App ID: `io.github.wgeorgezzzz.cloudcli-workbench`
 - Protocol: `cloudcli-workbench://`
 - Default profile: `%APPDATA%\CloudCLI Workbench`
@@ -60,7 +60,7 @@ empty success. Failed and interrupted receipts remain visible.
 
 Stopping a conversation, cancelling a queued delegation and stopping a monitor
 are separate controls. Existing monitor scheduling/recovery semantics remain.
-This is a local GACI assistant, not the OpenAI-hosted Dot service.
+This is a local Nexcode assistant, not the OpenAI-hosted Dot service.
 
 Native login tickets expire after one minute and are single-use. Browser login
 sessions are revocable from the sidebar's account control; revocation disconnects
@@ -138,7 +138,7 @@ Tasks sharing one conversation are serialized before provider startup. Existing
 interval schedules retain their original timestamps during migration. Permissions
 are read from each task's stored settings, never assumed to be bypass mode.
 
-The `GACI Windows installer` GitHub Actions workflow builds on a separate
+The `Nexcode Windows installer` GitHub Actions workflow builds on a separate
 Windows runner, installs into a disposable directory, starts the installed
 application and checks its authenticated API and frontend assets. Acceptance
 also starts a sentinel service on port 3001 and injects stale environment

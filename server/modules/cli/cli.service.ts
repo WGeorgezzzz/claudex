@@ -84,7 +84,7 @@ function showStatus(dependencies: CliServiceDependencies): void {
   const claudeProjectsPath = path.join(dependencies.homeDirectory, '.claude', 'projects');
   const environmentFilePath = path.join(dependencies.applicationRoot, '.env');
 
-  output.log(`\n${terminalTextStyles.bright('GACI - Status')}\n`);
+  output.log(`\n${terminalTextStyles.bright('Nexcode - Status')}\n`);
   output.log(terminalTextStyles.dim('═'.repeat(60)));
   output.log(`\n${terminalTextStyles.info('[INFO]')} Version: ${terminalTextStyles.bright(dependencies.packageMetadata.version)}`);
   output.log(`\n${terminalTextStyles.info('[INFO]')} Installation Directory:`);
@@ -127,7 +127,7 @@ function showStatus(dependencies: CliServiceDependencies): void {
 function showHelp(dependencies: CliServiceDependencies): void {
   dependencies.output.log(`
 ╔═══════════════════════════════════════════════════════════════╗
-║              GACI - Command Line Tool               ║
+║              Nexcode - Command Line Tool               ║
 ╚═══════════════════════════════════════════════════════════════╝
 
 Usage:
@@ -135,7 +135,7 @@ Usage:
   cloudcli [command] [options]
 
 Commands:
-  start            Start the GACI server (default)
+  start            Start the Nexcode server (default)
   sandbox          Manage Docker sandbox environments
   browser-use-mcp  Run Browser MCP stdio server
   status           Show configuration and data locations

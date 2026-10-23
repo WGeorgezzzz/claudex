@@ -45,9 +45,9 @@ test('prefers the persisted summary of a Cursor session, as the sessions API ret
 });
 
 test('falls back to the project title when no session is selected', () => {
-  assert.equal(getPageTitle(project, null), 'My Project - GACI');
+  assert.equal(getPageTitle(project, null), 'My Project - Nexcode');
 });
 
 test('falls back to the app title when no project or session is selected', () => {
-  assert.equal(getPageTitle(null, null), 'GACI');
+  assert.equal(getPageTitle(null, null), 'Nexcode');
 });

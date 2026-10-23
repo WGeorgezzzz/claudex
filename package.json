@@ -1,14 +1,15 @@
 {
   "name": "@wgeorgezzzz/claudex",
   "version": "0.8.0",
-  "productName": "GACI",
-  "description": "General Agent Cloud Integration. Your agents, one workspace.",
+  "productName": "Nexcode",
+  "description": "Nexcode (麻薯): the code nexus for your agents. Your agents, one workspace.",
   "type": "module",
   "main": "dist-server/server/index.js",
   "bin": {
     "cloudcli": "dist-server/server/modules/cli/cli.js",
     "claudex": "dist-server/server/modules/cli/cli.js",
-    "gaci": "dist-server/server/modules/cli/cli.js"
+    "gaci": "dist-server/server/modules/cli/cli.js",
+    "nexcode": "dist-server/server/modules/cli/cli.js"
   },
   "files": [
     "electron/",
@@ -67,9 +68,9 @@
   },
   "build": {
     "appId": "ai.cloudcli.desktop",
-    "productName": "GACI",
+    "productName": "Nexcode",
     "asar": false,
-    "artifactName": "GACI-${version}-${os}-${arch}.${ext}",
+    "artifactName": "Nexcode-${version}-${os}-${arch}.${ext}",
     "directories": {
       "output": "release/desktop"
     },
@@ -88,7 +89,7 @@
     ],
     "protocols": [
       {
-        "name": "GACI",
+        "name": "Nexcode",
         "schemes": [
           "cloudcli"
         ]
@@ -102,11 +103,11 @@
         "dmg"
       ],
       "extendInfo": {
-        "CFBundleName": "GACI",
-        "CFBundleDisplayName": "GACI",
+        "CFBundleName": "Nexcode",
+        "CFBundleDisplayName": "Nexcode",
         "CFBundleURLTypes": [
           {
-            "CFBundleURLName": "GACI",
+            "CFBundleURLName": "Nexcode",
             "CFBundleURLSchemes": [
               "cloudcli"
             ]

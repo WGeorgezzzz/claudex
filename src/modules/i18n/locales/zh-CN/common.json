@@ -1,5 +1,5 @@
 {
-  "workbuddy": {"localLogin": "在这台 Windows 电脑上打开 WorkBuddy 并登录，然后点击刷新即可在 GACI 中复用本地登录。当前接入支持对话，不包含文件、工具和附件操作。"},
+  "workbuddy": {"localLogin": "在这台 Windows 电脑上打开 WorkBuddy 并登录，然后点击刷新即可在 Nexcode 中复用本地登录。当前接入支持对话，不包含文件、工具和附件操作。"},
   "buttons": {
     "save": "保存",
     "cancel": "取消",
@@ -89,7 +89,7 @@
     "openInEditor": "在编辑器中打开"
   },
   "mainContent": {
-    "loading": "正在加载 GACI",
+    "loading": "正在加载 Nexcode",
     "settingUpWorkspace": "正在设置您的工作空间...",
     "chooseProject": "选择您的项目",
     "selectProjectDescription": "从侧边栏选择一个项目，与您的 Agent 开始协作。每个项目包含独立的对话和文件。",
