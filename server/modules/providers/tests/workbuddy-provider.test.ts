@@ -9,6 +9,53 @@ import { resolveWorkBuddyInstallation } from '@/modules/providers/list/workbuddy
 import { WorkBuddySessionsProvider, workBuddyTranscriptPath } from '@/modules/providers/list/workbuddy/workbuddy-sessions.provider.js';
 import { providerCapabilitiesService } from '@/modules/providers/services/provider-capabilities.service.js';
 import type { UserRuntimeContext } from '@/shared/types.js';
+import { buildWorkBuddyFreeModels } from '@/modules/providers/list/workbuddy/workbuddy-models.provider.js';
+import { workBuddyRuntime } from '@/modules/providers/list/workbuddy/workbuddy-runtime.provider.js';
+
+test('WorkBuddy lists only explicitly zero-credit chat models and prefers DeepSeek', () => {
+  const model = (id: string, credits?: unknown, extra = {}) => ({ id, name: id, credits, supportsToolCall: true, ...extra });
+  const catalog = buildWorkBuddyFreeModels({ models: [
+    model('hy3', 'x0.00 credits'), model('fast-model', 'x0.34 credits'),
+    model('deepseek-v4.1-flash-sg', 'x0.03 credits'), model('unknown'),
+    model('promo-label', 'Free now'), model('rounded-price', 'x0.001'),
+    model('numeric-zero', 0), model('disabled', 'x0', { disabled: true }),
+    model('not-enabled', 'x0', { enabled: false }), model('image-only', 'x0', { supportsToolCall: false }),
+    model('deepseek-v4.1-flash', 'x0.00 credits'), model('hy3', 'x0'), null,
+  ] });
+  assert.deepEqual(catalog.OPTIONS.map(option => option.value), ['deepseek-v4.1-flash', 'hy3']);
+  assert.equal(catalog.DEFAULT, 'deepseek-v4.1-flash');
+});
+
+test('WorkBuddy never invents a free fallback when prices are absent or become nonzero', () => {
+  for (const product of [null, {}, { models: 'invalid' }, { models: [{ id: 'hy3', credits: 'x0.01', supportsToolCall: true }] }]) {
+    assert.deepEqual(buildWorkBuddyFreeModels(product), { OPTIONS: [], DEFAULT: '' });
+  }
+});
+
+test('WorkBuddy blocks a paid saved selection before spawning a process or saving a prompt', { skip: process.platform !== 'win32' }, async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'claudex-workbuddy-test-'));
+  const previous = process.env.WORKBUDDY_INSTALL_DIR;
+  process.env.WORKBUDDY_INSTALL_DIR = root;
+  try {
+    await mkdir(path.join(root, 'resources/app.asar.unpacked/cli/dist'), { recursive: true });
+    await writeFile(path.join(root, 'WorkBuddyAI.exe'), 'not an executable');
+    await writeFile(path.join(root, 'resources/app.asar.unpacked/cli/dist/codebuddy-lite-wb.mjs'), '');
+    await writeFile(path.join(root, 'resources/app.asar.unpacked/cli/product.json'), JSON.stringify({ models: [
+      { id: 'free', credits: 'x0', supportsToolCall: true },
+    ] }));
+    await assert.rejects(workBuddyRuntime.run('must not send', {}, { send: event => assert.equal((event as { kind: string }).kind, 'error') }, {
+      resolveProviderSessionId: () => assert.fail('must validate before creating transcript'),
+      resolveResumeModel: async () => 'fast-model',
+      getProviderModels: async () => ({ OPTIONS: [], DEFAULT: '' }),
+      normalizeMessage: () => [], isProviderInstalled: async () => true,
+    }), /仅允许免费模型/);
+  } finally {
+    if (previous === undefined) delete process.env.WORKBUDDY_INSTALL_DIR;
+    else process.env.WORKBUDDY_INSTALL_DIR = previous;
+    assert(root.startsWith(path.join(os.tmpdir(), 'claudex-workbuddy-test-')));
+    await rm(root, { recursive: true, force: true });
+  }
+});
 
 test('WorkBuddy preserves actual provider, model, role and durable row identity', () => {
   const adapter = new WorkBuddySessionsProvider();
@@ -63,7 +110,7 @@ test('WorkBuddy exposes only capabilities implemented by the conversation adapte
   assert.equal(caps.supportsAbort, true);
   assert.equal(caps.supportsImages, false);
   assert.equal(caps.supportsFiles, false);
-  assert.equal(caps.supportsPermissionRequests, false);
+  assert.equal(caps.supportsPermissionRequests, true);
   assert.equal(caps.supportsSessionForking, false);
-  assert.deepEqual(caps.permissionModes, ['default']);
+  assert.deepEqual(caps.permissionModes, ['default', 'acceptEdits', 'bypassPermissions', 'plan']);
 });

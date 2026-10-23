@@ -14,7 +14,7 @@ let events: any[] = [];
 const writer = { send: (event: any) => events.push(event), setSessionId: (id: string) => { nativeId = id; } };
 const context = {
   resolveProviderSessionId: () => nativeId,
-  resolveResumeModel: async () => 'fast-model',
+  resolveResumeModel: async () => (await provider.models.getSupportedModels()).DEFAULT,
   getProviderModels: () => provider.models.getSupportedModels(),
   normalizeMessage: (raw: unknown, id: string | null) => provider.sessions.normalizeMessage(raw, id),
   isProviderInstalled: async () => true,

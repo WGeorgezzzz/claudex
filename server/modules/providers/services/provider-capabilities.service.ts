@@ -47,7 +47,7 @@ type ProviderCapabilities = {
 /**
  * The capability matrix mirrors what each runtime actually implements today:
  * - permission modes match the option sets accepted by each CLI/SDK.
- * - only the Claude SDK integration surfaces interactive permission requests.
+ * - Claude SDK and WorkBuddy CLI surface interactive permission requests.
  * - Cursor has no token usage endpoint support (its store.db has no usage rows).
  */
 const PROVIDER_CAPABILITIES: Record<LLMProvider, ProviderCapabilities> = {
@@ -100,9 +100,9 @@ const PROVIDER_CAPABILITIES: Record<LLMProvider, ProviderCapabilities> = {
     supportsSessionForking: true,
   },
   workbuddy: {
-    provider: 'workbuddy', permissionModes: ['default'], defaultPermissionMode: 'default',
+    provider: 'workbuddy', permissionModes: ['default', 'acceptEdits', 'bypassPermissions', 'plan'], defaultPermissionMode: 'default',
     supportsImages: false, supportsFiles: false, supportsAbort: true,
-    supportsPermissionRequests: false, supportsTokenUsage: false, supportsEffort: false,
+    supportsPermissionRequests: true, supportsTokenUsage: false, supportsEffort: false,
     effortLevels: [], supportsMessageEditing: false, supportsSessionForking: false,
   },
   opencode: {
