@@ -1,9 +1,10 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 
-import type { IProviderSessions } from '@/shared/index.js';
-import type { FetchHistoryOptions, FetchHistoryResult, NormalizedMessage } from '@/shared/index.js';
+import type { IProviderSessions, FetchHistoryOptions, FetchHistoryResult, NormalizedMessage } from '@/shared/index.js';
 import { createNormalizedMessage, getCloudCliHomeDir, readObjectRecord, sliceTailPage } from '@/shared/index.js';
+
+import { workBuddyTextProtocolError } from './workbuddy-protocol.provider.js';
 
 /** Runtime and history reader share the app-owned transcript path; native WorkBuddy files stay untouched. */
 export function workBuddyTranscriptPath(sessionId: string): string {
@@ -25,7 +26,10 @@ export class WorkBuddySessionsProvider implements IProviderSessions {
         if (!block) return [];
         const base = { role: row.type, id: `${row.uuid || message?.id || row.id}-${index}`, provider: 'workbuddy' as const, sessionId,
           timestamp: row.__timestamp || row.timestamp, model: message?.model };
-        if (block.type === 'text') return [createNormalizedMessage({ ...base, kind: 'text', content: block.text || '' })];
+        if (block.type === 'text') {
+          const error = row.type === 'assistant' ? workBuddyTextProtocolError(block.text) : null;
+          return [createNormalizedMessage({ ...base, kind: error ? 'error' : 'text', content: error || block.text || '' })];
+        }
         if (block.type === 'thinking') return [createNormalizedMessage({ ...base, kind: 'thinking', content: block.thinking || '' })];
         if (block.type === 'tool_use') return [createNormalizedMessage({ ...base, kind: 'tool_use', toolName: block.name, toolId: block.id, toolInput: block.input })];
         if (block.type === 'tool_result') {

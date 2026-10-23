@@ -93,6 +93,25 @@ test('WorkBuddy failures remain failures in saved history', () => {
   assert.equal(error.provider, 'workbuddy');
 });
 
+test('WorkBuddy reports leaked DSML calls as errors instead of successful prose', () => {
+  const adapter = new WorkBuddySessionsProvider();
+  const text = '现在重新查。\n\n<｜｜DSML｜｜ calls>\n<｜｜DSML｜｜ invoke name="Bash">\n<｜｜DSML｜｜ parameter name="command" string="true">ls</｜｜DSML｜｜ parameter>\n</｜｜DSML｜｜ invoke>\n</｜｜DSML｜｜ calls>';
+  const [message] = adapter.normalizeMessage({ type: 'assistant', uuid: 'broken', message: { content: [{ type: 'text', text }] } }, 'app-id');
+  assert.equal(message.kind, 'error');
+  assert.match(String(message.content), /工具调用格式异常/);
+  assert.equal(message.id, 'broken-0');
+});
+
+test('WorkBuddy preserves quoted protocol examples and user text', () => {
+  const adapter = new WorkBuddySessionsProvider();
+  const example = '<｜｜DSML｜｜ calls>\n<｜｜DSML｜｜ invoke name="Read">\n</｜｜DSML｜｜ invoke>\n</｜｜DSML｜｜ calls>';
+  for (const [role, text] of [['assistant', '示例：\n```xml\n' + example + '\n```'], ['user', example]]) {
+    const [message] = adapter.normalizeMessage({ type: role, uuid: 'example', message: { content: [{ type: 'text', text }] } }, 'app-id');
+    assert.equal(message.kind, 'text');
+    assert.equal(message.content, text);
+  }
+});
+
 test('WorkBuddy transcript IDs cannot traverse outside their directory', () => {
   for (const id of ['../auth', 'x/y', 'x\\y', '', 'x'.repeat(121)]) assert.throws(() => workBuddyTranscriptPath(id));
 });
