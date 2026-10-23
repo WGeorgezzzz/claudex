@@ -14,6 +14,8 @@ import { WorkBuddyPermissionBridge } from '@/modules/providers/list/workbuddy/wo
 import { providerCapabilitiesService } from '@/modules/providers/services/provider-capabilities.service.js';
 import { workBuddyTranscriptPath } from '@/modules/providers/list/workbuddy/workbuddy-sessions.provider.js';
 
+import { workBuddyTextProtocolError } from './workbuddy-protocol.provider.js';
+
 const active = new Map<string, { child: ChildProcess; aborted: boolean;
   submit: (id: string, content: string, settled: (result: ProviderLiveInputResult) => void) => void;
   settle: (result: ProviderLiveInputResult) => void }>();
@@ -59,6 +61,7 @@ export const workBuddyRuntime: IProviderRuntime = {
       let stderr = '';
       let announced = false;
       let persistenceError = false;
+      let protocolError: string | null = null;
       let nativeRequestId = '';
       const additions = new Map<string, { accepted: boolean; content: string; settled: (result: ProviderLiveInputResult) => void; timer: NodeJS.Timeout }>();
       const child = spawn(install.executable, args, {
@@ -129,7 +132,15 @@ export const workBuddyRuntime: IProviderRuntime = {
           && (readObjectRecord(row.message)!.content as unknown[]).some(block => readObjectRecord(block)?.type === 'tool_result');
         if (row.type === 'assistant' || row.type === 'result' || isToolResult) {
           try { persist(row); } catch { persistenceError = true; child.kill(); return; }
+          if (row.type === 'assistant') {
+            const blocks = readObjectRecord(row.message)?.content;
+            if (Array.isArray(blocks)) for (const value of blocks) {
+              const block = readObjectRecord(value);
+              if (block?.type === 'text') protocolError ||= workBuddyTextProtocolError(block.text);
+            }
+          }
           if (row.type === 'result') {
+            protocolError ||= workBuddyTextProtocolError(row.result);
             result = row; child.stdin.end();
             const used = Number(readObjectRecord(row._meta)?.['codebuddy.ai/contextUsed']);
             if (Number.isFinite(used) && used >= 0) writer.send(createNormalizedMessage({ kind: 'status', text: 'token_budget',
@@ -143,12 +154,12 @@ export const workBuddyRuntime: IProviderRuntime = {
         if (active.get(appId) === entry) { permissions.cancel(appId); active.delete(appId); }
         if (entry.aborted) { resolve(); return; }
         // The bundled CLI can exit 0 on auth/model errors. Require its semantic result as well.
-        const succeeded = code === 0 && result?.subtype === 'success' && result?.is_error === false && !persistenceError;
+        const succeeded = code === 0 && result?.subtype === 'success' && result?.is_error === false && !persistenceError && !protocolError;
         entry.settle({ status: succeeded ? 'succeeded' : 'failed', error: succeeded ? null : 'WorkBuddy failed before completing the inserted instruction.' });
         if (!succeeded) {
           const error = persistenceError ? 'Could not save the WorkBuddy conversation.'
-            : typeof result?.result === 'string' ? result.result
-              : stderr.trim() || 'WorkBuddy ended without a successful result. Check its local login and model permissions.';
+            : protocolError || (typeof result?.result === 'string' ? result.result
+              : stderr.trim() || 'WorkBuddy ended without a successful result. Check its local login and model permissions.');
           try { persist({ type: 'claudex_error', uuid: randomUUID(), __timestamp: new Date().toISOString(), content: error }); } catch { /* Preserve the runtime failure even when disk writes failed. */ }
           writer.send(createNormalizedMessage({ kind: 'error', content: error, provider: 'workbuddy', sessionId: nativeId }));
         }
