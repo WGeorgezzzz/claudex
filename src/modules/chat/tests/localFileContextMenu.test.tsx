@@ -42,7 +42,7 @@ test('keyboard menu navigation and Escape restore the link without launching', (
   const menu = screen.getByRole('menu');
   assert.equal(document.activeElement, screen.getByRole('menuitem', { name: /Open locally|本地打开/ }));
   fireEvent.keyDown(menu, { key: 'ArrowDown' });
-  assert.equal(document.activeElement, screen.getByRole('menuitem', { name: /Preview in CloudCLI|在 CloudCLI 中预览/ }));
+  assert.equal(document.activeElement, screen.getByRole('menuitem', { name: /Preview in Claudex|在 Claudex 中预览/ }));
   fireEvent.keyDown(menu, { key: 'Escape' });
   assert.equal(screen.queryByRole('menu'), null);
   assert.equal(document.activeElement, link);
@@ -64,6 +64,29 @@ test('web links keep the browser context menu', () => {
 });
 
 const sampleRoot = 'D:/embodied/piper-real-aligned-20261022/sample_videos/';
+
+test('a short report beside an absolute report uses that report directory, not the broad project root', async () => {
+  const expected='D:/embodied/piper-real-aligned-act-left-20261022/simeval/REPORT_zh.md';
+  readFileBlob.mockImplementation(async (_project,path)=>({ok:path===expected,status:path===expected?200:404}));
+  desktop.cloudcliDesktop={openLocalPath:vi.fn().mockResolvedValue({})};
+  const message='## 报告位置\n\n- 真机：`D:\\embodied\\piper-real-aligned-act-left-20261022\\real\\REPORT_zh.md`（E组）\n'
+    +'- 补采和训练：`D:\\embodied\\piper-act-left-centerbell-20261023\\REPORT_zh.md`\n'
+    +'- 训练和仿真评测：`D:\\embodied\\piper-real-aligned-act-left-20261022\\REPORT_zh.md`、`simeval\\REPORT_zh.md`';
+  render(<MarkdownWorkspaceContext.Provider value={{projectId:'one',projectPath:'D:/embodied'}}><Markdown>{message}</Markdown></MarkdownWorkspaceContext.Provider>);
+  const link=screen.getByRole('link',{name:'simeval\\REPORT_zh.md'});
+  fireEvent.contextMenu(link);fireEvent.click(screen.getByRole('menuitem',{name:/Open locally|本地打开/}));
+  await waitFor(()=>assert.deepEqual(desktop.cloudcliDesktop?.openLocalPath.mock.calls,[[expected]]));
+  fireEvent.click(link);await waitFor(()=>assert.deepEqual(preview.mock.calls,[[expected,null]]));
+  assert.ok(readFileBlob.mock.calls.every(call=>call[1]===expected&&call[2].method==='HEAD'));
+});
+
+test('multiple nearby absolute reports never pick an arbitrary existing relative file', async () => {
+  desktop.cloudcliDesktop={openLocalPath:vi.fn().mockResolvedValue({})};readFileBlob.mockResolvedValue({ok:true,status:200});
+  render(<MarkdownWorkspaceContext.Provider value={{projectId:'one',projectPath:'D:/embodied'}}><Markdown>{'`D:/one/REPORT.md`、`D:/two/REPORT.md`、`simeval/REPORT.md`'}</Markdown></MarkdownWorkspaceContext.Provider>);
+  fireEvent.contextMenu(screen.getByRole('link',{name:'simeval/REPORT.md'}));fireEvent.click(screen.getByRole('menuitem',{name:/Open locally|本地打开/}));
+  await waitFor(()=>assert.match(screen.getByRole('alert').textContent||'',/多个同名文件/));
+  assert.equal(desktop.cloudcliDesktop?.openLocalPath.mock.calls.length,0);
+});
 const sampleMessage = '**样例视频**：`' + sampleRoot.replace(/\//g, '\\') + '`\n\n'
   + '| 目录 | 内容 |\n|---|---|\n| `clean_bell-846000000-0001\\` | `high.mp4` |\n'
   + '| `random_bell-857000000-0002\\` | 文件同上 |\n\n我抽帧看了 clean：`_head_6frames.jpg`';

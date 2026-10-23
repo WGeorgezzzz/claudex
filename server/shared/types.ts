@@ -106,6 +106,8 @@ export type LLMProvider = 'claude' | 'codex' | 'cursor' | 'opencode';
  */
 export type ProviderModelOption = {
   value: string;
+  /** Aliases reported by the connected provider, resolving to this wire ID. */
+  aliases?: string[];
   label: string;
   description?: string;
   /** Stable SQLite row id used only by model-management actions. */

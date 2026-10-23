@@ -515,7 +515,7 @@
     },
     "managed": {
       "badge": "Spravováno",
-      "hint": "Spravuje CloudCLI."
+      "hint": "Spravuje Claudex."
     },
     "help": {
       "title": "O MCP pro Codex",
@@ -547,7 +547,7 @@
     "docs": "Dokumentace",
     "sections": {
       "officialTitle": "Oficiální pluginy",
-      "officialDescription": "Spravuje je tým CloudCLI a jsou připravené k přímé instalaci.",
+      "officialDescription": "Spravuje je tým Claudex a jsou připravené k přímé instalaci.",
       "unofficialTitle": "Další pluginy",
       "unofficialDescription": "Neoficiální pluginy a integrace od jiných uživatelů. Před instalací zkontrolujte zdrojový kód."
     },
@@ -569,10 +569,10 @@
       "description": "Plánujte prompty v pracovním prostoru, procházejte historii běhů a spravujte opakované lokální úkoly.",
       "install": "Instalovat"
     },
-    "prismCloudCLI": {
-      "name": "PRISM CloudCLI",
+    "prismClaudex": {
+      "name": "PRISM Claudex",
       "badge": "neoficiální",
-      "description": "Analýza relací Claude Code přímo v CloudCLI. Zjistěte, proč vaše relace spalují tokeny, aniž byste opustili prohlížeč.",
+      "description": "Analýza relací Claude Code přímo v Claudex. Zjistěte, proč vaše relace spalují tokeny, aniž byste opustili prohlížeč.",
       "install": "Instalovat"
     },
     "sessionManagerPlugin": {
@@ -786,7 +786,7 @@
   "mcpTeamCard": {
     "title": "Týmové konfigurace MCP",
     "description": "Sdílejte konfigurace MCP serverů v rámci týmu. Všichni budou mít vše automaticky synchronizované.",
-    "proLink": "K dispozici v CloudCLI Pro"
+    "proLink": "K dispozici v Claudex Pro"
   },
   "mcpServersAddErrors": {
     "loadFailedProvider": "Nepodařilo se načíst MCP servery pro {{provider}}",
@@ -803,15 +803,15 @@
     "tagline": "Open-source rozhraní pro AI asistenty programování",
     "starOnGitHub": "Dát hvězdičku na GitHubu",
     "docs": "Dokumentace",
-    "hostedTitle": "Vyzkoušejte CloudCLI Hosted",
+    "hostedTitle": "Vyzkoušejte Claudex Hosted",
     "hostedDescription": "Týmová spolupráce, sdílené konfigurace MCP, synchronizace nastavení napříč prostředími a spravovaná infrastruktura.",
     "learnMore": "Další informace",
-    "proFeaturesTitle": "Funkce CloudCLI Pro",
+    "proFeaturesTitle": "Funkce Claudex Pro",
     "syncSettingsTitle": "Synchronizace nastavení",
     "syncSettingsDescription": "Mějte předvolby, konfigurace MCP a motiv synchronizované ve všech svých prostředích.",
     "teamManagementTitle": "Správa týmu",
     "teamManagementDescription": "Více uživatelů, přístup podle rolí a sdílené projekty pro váš tým.",
     "licensed": "Šířeno pod licencí AGPL-3.0",
-    "proCta": "K dispozici v CloudCLI Pro"
+    "proCta": "K dispozici v Claudex Pro"
   }
 }

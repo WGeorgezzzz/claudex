@@ -68,7 +68,7 @@ function ComposerModelMenu({
     () => modelOptions.find((option) => option.value === model) ?? null,
     [model, modelOptions],
   );
-  const modelLabel = selectedModelOption?.label || model;
+  const modelLabel = selectedModelOption?.label || model || t('composer.loadingModels', { defaultValue: 'Loading models…' });
 
   const hasEffortSection = resolvedEffortOptions.length > 0;
   const hasModelSection = modelOptions.length > 0 || modelsLoading;

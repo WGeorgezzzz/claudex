@@ -88,7 +88,7 @@
     "openInEditor": "Abrir no editor"
   },
   "mainContent": {
-    "loading": "Carregando CloudCLI",
+    "loading": "Carregando Claudex",
     "settingUpWorkspace": "Configurando seu espaço de trabalho...",
     "chooseProject": "Escolha seu projeto",
     "selectProjectDescription": "Selecione um projeto na barra lateral para começar a codar com o Claude. Cada projeto contém suas sessões de chat e histórico de arquivos.",
@@ -252,7 +252,7 @@
     "viewFullRelease": "Ver release completo",
     "updateProgress": "Progresso da atualização:",
     "manualUpgrade": "Atualização manual:",
-    "npmUpgradeCommand": "npm install -g @cloudcli-ai/cloudcli@latest",
+    "npmUpgradeCommand": "npm install -g @wgeorgezzzz/claudex@latest",
     "manualUpgradeHint": "Ou clique em \"Atualizar agora\" para executar a atualização automaticamente.",
     "updateCompleted": "Atualização concluída com sucesso!",
     "restartServer": "Reinicie o servidor para aplicar as mudanças.",

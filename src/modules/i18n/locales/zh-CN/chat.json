@@ -16,10 +16,10 @@
   "fileLink": {
     "menu": "文件操作",
     "openLocally": "本地打开",
-    "preview": "在 CloudCLI 中预览",
+    "preview": "在 Claudex 中预览",
     "copyPath": "复制文件路径",
     "noProject": "无法获取项目路径，请先在所属项目中打开此会话。",
-    "desktopOnly": "请在 CloudCLI 桌面版中使用本地程序打开此文件。",
+    "desktopOnly": "请在 Claudex 桌面版中使用本地程序打开此文件。",
     "copyFailed": "无法复制文件路径。"
   },
   "codeBlock": {

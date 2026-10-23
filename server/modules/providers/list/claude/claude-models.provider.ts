@@ -1,5 +1,7 @@
 import { readFile } from 'node:fs/promises';
 
+import { query, type ModelInfo } from '@anthropic-ai/claude-agent-sdk';
+
 import { sessionsDb } from '@/modules/database/index.js';
 import type { IProviderModels } from '@/shared/interfaces.js';
 import type {
@@ -11,7 +13,27 @@ import {
   buildDefaultProviderCurrentActiveModel,
   isPlaceholderProviderModel,
   stripAnsiSequences,
+  getClaudeConfigDir,
 } from '@/shared/utils.js';
+import { resolveClaudeCodeExecutablePath } from '@/shared/claude-cli-path.js';
+
+// Control-only handshake: same executable and auth as chat, without a prompt
+// or a persisted conversation. Concurrent callers share one bounded request.
+async function loadConnectedClaudeModels(): Promise<ModelInfo[]> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 45000);
+  // eslint-disable-next-line require-yield -- deliberately no user prompt
+  async function* input(): AsyncGenerator<never> {
+    await new Promise<void>((resolve) => controller.signal.addEventListener('abort', () => resolve(), { once: true }));
+  }
+  const connection = query({ prompt: input(), options: {
+    cwd: getClaudeConfigDir(), persistSession: false, abortController: controller,
+    pathToClaudeCodeExecutable: resolveClaudeCodeExecutablePath(process.env.CLAUDE_CLI_PATH) ?? undefined,
+    env: { ...process.env },
+  } });
+  try { return await connection.supportedModels(); }
+  finally { clearTimeout(timer); connection.close(); controller.abort(); }
+}
 
 /**
  * Ultracode is not one of the SDK's reasoning-effort levels. Selecting it runs the turn at
@@ -277,19 +299,34 @@ const readClaudeSessionModelFromJsonl = async (
 };
 
 export class ClaudeProviderModels implements IProviderModels {
+  private pending?: Promise<ProviderModelsDefinition>;
+  private cached?: { expires: number; catalog: ProviderModelsDefinition };
+
+  constructor(private readonly loadModels: () => Promise<ModelInfo[]> = loadConnectedClaudeModels) {}
+
   async getSupportedModels(): Promise<ProviderModelsDefinition> {
-    // claude creates a new jsonl file as a separate session for this request.
-    // As a result, it lists the workspace where this is invoked when it shouldn't.
-    //
-    // Disabled for now:
-    // const queryInstance = query({
-    //   prompt: 'Get supported models',
-    //   options: buildClaudeQueryOptions(),
-    // });
-    // const supportedModels = await queryInstance.supportedModels();
-    // queryInstance.close();
-    // return buildClaudeModelsDefinition(supportedModels);
-    return CLAUDE_PREDEFINED_MODELS;
+    if (this.cached && this.cached.expires > Date.now()) return this.cached.catalog;
+    if (this.pending) return this.pending;
+    this.pending = this.loadModels().then((models) => {
+      const options = new Map<string, ProviderModelOption>();
+      for (const model of models) {
+        const value = (model.resolvedModel || model.value).trim();
+        if (!value) continue;
+        const previous = options.get(value);
+        const aliases = [...new Set([...(previous?.aliases ?? []), model.value])];
+        options.set(value, {
+          value, label: value, aliases, description: model.description,
+          ...(model.supportedEffortLevels?.length ? { effort: {
+            values: model.supportedEffortLevels.map((level) => ({ value: level })),
+          } } : {}),
+        });
+      }
+      if (options.size === 0) throw new Error('The connected Claude account returned no models.');
+      const catalog = { OPTIONS: [...options.values()], DEFAULT: [...options.keys()][0] };
+      this.cached = { expires: Date.now() + 5 * 60_000, catalog };
+      return catalog;
+    }).finally(() => { this.pending = undefined; });
+    return this.pending;
   }
 
   async getCurrentActiveModel(sessionId?: string): Promise<ProviderCurrentActiveModel> {

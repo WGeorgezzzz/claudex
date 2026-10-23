@@ -29,13 +29,6 @@ const toProviderEffortOptions = (
   values: readonly string[],
 ): NonNullable<ProviderModelOption['effort']>['values'] => values.map((value) => ({ value }));
 
-const FALLBACK_DEFAULT_MODEL: Record<LLMProvider, string> = {
-  claude: 'default',
-  cursor: 'gpt-5.3-codex',
-  codex: 'gpt-5.4',
-  opencode: 'anthropic/claude-sonnet-4-5',
-};
-
 const PROVIDERS: LLMProvider[] = ['claude', 'cursor', 'codex', 'opencode'];
 
 /** localStorage key holding the user's default model for one provider. */
@@ -137,8 +130,8 @@ export function useChatProviderState({ selectedSession, selectedProject }: UseCh
   // that validates them arrives asynchronously per provider.
   const [providerModels, setProviderModels] = useState<Record<LLMProvider, string>>(() => {
     return PROVIDERS.reduce<Record<LLMProvider, string>>((acc, targetProvider) => {
-      acc[targetProvider] = localStorage.getItem(providerModelStorageKey(targetProvider))
-        || FALLBACK_DEFAULT_MODEL[targetProvider];
+      // Until discovery succeeds, retain only an actual user selection.
+      acc[targetProvider] = localStorage.getItem(providerModelStorageKey(targetProvider)) || '';
       return acc;
     }, {} as Record<LLMProvider, string>);
   });
@@ -287,7 +280,7 @@ export function useChatProviderState({ selectedSession, selectedProject }: UseCh
     if (current && def.OPTIONS.some((o) => o.value === current)) {
       return current;
     }
-    return def.DEFAULT;
+    return def.OPTIONS.find((option) => option.aliases?.includes(stored || current))?.value ?? def.DEFAULT;
   };
 
   const getModelOption = useCallback((
@@ -299,14 +292,14 @@ export function useChatProviderState({ selectedSession, selectedProject }: UseCh
       return null;
     }
 
-    return definition.OPTIONS.find((option) => option.value === model) ?? null;
+    return definition.OPTIONS.find((option) => option.value === model || option.aliases?.includes(model)) ?? null;
   }, [providerModelCatalog]);
 
   const getEffortOptionsForModel = useCallback((
     targetProvider: LLMProvider,
     model: string,
   ): NonNullable<ProviderModelOption['effort']>['values'] => {
-    if (!getSupportsEffortForProvider(targetProvider)) {
+    if (!model || !getSupportsEffortForProvider(targetProvider)) {
       return [];
     }
 
@@ -706,7 +699,8 @@ export function useChatProviderState({ selectedSession, selectedProject }: UseCh
 
   // The open session's model wins over the per-provider default, so switching
   // sessions shows (and sends) what each session actually runs with.
-  const currentProviderModel = sessionModel ?? providerModels[provider];
+  const selectedModel = sessionModel ?? providerModels[provider];
+  const currentProviderModel = getModelOption(provider, selectedModel)?.value ?? selectedModel;
   const currentProviderEffortOptions = useMemo(() => {
     return getEffortOptionsForModel(provider, currentProviderModel);
   }, [currentProviderModel, getEffortOptionsForModel, provider]);
