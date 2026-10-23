@@ -280,7 +280,7 @@ const MessageComponent = memo(({ message, prevMessage, createDiff, onFileOpen, s
                   // Bash draws its output inside this row rather than in the
                   // result section below, so for a backgrounded command this is
                   // the row the background-tasks strip scrolls to.
-                  <div id={message.toolName === 'Bash' ? `tool-result-${message.toolId}` : undefined} className="scroll-mt-4">
+                  <div id={message.toolName === 'Bash' || message.toolName === 'PowerShell' ? `tool-result-${message.toolId}` : undefined} className="scroll-mt-4">
                     <ToolRenderer
                       toolName={message.toolName || 'UnknownTool'}
                       toolInput={message.toolInput}
@@ -298,7 +298,7 @@ const MessageComponent = memo(({ message, prevMessage, createDiff, onFileOpen, s
                 )}
 
                 {/* Tool Result Section — Bash renders its output inside the command row above. */}
-                {message.toolResult && message.toolName !== 'Bash' && !shouldHideToolResult(message.toolName || 'UnknownTool', message.toolResult) && (
+                {message.toolResult && message.toolName !== 'Bash' && message.toolName !== 'PowerShell' && !shouldHideToolResult(message.toolName || 'UnknownTool', message.toolResult) && (
                   message.toolResult.isError ? (
                     // Error results — collapsed red row that expands to the content
                     <div id={`tool-result-${message.toolId}`} className="scroll-mt-4">

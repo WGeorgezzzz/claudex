@@ -36,7 +36,7 @@ type ToolRendererProps = {
 function getToolCategory(toolName: string): string {
   if (['Edit', 'Write', 'ApplyPatch'].includes(toolName)) return 'edit';
   if (['Grep', 'Glob'].includes(toolName)) return 'search';
-  if (toolName === 'Bash') return 'bash';
+  if (toolName === 'Bash' || toolName === 'PowerShell') return 'bash';
   if (['TodoWrite', 'TodoRead'].includes(toolName)) return 'todo';
   if (['TaskCreate', 'TaskUpdate', 'TaskList', 'TaskGet'].includes(toolName)) return 'task';
   if (toolName === 'Task') return 'agent';
@@ -120,7 +120,7 @@ export const ToolRenderer: React.FC<ToolRendererProps> = memo(({
   // the input render; the separate result section is suppressed in MessageComponent.
   // Files the command changed are listed under the row, outside its collapse, so
   // they read like the Edit rows they stand in for.
-  if (toolName === 'Bash' && mode === 'input') {
+  if ((toolName === 'Bash' || toolName === 'PowerShell') && mode === 'input') {
     const command = typeof parsedData === 'object' && parsedData !== null && 'command' in parsedData
       ? String(parsedData.command || '')
       : typeof toolInput === 'string'
