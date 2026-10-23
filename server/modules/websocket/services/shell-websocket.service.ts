@@ -7,7 +7,7 @@ import { WebSocket, type RawData } from 'ws';
 
 import { assertOwnedSession } from '@/modules/access-control/index.js';
 import { assertUserPath, getUserContext, getCurrentUserContext, withUserContext } from '@/modules/auth/index.js';
-import { getClaudeConfigDir } from '@/shared/index.js';
+import { createClaudeLaunchEnvironment, getClaudeConfigDir } from '@/shared/index.js';
 import { parseIncomingJsonObject, stripAnsiSequences } from '@/shared/utils.js';
 
 type ShellIncomingMessage = {
@@ -681,7 +681,11 @@ export function handleShellConnection(
           : os.platform() === 'win32' ? ['-NoLogo', '-NoExit'] : ['-i'];
         const termCols = readNumber(data.cols, 80);
         const termRows = readNumber(data.rows, 24);
-        const prioritizedPath = prioritizeUserNpmGlobalBin(userContext?.env ?? process.env);
+        const baseEnvironment = userContext?.env ?? process.env;
+        const launchEnvironment = readString(data.provider, 'claude') === 'claude'
+          ? createClaudeLaunchEnvironment(baseEnvironment, process.env.CLAUDE_CLI_PATH)
+          : baseEnvironment;
+        const prioritizedPath = prioritizeUserNpmGlobalBin(launchEnvironment);
 
         shellProcess = (dependencies.spawnPty ?? pty.spawn)(shell, shellArgs, {
           name: 'xterm-256color',
@@ -689,7 +693,7 @@ export function handleShellConnection(
           rows: termRows,
           cwd: resolvedProjectPath,
           env: {
-            ...(userContext?.env ?? process.env),
+            ...launchEnvironment,
             [prioritizedPath.key]: prioritizedPath.value,
             TERM: 'xterm-256color',
             COLORTERM: 'truecolor',

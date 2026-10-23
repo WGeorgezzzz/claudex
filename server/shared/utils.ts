@@ -1367,6 +1367,53 @@ export function findApplicationRoot(startDirectory: string): string {
 }
 
 //----------------- CLAUDE CONFIGURATION PATHS ------------
+/**
+ * Providers and WebSocket terminals use this when spawning a configured Windows
+ * Claude launcher. Independent-lane launchers select an upstream from inherited
+ * proxy variables before creating their own listener; inheriting that listener
+ * makes the forwarder connect to itself. Remove only matching loopback endpoints
+ * from a copy, leaving system-proxy discovery to the launcher. Native binaries
+ * must retain their proxy: they consume the lane instead of starting it.
+ * Reads the current user's manifest on every launch so reinstall/port changes
+ * need no cached state, script patch, or credentials in application settings.
+ */
+export function createClaudeLaunchEnvironment(
+  environment: NodeJS.ProcessEnv,
+  executablePath: string | undefined,
+  platform: NodeJS.Platform = process.platform,
+): NodeJS.ProcessEnv {
+  const result = { ...environment };
+  const executable = executablePath?.trim().replace(/^(["'])(.*)\1$/, '$2');
+  if (platform !== 'win32' || !executable || !/\.(?:[cm]?[jt]sx?|ps1|cmd|bat)$/i.test(executable)) {
+    return result;
+  }
+  const configDir = environment.CLAUDE_CONFIG_DIR?.trim();
+  if (!configDir || !path.isAbsolute(configDir)) return result;
+  let port: unknown;
+  try {
+    const manifest = JSON.parse(fs.readFileSync(path.join(configDir, 'lane-manifest.json'), 'utf8').replace(/^\uFEFF/, ''));
+    port = manifest?.port;
+  } catch {
+    return result;
+  }
+  if (typeof port !== 'number' || !Number.isInteger(port) || port < 1 || port > 65535) return result;
+  for (const key of Object.keys(result)) {
+    if (!/^(?:https?|all)_proxy$/i.test(key) || !result[key]) continue;
+    try {
+      const value = result[key]!.trim();
+      const proxy = new URL(value.includes('://') ? value : `http://${value}`);
+      const proxyPort = Number(proxy.port || (proxy.protocol === 'https:' ? 443 : 80));
+      const host = proxy.hostname.replace(/^\[|\]$/g, '').replace(/\.$/, '').toLowerCase();
+      const loopback = host === 'localhost' || host === '::1' || host === '::' || host === '0.0.0.0'
+        || /^127\./.test(host) || /^::ffff:7f[\da-f]{2}:[\da-f]{1,4}$/.test(host);
+      if (proxyPort === port && loopback) delete result[key];
+    } catch {
+      // Unrecognized proxy formats are not evidence of a self-loop.
+    }
+  }
+  return result;
+}
+
 /** Used by providers, agents and session discovery. Resolves the SDK configuration
  * root at call time so explicit CLAUDE_CONFIG_DIR overrides are honored everywhere. */
 export function getClaudeConfigDir(): string {
