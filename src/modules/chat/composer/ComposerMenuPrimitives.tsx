@@ -26,10 +26,12 @@ export function ComposerMenuSurface({
       ref={menuRef}
       role="menu"
       aria-label={ariaLabel}
-      className="fixed z-[100] min-w-48 overflow-y-auto overscroll-contain rounded-xl border border-border bg-popover p-1 text-popover-foreground shadow-xl"
+      className="fixed z-[100] min-w-0 overflow-y-auto overflow-x-hidden overscroll-contain rounded-xl border border-border bg-popover p-1 text-popover-foreground shadow-xl"
       style={{
         right: anchor.right,
+        top: anchor.top,
         bottom: anchor.bottom,
+        width: anchor.maxWidth,
         maxHeight: anchor.maxHeight,
         maxWidth: anchor.maxWidth,
       }}
@@ -88,7 +90,7 @@ export function ComposerMenuItem({
       <span className="min-w-0 flex-1">
         <span className="block truncate leading-5">{label}</span>
         {description && (
-          <span className="mt-0.5 block text-xs leading-4 text-muted-foreground">{description}</span>
+          <span className="mt-0.5 block break-words text-xs leading-4 text-muted-foreground">{description}</span>
         )}
       </span>
       <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center">

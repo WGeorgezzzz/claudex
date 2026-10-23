@@ -797,10 +797,11 @@ export type BackgroundSendPrompt = {
   work: string[];
 };
 
-/** Viewport-relative placement box (right/bottom offsets plus max height and width) computed for a composer popover so the model and permission menus stay inside the window. */
+/** Layout viewport offsets and visible size limits for chat's model and permission popovers; top is used when opening below the trigger. */
 export type ComposerMenuAnchor = {
   right: number;
-  bottom: number;
+  bottom?: number;
+  top?: number;
   maxHeight: number;
   maxWidth: number;
 };
