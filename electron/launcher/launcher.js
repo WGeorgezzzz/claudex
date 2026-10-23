@@ -348,7 +348,6 @@ window.__MOCK_STATE__ = {
   }
 
   CC.titlebar = function (state) {
-    var conn = connected(state);
     var activeTab = (state.tabs || []).filter(function (tab) { return tab.active; })[0] || null;
     var activeEnvironmentId = state.activeTarget && state.activeTarget.kind === 'remote' ? state.activeTarget.id : null;
     if (!activeEnvironmentId && activeTab && /^remote:/.test(activeTab.id || '')) {
@@ -358,15 +357,12 @@ window.__MOCK_STATE__ = {
       (activeTab && activeTab.id !== 'home');
     var envActions = activeEnvironmentId ? '<button class="btn sm tb-action no-drag" data-cc-action="env-row-menu" data-cc-environment-id="' + esc(activeEnvironmentId) + '" title="Open environment actions">Open environment in...</button>' : '';
     var refreshAction = activeRefreshable ? '<button class="icon-btn tb-action no-drag" data-cc-action="refresh-tab" title="Refresh tab">' + icon('refresh', 16) + '</button>' : '';
-    var logoutAction = (conn || authState(state) === 'expired') ? '<button class="icon-btn tb-action no-drag" data-cc-action="logout" title="Logout">' + icon('logOut', 16) + '</button>' : '';
     return '<div class="titlebar">' +
       '<div class="brand"><img class="mk" src="' + esc(LOGO_URL) + '" alt=""><span>GACI</span></div>' +
       '<div class="tb-tabs no-drag">' + renderTabs(state) + '</div>' +
       '<span style="flex:1"></span>' +
       refreshAction +
       envActions +
-      '<button class="btn sm tb-action no-drag" data-cc-action="connect" title="' + esc(authState(state) === 'expired' ? 'Reconnect your GACI account' : accountLabel(state)) + '"><span class="dot" style="background:' + (conn ? 'var(--ok)' : (authState(state) === 'expired' ? 'var(--warn)' : 'var(--tx3)')) + '"></span>' + esc(accountLabel(state)) + '</button>' +
-      logoutAction +
       '<button class="icon-btn tb-action no-drag" data-cc-action="settings-toggle" title="Settings">' + icon('settings', 16) + '</button>' +
       '</div>';
   };
@@ -376,8 +372,6 @@ window.__MOCK_STATE__ = {
     var running = !!state.localServerRunning;
     return '<div class="statusbar">' +
       '<span><span class="dot" style="width:7px;height:7px;background:' + (running ? 'var(--ok)' : 'var(--tx3)') + '"></span> local ' + (running ? 'running · ' + esc(localUrl(state)) : 'idle') + '</span>' +
-      '<span class="sep">·</span><span>' + esc(envCount(state)) + '</span>' +
-      '<span class="sep">·</span><span>' + (authState(state) === 'expired' ? 'session expired' : (connected(state) ? esc(accountLabel(state)) : 'not connected')) + '</span>' +
       '<span style="flex:1"></span>' +
       (status.msg ? '<span class="status-msg ' + esc(status.tone) + '">' + esc(status.msg) + '</span><span class="sep">·</span>' : '') +
       '<span>v' + esc(VERSION) + '</span>' +
@@ -639,42 +633,13 @@ window.__MOCK_STATE__ = {
       '<div class="card-actions"><button class="btn pri" data-cc-action="local">' + CC.icon('play', 15) + 'Open Local GACI</button><button class="btn" data-cc-action="open-web">' + CC.icon('arrow', 14) + 'Open in browser</button><button class="btn" data-cc-action="copy-web">' + CC.icon('copy', 14) + 'Copy URL</button></div></div>';
   }
 
-  function envRow(environment) {
-    var meta = CC.statusMeta(environment.status);
-    var tags = (environment.agent ? '<span class="tag">' + CC.esc(environment.agent) + '</span>' : '') + (environment.region ? '<span class="tag">' + CC.esc(environment.region) + '</span>' : '');
-    return '<div class="env" data-cc-env="' + environment.id + '"><span class="dot" style="background:' + meta.dot + '"></span>' +
-      '<div class="env-i"><div class="env-n">' + CC.esc(environment.name || environment.subdomain) + '</div><div class="env-u mono">' + CC.esc(environment.access_url || '') + '</div></div>' +
-      '<div class="env-tags">' + tags + '</div>' +
-      '<span class="badge ' + meta.cls + '">' + meta.label + '</span>' +
-      '<button class="btn sm" data-cc-action="env-row-menu" data-cc-environment-id="' + environment.id + '">Open environment in...</button>' +
-      '<button class="btn sm ' + (environment.status === 'running' ? 'pri' : '') + '">' + CC.icon(meta.busy ? 'refresh' : (environment.status === 'running' ? 'arrow' : 'play'), 14) + meta.open + '</button></div>';
-  }
-
-  function cloudPane(state) {
-    var header = '<div class="pane-h"><div><h2 class="pane-title">Environments</h2><p class="pane-sub">' + CC.esc(CC.envCount(state)) + '</p></div><button class="btn sm" data-cc-action="dashboard">' + CC.icon('arrow', 14) + 'Dashboard</button></div>';
-    if (CC.authState(state) === 'expired') {
-      return header + '<div class="empty">Your GACI session expired.<div style="margin-top:14px"><button class="btn pri" data-cc-action="connect">' + CC.icon('cloudPlus', 15) + 'Reconnect account</button></div></div>';
-    }
-    if (!CC.connected(state)) {
-      return header + '<div class="empty">Connect your GACI account to list hosted environments.<div style="margin-top:14px"><button class="btn pri" data-cc-action="connect">' + CC.icon('cloudPlus', 15) + 'Connect account</button></div></div>';
-    }
-    if (state.cloudLoading && !(state.environments || []).length) {
-      return header + '<div class="empty">Loading your GACI environments...</div>';
-    }
-
-    var list = (state.environments || []).map(envRow).join('');
-    if (!list) list = '<div class="empty">No hosted environments yet.</div>';
-    return header + list;
-  }
-
   function renderBody(state) {
-    var section = CC.ui.section || ((CC.connected(state) || CC.authState(state) === 'expired') ? 'cloud' : 'local');
+    var section = "local";
     CC.ui.section = section;
     var nav = '<div class="sb"><div class="sb-grp"><div class="lbl">Launcher</div>' +
       navItem('local', 'terminal', 'Local servers', state.localServerRunning ? 'on' : 'idle', section) +
-      navItem('cloud', 'cloud', 'Cloud environments', (state.environments || []).length, section) +
       '</div></div>';
-    return nav + '<div class="sb-main">' + (section === 'local' ? localPane(state) : cloudPane(state)) + '</div>';
+    return nav + '<div class="sb-main">' + localPane(state) + '</div>';
   }
 
   function onClick(event) {

@@ -966,7 +966,7 @@ async function bootstrap() {
     // Show the window immediately and let the local tab display startup progress/errors.
     void openLocalInDesktop().catch((error) => showError('本地 GACI 启动失败', error));
   }
-  void refreshCloudEnvironments({ showErrors: false });
+  // The desktop launcher exposes local and private connections only.
 }
 
 if (registerSingleInstance()) {

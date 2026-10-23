@@ -386,37 +386,9 @@ export class DesktopWindowManager {
     return items;
   }
 
-  buildTrayEnvironmentSection() {
-    const cloudState = this.getCloudState();
-    if (!cloudState.account?.apiKey) {
-      return [
-        {
-          label: cloudState.account?.email ? `Reconnect ${cloudState.account.email}` : 'Login',
-          click: () => void this.actions.connectCloudAccount()
-            .catch((error) => this.actions.showError('Could not connect GACI account', error)),
-        },
-      ];
-    }
-
-    if (!cloudState.environments.length) {
-      return [{ label: 'No environments found', enabled: false }];
-    }
-
-    return cloudState.environments.map((environment) => ({
-      label: `${environment.name || environment.subdomain} - ${environment.status}`,
-      submenu: this.buildEnvironmentActionsSubmenu(environment),
-    }));
-  }
-
   buildAppMenu() {
     if (!this.mainWindow) return;
-    const cloudState = this.getCloudState();
     const localState = this.getLocalState();
-    const remoteItems = this.getRemoteEnvironmentMenuItems();
-    const cloudAccountLabel = cloudState.account?.apiKey
-      ? (cloudState.account?.email ? `Connected: ${cloudState.account.email}` : 'GACI Connected')
-      : (cloudState.account?.email ? `Reconnect: ${cloudState.account.email}` : 'Connect GACI Account...');
-
     const template = [
       {
         label: this.appName,
@@ -427,11 +399,6 @@ export class DesktopWindowManager {
             label: 'Show Launcher',
             accelerator: 'CmdOrCtrl+Shift+L',
             click: () => void this.showLauncher().catch((error) => this.actions.showError('Could not show launcher', error)),
-          },
-          {
-            label: 'Switch Environment',
-            accelerator: 'CmdOrCtrl+Shift+E',
-            click: () => void this.actions.showEnvironmentPicker().catch((error) => this.actions.showError('Could not switch environment', error)),
           },
           {
             label: 'Diagnostics',
@@ -461,11 +428,6 @@ export class DesktopWindowManager {
             label: 'Show Launcher',
             accelerator: 'CmdOrCtrl+Shift+L',
             click: () => void this.showLauncher().catch((error) => this.actions.showError('Could not show launcher', error)),
-          },
-          {
-            label: 'Switch Environment',
-            accelerator: 'CmdOrCtrl+Shift+E',
-            click: () => void this.actions.showEnvironmentPicker().catch((error) => this.actions.showError('Could not switch environment', error)),
           },
           { type: 'separator' },
           {
@@ -497,31 +459,6 @@ export class DesktopWindowManager {
             checked: localState.desktopSettings.exposeLocalServerOnNetwork,
             click: (menuItem) => void this.actions.updateDesktopSetting('exposeLocalServerOnNetwork', menuItem.checked)
               .catch((error) => this.actions.showError('Could not update desktop setting', error)),
-          },
-        ],
-      },
-      {
-        label: 'Cloud',
-        submenu: [
-          {
-            label: cloudAccountLabel,
-            accelerator: 'CmdOrCtrl+Shift+C',
-            click: () => void this.actions.connectCloudAccount().catch((error) => this.actions.showError('Could not connect GACI account', error)),
-          },
-          {
-            label: 'Refresh Cloud Environments',
-            click: () => void this.actions.refreshCloudEnvironments().catch((error) => this.actions.showError('Could not load GACI environments', error)),
-            enabled: Boolean(cloudState.account?.apiKey),
-          },
-          {
-            label: 'Logout GACI Account',
-            click: () => void this.actions.clearCloudAccount().catch((error) => this.actions.showError('Could not logout', error)),
-            enabled: Boolean(cloudState.account?.apiKey),
-          },
-          { type: 'separator' },
-          {
-            label: 'Remote Environments',
-            submenu: remoteItems,
           },
         ],
       },
@@ -578,10 +515,6 @@ export class DesktopWindowManager {
       {
         label: 'Help',
         submenu: [
-        {
-          label: 'Open cloudcli.ai',
-          click: () => void this.actions.openCloudDashboard(),
-        },
           {
             label: 'Copy Diagnostics',
             click: () => void this.actions.copyDiagnostics(),
@@ -596,7 +529,6 @@ export class DesktopWindowManager {
 
   buildTrayMenu() {
     if (!this.tray) return;
-    const cloudState = this.getCloudState();
     const localState = this.getLocalState();
 
     const template = [
@@ -617,21 +549,6 @@ export class DesktopWindowManager {
           },
         ],
       },
-      {
-        label: 'Cloud Environments',
-        submenu: this.buildTrayEnvironmentSection(),
-      },
-      { type: 'separator' },
-      {
-        label: cloudState.account?.email ? `Connected: ${cloudState.account.email}` : 'Login',
-        click: () => void this.actions.connectCloudAccount().catch((error) => this.actions.showError('Could not connect GACI account', error)),
-      },
-      {
-        label: 'Logout GACI Account',
-        click: () => void this.actions.clearCloudAccount().catch((error) => this.actions.showError('Could not logout', error)),
-        enabled: Boolean(cloudState.account?.apiKey),
-      },
-      { type: 'separator' },
       {
         label: `Quit ${this.appName}`,
         role: 'quit',
