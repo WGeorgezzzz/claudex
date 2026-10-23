@@ -107,7 +107,10 @@ async function runSessionSynchronization(): Promise<SessionSynchronizeResult> {
 
   // Pruning is skipped after a partial sync: a provider that just failed may
   // not have re-indexed transcripts it would otherwise have re-created.
-  const prunedOrphans = failures.length === 0 ? await pruneOrphanedSessions() : 0;
+  // A passive verification copy deliberately has only selected transcripts.
+  // Never interpret its incomplete filesystem as permission to delete baseline rows.
+  const prunedOrphans = failures.length === 0 && process.env.CLAUDEX_PASSIVE_INSTANCE !== '1'
+    ? await pruneOrphanedSessions() : 0;
 
   if (failures.length === 0) {
     scanStateDb.updateLastScannedAt(scanBoundary);

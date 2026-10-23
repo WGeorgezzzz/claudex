@@ -33,6 +33,7 @@ test('section assignments reject foreign session IDs and omit stale saved refere
   closeConnection();process.env.DATABASE_PATH=path.join(root,'test.db');await initializeDatabase();
   try{
     const user=Number(userDb.createUser('sections-owner','hash').id);sessionsDb.createAppSession('owned','claude',root);
+    userDb.createUser('sections-other','hash');
     let layout=workspaceSectionsService.update(user+1,{revision:0,action:'create',name:'Other'});
     assert.throws(()=>workspaceSectionsService.update(user+1,{revision:layout.revision,action:'assign',kind:'session',targetId:'owned',sectionId:layout.sections[0].id}),error=>error instanceof Error && 'statusCode' in error && error.statusCode===403);
     workspaceSectionsDb.update(user+1,layout.revision,state=>{state.assignments.push({kind:'session',targetId:'owned',sectionId:state.sections[0].id});});

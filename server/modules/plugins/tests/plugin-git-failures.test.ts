@@ -25,13 +25,15 @@ const fixtureHome = await mkdtemp(path.join(os.tmpdir(), 'plugin-git-home-'));
 const gitConfigPath = path.join(fixtureHome, 'gitconfig');
 await writeFile(gitConfigPath, '');
 const savedEnvironment = Object.fromEntries(
-  ['HOME', 'USERPROFILE', 'GIT_CONFIG_GLOBAL', 'GIT_CONFIG_NOSYSTEM', 'GIT_TERMINAL_PROMPT', 'GIT_ASKPASS', 'SSH_ASKPASS']
+  ['HOME', 'USERPROFILE', 'GIT_CONFIG_GLOBAL', 'GIT_CONFIG_NOSYSTEM', 'GIT_TERMINAL_PROMPT', 'GIT_ASKPASS', 'SSH_ASKPASS', 'NO_PROXY', 'no_proxy']
     .map((name) => [name, process.env[name]]),
 );
 process.env.HOME = fixtureHome;
 process.env.USERPROFILE = fixtureHome;
 process.env.GIT_CONFIG_GLOBAL = gitConfigPath;
 process.env.GIT_CONFIG_NOSYSTEM = '1';
+process.env.NO_PROXY = '127.0.0.1,localhost';
+process.env.no_proxy = '127.0.0.1,localhost';
 delete process.env.GIT_TERMINAL_PROMPT;
 delete process.env.GIT_ASKPASS;
 delete process.env.SSH_ASKPASS;
@@ -195,7 +197,7 @@ test('an install of a repository the host does not have fails as PLUGIN_GIT_REPO
 test('an install from a host nothing answers on fails as PLUGIN_GIT_HOST_UNREACHABLE', { timeout: 30_000 }, async () => {
   const error = await rejection(installPluginFromGit(`http://127.0.0.1:${await closedPort()}/acme/plugin.git`));
 
-  assert.equal(error.code, 'PLUGIN_GIT_HOST_UNREACHABLE');
+  assert.equal(error.code, 'PLUGIN_GIT_HOST_UNREACHABLE', JSON.stringify(error.details));
   assert.equal(error.statusCode, 502);
   assert.match(error.message, /^Could not install the plugin: the git host could not be reached/);
   assert.deepEqual(await leftoverTempDirectories(), []);

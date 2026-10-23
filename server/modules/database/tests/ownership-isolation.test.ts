@@ -21,9 +21,9 @@ const { withUserContext, getUserContext } = await import('@/modules/auth/index.j
 const { initializeOwnership } = await import('../ownership.js');
 const { connectedClients, clientUserIds, broadcastSessionUpsertedBatch } = await import('@/modules/websocket/index.js');
 const { sessionSynchronizerService } = await import('@/modules/providers/index.js');
-const { createSessionHistoryCache } = await import('@/modules/providers/services/session-history-cache.service.js');
+const { createSessionHistoryCache } = await import('@/modules/providers/index.js');
 const { getProjectsWithSessions } = await import('@/modules/projects/index.js');
-const { handleChatConnection } = await import('@/modules/websocket/services/chat-websocket.service.js');
+const { handleChatConnection } = await import('@/modules/websocket/index.js');
 const { EventEmitter } = await import('node:events');
 
 class Connection extends EventEmitter {
@@ -52,6 +52,11 @@ test('real SQLite, HTTP, provider scans, private caches and websocket transport 
     withUserContext(3, () => sessionsDb.createAppSession('bob-session', 'codex', rootB, 'beta-3'));
     assert.equal(getSessionOwnerId('alice-session'), 2);
     assert.equal(getSessionOwnerId('bob-session'), 3);
+    // Restarts must not treat member-owned existing paths as admin inserts.
+    await initializeDatabase();
+    await initializeDatabase();
+    assert.equal(getSessionOwnerId('alice-session'), 2);
+    assert.equal(withUserContext(3, () => projectsDb.getProjectPath(rootB))?.project_path, rootB);
     withUserContext(3, () => {
       assert.equal(sessionsDb.getSessionById('alice-session'), null);
       assert.equal(projectsDb.getProjectById(projectA.project_id), null);
@@ -104,8 +109,8 @@ test('real SQLite, HTTP, provider scans, private caches and websocket transport 
     const [ca,cb] = await Promise.all([withUserContext(2,()=>cache.getFullHistory({sessionId:'same',transcriptPath:cachePath,loadFull:load('alpha')})),withUserContext(3,()=>cache.getFullHistory({sessionId:'same',transcriptPath:cachePath,loadFull:load('beta')}))]);
     assert.equal((ca?.messages[0] as any).text,'alpha'); assert.equal((cb?.messages[0] as any).text,'beta');
 
-    const { default: projectsRouter } = await import('@/modules/projects/projects.routes.js');
-    const { default: providerRouter } = await import('@/modules/providers/provider.routes.js');
+    const { projectsRoutes: projectsRouter } = await import('@/modules/projects/index.js');
+    const { providerRoutes: providerRouter } = await import('@/modules/providers/index.js');
     const app = express(); app.use(express.json());
     app.use((req,_res,next)=>{ (req as any).user={id:Number(req.headers['x-test-user'])}; next(); });
     app.use('/projects',projectsRouter); app.use('/providers',providerRouter);

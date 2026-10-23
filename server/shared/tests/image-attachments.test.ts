@@ -326,7 +326,7 @@ test('buildCodexInputItems emits text plus absolute local_image paths', () => {
 
 test('isAllowedImageSourcePath only accepts the upload store and the run cwd', () => {
   const cwd = path.join(os.tmpdir(), 'some-project');
-  const uploadStore = path.join(os.homedir(), '.cloudcli', 'assets');
+  const uploadStore = path.join(process.env.CLOUDCLI_HOME || path.join(os.homedir(), '.cloudcli'), 'assets');
 
   assert.equal(isAllowedImageSourcePath(path.join(uploadStore, 'shot.png'), cwd), true);
   assert.equal(isAllowedImageSourcePath(path.join(cwd, 'docs', 'diagram.png'), cwd), true);

@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { createHash } from 'node:crypto';
 
 import type { UserRuntimeContext } from '@/shared/types.js';
 import { getConnection } from '@/modules/database/index.js';
@@ -27,7 +28,7 @@ function canonical(target: string): string {
   }
 }
 
-function share(source: string, destination: string): 'junction' | 'copy' | 'missing' {
+function share(source: string, destination: string, credential = false): 'junction' | 'copy' | 'missing' {
   if (!fs.existsSync(source)) return 'missing';
   const sourceStat = fs.statSync(source);
   if (sourceStat.isDirectory()) {
@@ -38,17 +39,25 @@ function share(source: string, destination: string): 'junction' | 'copy' | 'miss
   // Private snapshots cannot write back through a hardlink/symlink. Comparing
   // contents also catches atomic credential replacement and same-size updates.
   const content = fs.readFileSync(source);
+  const fingerprint = createHash('sha256').update(content).digest('hex');
+  const marker = destination + '.shared-source.sha256';
   let current: fs.Stats | undefined;
   try { current = fs.lstatSync(destination); } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
   }
+  if (credential && current && !current.isSymbolicLink() && current.nlink === 1
+      && fs.existsSync(marker) && fs.readFileSync(marker, 'utf8') === fingerprint) return 'copy';
   if (current && !current.isSymbolicLink() && current.nlink === 1
-      && fs.readFileSync(destination).equals(content)) return 'copy';
+      && fs.readFileSync(destination).equals(content)) {
+    if (credential) fs.writeFileSync(marker, fingerprint, { mode: 0o600 });
+    return 'copy';
+  }
   const temporary = destination + '.' + process.pid + '.' + Math.random().toString(36).slice(2) + '.tmp';
   try {
     fs.writeFileSync(temporary, content, { mode: 0o600, flag: 'wx' });
     // Rename replaces the directory entry rather than the linked source inode.
     fs.renameSync(temporary, destination);
+    if (credential) fs.writeFileSync(marker, fingerprint, { mode: 0o600 });
   } finally {
     try { fs.unlinkSync(temporary); } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') console.warn('Could not remove shared config temporary file:', temporary);
@@ -104,9 +113,9 @@ export function getUserContext(userId: number | string): UserRuntimeContext {
     syncClaudeLoginConfig(sourceClaudeConfig, path.join(claudeConfigDir, '.claude.json'));
     sharedFiles['claude/.claude.json'] = 'selected-fields-copy';
     for (const entry of ['.credentials.json', 'settings.json', 'plugins', 'skills', '.mcp.json']) {
-      sharedFiles['claude/' + entry] = share(path.join(adminClaude, entry), path.join(claudeConfigDir, entry));
+      sharedFiles['claude/' + entry] = share(path.join(adminClaude, entry), path.join(claudeConfigDir, entry), entry === '.credentials.json');
     }
-    for (const entry of ['auth.json', 'config.toml']) sharedFiles['codex/' + entry] = share(path.join(adminCodex, entry), path.join(codexHome, entry));
+    for (const entry of ['auth.json', 'config.toml']) sharedFiles['codex/' + entry] = share(path.join(adminCodex, entry), path.join(codexHome, entry), entry === 'auth.json');
     fs.writeFileSync(path.join(root, 'shared-config.json'), JSON.stringify(sharedFiles, null, 2));
   }
   const gitEnv = { ...process.env };

@@ -1,4 +1,4 @@
-import { installAuthorizationFixture, testUserId } from '../../access-control/tests/authorization-fixture.js';
+import { installAuthorizationFixture, testUserId } from '@/test-support/authorization-fixture.js';
 import { withUserContext } from '@/modules/auth/index.js';
 import assert from 'node:assert/strict';
 import test from 'node:test';

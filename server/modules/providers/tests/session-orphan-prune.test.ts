@@ -105,3 +105,21 @@ test('synchronizeSessions keeps sessions that have no transcript path yet', asyn
     assert.ok(sessionsDb.getSessionById('opencode-session'));
   });
 });
+
+test('passive verification preserves indexed history when copied transcripts are incomplete', async () => {
+  await withIsolatedDatabase(async (workspace) => {
+    const directory = path.join(workspace, 'partial-transcripts');
+    await mkdir(directory, { recursive: true });
+    sessionsDb.createSession('copied-baseline-session', 'claude', PROJECT_PATH, 'Baseline', undefined, undefined, path.join(directory, 'not-copied.jsonl'));
+    const previous = process.env.CLAUDEX_PASSIVE_INSTANCE;
+    process.env.CLAUDEX_PASSIVE_INSTANCE = '1';
+    try {
+      const result = await sessionSynchronizerService.synchronizeSessions();
+      assert.equal(result.prunedOrphans, 0);
+      assert.ok(sessionsDb.getSessionById('copied-baseline-session'));
+    } finally {
+      if (previous === undefined) delete process.env.CLAUDEX_PASSIVE_INSTANCE;
+      else process.env.CLAUDEX_PASSIVE_INSTANCE = previous;
+    }
+  });
+});

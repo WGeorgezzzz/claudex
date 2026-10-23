@@ -2,6 +2,7 @@ import { getSessionOwnerId, getOwnerUserId } from '@/modules/database/index.js';
 import { userContextMiddleware } from '@/modules/access-control/index.js';
 import express, { type Request, type Response } from 'express';
 import { requireSharedResourceAdministrator } from '@/modules/auth/index.js';
+import { assertUserPath, getCurrentUserContext } from '@/modules/auth/index.js';
 
 import { providerAuthService } from '@/modules/providers/services/provider-auth.service.js';
 import { claudeSettingsPermissionsService } from '@/modules/providers/services/claude-settings-permissions.service.js';
@@ -37,6 +38,18 @@ router.use((request, response, next) => {
   next();
 });
 router.use(userContextMiddleware);
+router.use((request, _response, next) => {
+  try {
+    const user = getCurrentUserContext();
+    for (const target of [request.query.workspacePath, request.body?.workspacePath]) {
+      if (typeof target === 'string' && target) assertUserPath(user!.userId, target);
+    }
+    if (user?.role === 'member' && /^\/[^/]+\/(skills|mcp)(\/|$)/.test(request.path) && !request.query.workspacePath) {
+      request.query.workspacePath = user.workRoot || '';
+    }
+    next();
+  } catch (error) { next(error); }
+});
 router.param('sessionId', (_req, _res, next, id: string) => {
   const owner = getSessionOwnerId(id);
   if (owner !== null && owner !== getOwnerUserId()) return next(new AppError('无权访问此会话。', { statusCode: 403, code: 'SESSION_FORBIDDEN' }));

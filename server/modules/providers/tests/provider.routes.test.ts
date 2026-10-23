@@ -27,7 +27,7 @@ async function withProviderServer(
   await initializeDatabase();
   getConnection().prepare("INSERT INTO users(id,username,password_hash,role) VALUES(1,'test-admin','test','admin')").run();
 
-  const app = express().use(express.json()).use((req, _res, next) => { (req as Request & {user: {id: number}}).user = {id: 1}; next(); }).use('/api/providers', providerRouter);
+  const app = express().use(express.json()).use((req, _res, next) => { (req as Request & {user: {id: number; role: string}}).user = {id: 1, role: 'admin'}; next(); }).use('/api/providers', providerRouter);
   app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
     if (error instanceof AppError) {
       res.status(error.statusCode).json({
@@ -431,7 +431,8 @@ test('the running-sessions route reports a session held open for background work
   } as unknown as IProvider];
 
   try {
-    await withProviderServer(async (baseUrl) => {
+    await withProviderServer(async (baseUrl, workspacePath) => {
+      sessionsDb.createAppSession('held-session', 'claude', workspacePath, 'Held session');
       const response = await fetch(`${baseUrl}/api/providers/sessions/running`);
       const payload = await response.json() as { data: { sessions: unknown[] } };
 

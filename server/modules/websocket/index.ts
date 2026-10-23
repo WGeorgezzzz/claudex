@@ -12,3 +12,5 @@ export type { ProviderRuntimeGateway } from './services/chat-websocket.service.j
 
 // Authorization integration tests exercise the authenticated terminal entrypoint.
 export { handleShellConnection } from './services/shell-websocket.service.js';
+
+export { handleChatConnection } from './services/chat-websocket.service.js';

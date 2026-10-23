@@ -21,7 +21,7 @@ export function installAuthorizationFixture(): void {
 }
 /** HTTP transport tests establish the same req.user contract as the production authentication middleware. */
 export const authenticateTestRequest: RequestHandler = (req, _res, next) => {
-  (req as typeof req & {user: {id: number}}).user = {id: userId};
+  (req as typeof req & {user: {id: number; role: string}}).user = {id: userId, role: 'admin'};
   next();
 };
 /** PTY regression tests pass the verified handshake account through the public numeric identity contract. */

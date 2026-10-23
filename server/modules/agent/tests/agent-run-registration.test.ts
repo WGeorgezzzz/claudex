@@ -10,7 +10,7 @@ import test from 'node:test';
 import express from 'express';
 
 import { closeConnection, initializeDatabase, sessionsDb, userDb } from '@/modules/database/index.js';
-import { generateToken } from '@/modules/auth/auth.middleware.js';
+import { generateToken } from '@/modules/auth/index.js';
 import { chatRunRegistry, connectedClients } from '@/modules/websocket/index.js';
 import type { NormalizedMessage } from '@/shared/types.js';
 import { createNormalizedMessage } from '@/shared/utils.js';

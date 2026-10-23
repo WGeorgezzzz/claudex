@@ -1,4 +1,4 @@
-import { installAuthorizationFixture, authenticateTestRequest } from '../../access-control/tests/authorization-fixture.js';
+import { installAuthorizationFixture, authenticateTestRequest, testUserId } from '@/test-support/authorization-fixture.js';
 import assert from 'node:assert/strict';
 import { EventEmitter, once } from 'node:events';
 import type { AddressInfo } from 'node:net';
@@ -7,7 +7,7 @@ import test from 'node:test';
 
 import express from 'express';
 
-import { connectedClients } from '@/modules/websocket/index.js';
+import { connectedClients, clientUserIds } from '@/modules/websocket/index.js';
 
 import { createTaskmasterRouter } from '../taskmaster.routes.js';
 
@@ -184,6 +184,7 @@ test('TaskMaster broadcasts reach only the tracked chat clients', async () => {
   await once(server, 'listening');
 
   connectedClients.add(chatClient as never);
+  clientUserIds.set(chatClient as never, testUserId());
   connectedClients.add(closingClient as never);
   try {
     const address = server.address() as AddressInfo;

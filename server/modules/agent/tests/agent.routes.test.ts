@@ -1,5 +1,5 @@
-import { installAuthorizationFixture } from '../../access-control/tests/authorization-fixture.js';
-import { generateToken } from '@/modules/auth/auth.middleware.js';
+import { installAuthorizationFixture } from '@/test-support/authorization-fixture.js';
+import { generateToken } from '@/modules/auth/index.js';
 import { userDb } from '@/modules/database/index.js';
 import assert from 'node:assert/strict';
 import * as nodeCrypto from 'node:crypto';

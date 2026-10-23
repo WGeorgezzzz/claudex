@@ -26,7 +26,7 @@ test('cross-session tools bind source identity, preserve queue semantics and rej
     await assert.rejects(()=>executeSessionBridgeTool({userId:user,sessionId:'source',autonomous:false,planMode:true},{...args,action:'send'}),/cannot dispatch/);
     assert.throws(()=>sessionBridgeService.send(user,'source',{...args,sessionId:'source'}),/another/);
     const protection=path.join(root,'protected.json');await writeFile(protection,JSON.stringify({sessionIds:['target']}));process.env.CLOUDCLI_PROTECTED_SESSIONS_FILE=protection;
-    assert.equal(sessionBridgeService.list('target').sessions[0].canSend,false);assert.throws(()=>sessionBridgeService.send(user,'source',{...args,requestId:'send-2'}),/owned/);
+    assert.equal(sessionBridgeService.list('target', 0, user).sessions[0].canSend,false);assert.throws(()=>sessionBridgeService.send(user,'source',{...args,requestId:'send-2'}),/owned/);
     assert.equal(messageQueueDb.list(user,'target').length,1);
   } finally {closeConnection();if(old===undefined)delete process.env.DATABASE_PATH;else process.env.DATABASE_PATH=old;if(oldProtected===undefined)delete process.env.CLOUDCLI_PROTECTED_SESSIONS_FILE;else process.env.CLOUDCLI_PROTECTED_SESSIONS_FILE=oldProtected;assert.ok(path.resolve(root).startsWith(path.resolve(os.tmpdir())+path.sep));await rm(root,{recursive:true,force:true});}
 });

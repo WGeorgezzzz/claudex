@@ -483,16 +483,19 @@ const ensureProjectsForSessionPaths = (db: Database): void => {
     return;
   }
 
+  const hasOwnership = getTableInfo(db, 'sessions').some(column => column.name === 'owner_id')
+    && getTableInfo(db, 'projects').some(column => column.name === 'owner_id');
   db.exec(`
-    INSERT INTO projects (project_id, project_path, custom_project_name, isStarred, isArchived)
+    INSERT INTO projects (project_id, project_path, custom_project_name, isStarred, isArchived${hasOwnership ? ', owner_id' : ''})
     SELECT
       ${SQLITE_UUID_SQL},
-      project_path,
+      s.project_path,
       NULL,
       0,
-      0
-    FROM sessions
-    WHERE project_path IS NOT NULL AND trim(project_path) <> ''
+      0${hasOwnership ? ', s.owner_id' : ''}
+    FROM sessions s
+    WHERE s.project_path IS NOT NULL AND trim(s.project_path) <> ''
+      AND NOT EXISTS (SELECT 1 FROM projects p WHERE p.project_path=s.project_path)
     ON CONFLICT(project_path) DO NOTHING
   `);
 };

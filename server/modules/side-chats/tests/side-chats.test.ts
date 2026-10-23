@@ -97,8 +97,9 @@ test('legacy adoption verifies the actual parent and does not accept arbitrary s
   await fakeFork(root)('parent',{title:'Legacy'},'legacy-child');
   assert.equal(service.adopt(userId,'parent','legacy-child').child_session_id,'legacy-child');
   assert.equal(service.adopt(userId,'parent','legacy-child').status,'active');
+  sessionsDb.createAppSession('wrong-parent','claude',root);
   assert.throws(()=>service.adopt(userId,'wrong-parent','legacy-child'),/verified fork/);
-  assert.throws(()=>service.adopt(userId+1,'parent','legacy-child'),/another owner/);
+  assert.throws(()=>service.adopt(userId+1,'parent','legacy-child'),/another user/);
 }));
 
 test('the display boundary is frozen after copied timestamps and survives later renaming',()=>fixture(async(userId,root)=>{

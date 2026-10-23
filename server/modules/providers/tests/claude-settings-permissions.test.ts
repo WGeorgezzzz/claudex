@@ -1,3 +1,4 @@
+import { installAuthorizationFixture, authenticateTestRequest } from '@/test-support/authorization-fixture.js';
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
@@ -242,13 +243,15 @@ test('follows CLAUDE_CONFIG_DIR like the CLI does', async () => {
   });
 });
 
+installAuthorizationFixture();
+
 test('GET /api/providers/claude/settings-permissions serves the sources and never writes the files', async () => {
   await withHome(async (homeDir) => {
     const userFile = path.join(homeDir, '.claude', 'settings.json');
     const original = JSON.stringify({ permissions: { allow: ['Bash(git status)'] } });
     await writeSettings(userFile, original);
 
-    const app = express().use('/api/providers', providerRouter);
+    const app = express().use(authenticateTestRequest).use('/api/providers', providerRouter);
     const server = app.listen(0, '127.0.0.1');
     await once(server, 'listening');
     try {

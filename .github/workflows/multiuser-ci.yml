@@ -16,7 +16,6 @@ jobs:
     timeout-minutes: 35
     env:
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
-      CLAUDEX_PASSIVE_INSTANCE: '1'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

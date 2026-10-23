@@ -348,12 +348,13 @@ test('scheduling validates its input', async () => {
     );
     assert.throws(
       () => scheduledMessagesService.schedule({ ...base, sessionId: 'nope', content: 'hi' }),
-      (error: Error & { code?: string }) => error.code === 'SESSION_NOT_FOUND',
+      (error: Error & { statusCode?: number }) => error.statusCode === 403,
     );
   });
 });
 
 test('schedule references and legacy pending rows cannot cross the session owner boundary',()=>withIsolatedDatabase(async user=>{
+  userDb.createUser('schedule-other','hash');
   const input={userId:user+1,sessionId:SESSION_ID,content:'foreign',options:{},scheduledFor:new Date(Date.now()+1000).toISOString()};
   assert.throws(()=>scheduledMessagesService.schedule(input),error=>error instanceof Error && 'statusCode' in error && error.statusCode===403);
   assert.throws(()=>scheduledMessagesService.listForSession(user+1,SESSION_ID),error=>error instanceof Error && 'statusCode' in error && error.statusCode===403);

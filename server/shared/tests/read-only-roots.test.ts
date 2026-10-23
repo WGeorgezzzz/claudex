@@ -69,9 +69,15 @@ test('a background agent output link resolves to its transcript under the Claude
     await writeFile(transcriptPath, '{"type":"assistant"}\n', 'utf8');
 
     const tasksDirectory = path.join(temporaryDirectory, 'tasks');
-    await mkdir(tasksDirectory);
-    const outputLink = path.join(tasksDirectory, 'task-1.output');
-    await symlink(transcriptPath, outputLink);
+    let outputLink: string;
+    if (process.platform === 'win32') {
+      await symlink(transcriptDirectory, tasksDirectory, 'junction');
+      outputLink = path.join(tasksDirectory, 'agent-1.jsonl');
+    } else {
+      await mkdir(tasksDirectory);
+      outputLink = path.join(tasksDirectory, 'task-1.output');
+      await symlink(transcriptPath, outputLink);
+    }
 
     assert.equal(await resolveReadOnlyRootPath(outputLink), transcriptPath);
     assert.equal(await resolveReadOnlyRootPath(transcriptPath), transcriptPath);
@@ -106,7 +112,7 @@ test('a symlink planted in the temp directory cannot read outside every root', a
   try {
     await writeFile(path.join(outsideDirectory, 'secret.txt'), 'secret', 'utf8');
     const escapeLink = path.join(temporaryDirectory, 'escape');
-    await symlink(outsideDirectory, escapeLink);
+    await symlink(outsideDirectory, escapeLink, process.platform === 'win32' ? 'junction' : 'dir');
 
     // The name is under a read-only root but the file is not, so resolving the
     // link before comparing is what keeps this closed.

@@ -43,7 +43,12 @@ type CreateProjectServiceResult = {
 };
 
 const defaultDependencies: CreateProjectDependencies = {
-  validatePath: validateWorkspacePath,
+  validatePath: async (projectPath) => {
+    const user = getCurrentUserContext();
+    return user?.role === 'member'
+      ? { valid: true, resolvedPath: assertUserPath(user.userId, projectPath) }
+      : validateWorkspacePath(projectPath);
+  },
   ensureWorkspaceDirectory: async (projectPath: string): Promise<void> => {
     await fs.mkdir(projectPath, { recursive: true });
     const directoryStats = await fs.stat(projectPath);

@@ -14,3 +14,6 @@ export { initializeSessionsWatcher } from './services/sessions-watcher.service.j
 export { closeSessionsWatcher } from './services/sessions-watcher.service.js';
 // Session Bridge rejects dispatch into conversations still owned by another installation.
 export { assertSessionOwnerAvailable } from '@/modules/providers/services/session-owner.service.js';
+
+export { default as providerRoutes } from './provider.routes.js';
+export { createSessionHistoryCache } from './services/session-history-cache.service.js';

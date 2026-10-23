@@ -31,6 +31,8 @@ const { browserUseRoutes: browserRoutes } = await import('@/modules/browser-use/
 const { browserUseMcpRoutes: browserMcpRoutes } = await import('@/modules/browser-use/index.js');
 const { handleShellConnection } = await import('@/modules/websocket/index.js');
 const { executeSessionBridgeTool } = await import('@/modules/session-bridge/index.js');
+const { providerRoutes } = await import('@/modules/providers/index.js');
+const { createProject } = await import('@/modules/projects/index.js');
 
 await db.initializeDatabase();
 const sql = db.getConnection();
@@ -58,6 +60,7 @@ app.use((req, _res, next) => {
 app.use('/files', fileTreeRoutes);
 app.use('/git', createGitModule({ queryClaude: noProvider, queryCursor: noProvider }));
 app.use('/commands', commandsRoutes);
+app.use('/providers', providerRoutes);
 app.use('/taskmaster', taskmasterRoutes);
 app.use('/bridge', sessionBridgeRoutes);
 app.use('/monitors', monitorsRoutes);
@@ -76,6 +79,24 @@ async function request(userId: number, url: string, body?: unknown) {
 
 test('authorization HTTP surfaces isolate paths, sessions, bridge tools, monitors and browser capabilities', async () => {
   try {
+    const sourceCredential = path.join(process.env.CLAUDE_CONFIG_DIR!, '.credentials.json');
+    fs.writeFileSync(sourceCredential, '{"fixture":"old"}');
+    fs.writeFileSync(path.join(process.env.CLAUDE_CONFIG_DIR!, 'CLAUDE.md'), 'administrator private memory');
+    const memberConfig = auth.getUserContext(a.id);
+    const memberCredential = path.join(memberConfig.claudeConfigDir, '.credentials.json');
+    assert.equal(fs.readFileSync(memberCredential, 'utf8'), '{"fixture":"old"}');
+    assert.ok(!fs.existsSync(path.join(memberConfig.claudeConfigDir, 'CLAUDE.md')));
+    fs.writeFileSync(memberCredential, '{"fixture":"member-refresh"}');
+    auth.getUserContext(a.id);
+    assert.equal(fs.readFileSync(memberCredential, 'utf8'), '{"fixture":"member-refresh"}');
+    assert.equal(fs.readFileSync(sourceCredential, 'utf8'), '{"fixture":"old"}');
+    fs.writeFileSync(sourceCredential + '.next', '{"fixture":"renewed"}');
+    fs.renameSync(sourceCredential + '.next', sourceCredential);
+    auth.getUserContext(a.id);
+    assert.equal(fs.readFileSync(memberCredential, 'utf8'), '{"fixture":"renewed"}');
+    const created = await auth.withUserContext(a.id, () => createProject({ projectPath: path.join(a.workRoot, 'new-project') }));
+    assert.equal(created.outcome, 'created');
+    assert.ok(fs.statSync(created.project.path).isDirectory());
     const own = await request(a.id, `/files/projects/${projects[1].project_id}/file?filePath=private.txt`);
     assert.equal(own.status, 200); assert.match(await own.text(), /secret-/);
     const checks: Array<[string, unknown?]> = [
@@ -85,6 +106,8 @@ test('authorization HTTP surfaces isolate paths, sessions, bridge tools, monitor
       [`/git/status?project=${projects[1].project_id}`],
       ['/git/init', { project: projects[1].project_id }],
       ['/commands/list', { projectPath: a.workRoot }],
+      [`/providers/claude/skills?workspacePath=${encodeURIComponent(a.workRoot)}`],
+      [`/providers/codex/mcp?workspacePath=${encodeURIComponent(a.workRoot)}`],
       ['/commands/execute', { commandName: 'x', commandPath: path.join(a.workRoot, 'private.txt'), context: { projectPath: a.workRoot } }],
       [`/taskmaster/tasks/${projects[1].project_id}`],
       [`/bridge/sessions/session-${a.id}`],

@@ -1,4 +1,4 @@
-import { installAuthorizationFixture, authenticateTestRequest } from '../../access-control/tests/authorization-fixture.js';
+import { installAuthorizationFixture, authenticateTestRequest } from '@/test-support/authorization-fixture.js';
 import assert from 'node:assert/strict';
 import { EventEmitter, once } from 'node:events';
 import type { AddressInfo } from 'node:net';
