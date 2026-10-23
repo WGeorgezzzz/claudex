@@ -41,6 +41,10 @@ export type CodexAppServerTurnOptions = {
   sandbox: string;
   approvalPolicy: string;
   effort?: string | null;
+  planMode?: boolean;
+  /** The runtime owns approval UI and clears it when native requests end. */
+  onRequest?: (message: AnyRecord, reply: (result: AnyRecord) => void) => boolean;
+  onRequestResolved?: (id: string | number) => void;
   /** A plain prompt, or `codex exec`-style input items (text / local_image). */
   input: string | AnyRecord[];
   signal: AbortSignal;
@@ -186,13 +190,19 @@ export async function* runCodexAppServerTurn(options: CodexAppServerTurnOptions)
       return;
     }
     if (message.method && message.id !== undefined) {
-      // `codex exec` cannot answer approval prompts either; decline them the same way.
-      write({ id: message.id, result: { decision: 'decline' } });
+      const params = message.params ?? {};
+      if ((!params.threadId || params.threadId === threadId) && (!params.turnId || !turnId || params.turnId === turnId)
+        && options.onRequest?.(message, result => write({ id: message.id, result }))) return;
+      // Unknown requests fail closed; known approvals are answered by the user.
+      write({ id: message.id, error: { code: -32601, message: 'Unsupported client request or inactive owning turn.' } });
       return;
     }
     const params = message.params ?? {};
     if (params.threadId && threadId && params.threadId !== threadId) return; // subagent threads
     switch (message.method) {
+      case 'serverRequest/resolved':
+        options.onRequestResolved?.(params.requestId);
+        break;
       case 'turn/started':
         turnId = params.turn?.id ?? turnId;
         turnOpen = true;
@@ -229,6 +239,7 @@ export async function* runCodexAppServerTurn(options: CodexAppServerTurnOptions)
           push({ type: 'turn.failed', error: { message: turn.error?.message ?? 'Turn failed' } });
         } else if (turn.status === 'interrupted') {
           settleSteered({ status: 'interrupted', error: 'The Codex turn was interrupted before this addition was answered.' });
+          push({ type: 'turn.interrupted' });
         } else {
           settleSteered({ status: 'succeeded', error: null });
           push({
@@ -265,7 +276,7 @@ export async function* runCodexAppServerTurn(options: CodexAppServerTurnOptions)
   options.signal.addEventListener('abort', onAbort, { once: true });
 
   try {
-    await call('initialize', { clientInfo: { name: 'claudex', title: 'Claudex', version: '1' }, capabilities: {} });
+    await call('initialize', { clientInfo: { name: 'claudex', title: 'GACI', version: '1' }, capabilities: { experimentalApi: true } });
     write({ method: 'initialized', params: {} });
     const threadParams = {
       cwd: options.cwd, model: options.model ?? null,
@@ -281,6 +292,8 @@ export async function* runCodexAppServerTurn(options: CodexAppServerTurnOptions)
     const started = await call('turn/start', {
       threadId, input: toUserInput(options.input),
       ...(options.effort ? { effort: options.effort } : {}),
+      ...(options.model ? { collaborationMode: { mode: options.planMode ? 'plan' : 'default',
+        settings: { model: options.model, reasoning_effort: options.effort ?? null, developer_instructions: null } } } : {}),
     });
     turnId = turnId ?? started.turn?.id ?? null;
     turnOpen = !finished;

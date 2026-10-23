@@ -51,6 +51,23 @@ async function main() {
     process.stdout.write(JSON.stringify({ authenticated: true, expiresAt, product: product.productName, endpoint: endpoint.origin }));
     return;
   }
+  if (process.argv[2] === '--usage') {
+    // Read the same resource summary used by the installed desktop billing page.
+    // Return quota fields only; neither account identifiers nor credentials enter stdout.
+    const response = await fetch(endpoint.origin + '/billing/meter/get-user-resource-summary', {
+      method: 'POST', signal: AbortSignal.timeout(20000),
+      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json',
+        'X-User-Id': String(session.account?.uid || ''), 'X-Domain': String(session.auth?.domain || ''),
+        'X-Product': product.deploymentType || 'SaaS', 'Accept-Language': 'zh' }, body: '{}',
+    });
+    if (!response.ok) throw new Error('Usage unavailable');
+    const body = await response.json();
+    if (!Array.isArray(body.data?.Packages)) throw new Error('Usage schema unavailable');
+    process.stdout.write(JSON.stringify({ checkedAt: new Date().toISOString(), packages: body.data.Packages.map(row => ({
+      name: row.PackageCode, total: row.CycleTotalCapacity, remaining: row.CycleRemainCapacity, used: row.CycleUsedCapacity,
+    })) }));
+    return;
+  }
   for (const name of Object.keys(process.env)) {
     if (/^(https?|all)_proxy$/i.test(name) || /^(ANTHROPIC_|CLAUDE_|ACC_PRODUCT_CONFIG|CODEBUDDY_(AUTH_TOKEN|API_KEY|BASE_URL|CUSTOM_HEADERS))/.test(name)) delete process.env[name];
   }

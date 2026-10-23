@@ -49,6 +49,9 @@ type ChatComposerProps = {
   extraActions?: ReactNode;
   onQueue?: ()=>void;
   onSendLive?: ()=>void;
+  busySendMode?: 'insert' | 'queue';
+  supportsLiveInput?: boolean;
+  onBusySendModeChange?: (mode: 'insert' | 'queue') => void;
   compact?: boolean;
   monitorSessionId?: string | null;
   pendingPermissionRequests: PendingPermissionRequest[];
@@ -135,6 +138,9 @@ export default function ChatComposer({
   extraActions,
   onQueue,
   onSendLive,
+  busySendMode = 'insert',
+  supportsLiveInput = false,
+  onBusySendModeChange,
   compact = false,
   monitorSessionId,
   pendingPermissionRequests,
@@ -273,7 +279,7 @@ export default function ChatComposer({
   const canQueueDraft = isLoading && Boolean(input.trim() || attachedFiles.length > 0);
   // Enter/send inserts into the running turn (text only, not slash commands);
   // the queue stays one Alt+Enter or the "add to queue" action away.
-  const insertsLive = canQueueDraft && Boolean(onSendLive) && attachedFiles.length === 0 && !input.trimStart().startsWith('/');
+  const insertsLive = busySendMode === 'insert' && canQueueDraft && Boolean(onSendLive) && attachedFiles.length === 0 && !input.trimStart().startsWith('/');
   const submitHint = insertsLive
     ? t('liveInput.enterHint')
     : canQueueDraft
@@ -513,6 +519,14 @@ export default function ChatComposer({
             />
           </PromptInputTools>
           <div className="ml-auto flex shrink-0 items-center gap-2">
+            {onBusySendModeChange && <select aria-label={t('liveInput.modeLabel', { defaultValue: '运行中消息发送方式' })}
+              title={t('liveInput.modeHint', { defaultValue: '插入当前任务，或等当前任务结束后排队发送。附件和命令始终排队。' })}
+              className="h-8 max-w-24 rounded-md border border-border bg-background px-1 text-xs"
+              value={supportsLiveInput ? busySendMode : 'queue'}
+              onChange={event => onBusySendModeChange(event.target.value as 'insert' | 'queue')}>
+              {supportsLiveInput && <option value="insert">{t('liveInput.modeInsert', { defaultValue: '运行中：插入' })}</option>}
+              <option value="queue">{t('liveInput.modeQueue', { defaultValue: '运行中：排队' })}</option>
+            </select>}
             {onVoiceTranscript && voiceAvailable && <VoiceInputButton state={voiceState} onToggle={voiceToggle} errorMsg={voiceError} />}
             <PromptInputSubmit
               onClick={

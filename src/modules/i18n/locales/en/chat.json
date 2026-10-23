@@ -1,11 +1,20 @@
 {
   "workbuddyModes": {
-    "modes": { "default": "Ask for approval", "acceptEdits": "Auto-approve edits", "bypassPermissions": "Skip routine approvals", "plan": "Plan mode" },
+    "modes": {
+      "default": "Ask for approval",
+      "acceptEdits": "Auto-approve edits",
+      "bypassPermissions": "Skip routine approvals",
+      "plan": "Plan mode",
+      "auto": "Automatic review",
+      "dontAsk": "Deny approval-required actions"
+    },
     "descriptions": {
       "default": "Follow WorkBuddy permission rules. Allow or deny requested actions in the conversation.",
       "acceptEdits": "Automatically approve routine file edits; other actions can still require approval.",
       "bypassPermissions": "Automatically approve routine actions. WorkBuddy can still request approval for high-risk actions.",
-      "plan": "Analyze and plan using permitted read-only tools. Changes require leaving plan mode and approval."
+      "plan": "Analyze and plan using permitted read-only tools. Changes require leaving plan mode and approval.",
+      "auto": "Use native WorkBuddy automatic review; sensitive actions may still require approval.",
+      "dontAsk": "Do not prompt; tools needing permission are denied."
     }
   },
   "liveInput": {
@@ -20,15 +29,19 @@
     "insertHint": "Insert into the running turn (Enter). Alt+Enter queues it for after this turn.",
     "enterHint": "Enter to insert into the running turn · Alt+Enter to queue after it",
     "inserted": "Inserted",
-    "insertedHint": "Sent while the assistant was still responding and delivered into that turn"
+    "insertedHint": "Sent while the assistant was still responding and delivered into that turn",
+    "modeLabel": "Messages while running",
+    "modeInsert": "While running: Insert",
+    "modeQueue": "While running: Queue",
+    "modeHint": "Insert into the current turn or queue for the next turn. Attachments and commands are queued."
   },
   "fileLink": {
     "menu": "File actions",
     "openLocally": "Open locally",
-    "preview": "Preview in Claudex",
+    "preview": "Preview in GACI",
     "copyPath": "Copy file path",
     "noProject": "The project path is unavailable. Open this conversation in its project first.",
-    "desktopOnly": "Open this link in the Claudex desktop app to use a local program.",
+    "desktopOnly": "Open this link in the GACI desktop app to use a local program.",
     "copyFailed": "Unable to copy the file path."
   },
   "codeBlock": {
@@ -149,11 +162,11 @@
       "plan": "Plan Mode"
     },
     "descriptions": {
-      "default": "Only trusted commands (ls, cat, grep, git status, etc.) run automatically. Other commands are skipped. Can write to workspace.",
+      "default": "Run inside the workspace sandbox; request approval in the conversation when broader access is needed.",
       "auto": "A model classifier decides per tool call whether to approve or deny. Hands-off, but safer than Bypass — denials still happen.",
       "acceptEdits": "All commands run automatically within the workspace. Full auto mode with sandboxed execution.",
       "bypassPermissions": "Full system access with no restrictions. All commands run automatically with full disk and network access. Use with caution.",
-      "plan": "Planning mode - no commands are executed"
+      "plan": "Use native Codex Plan mode with a read-only sandbox for analysis and planning."
     },
     "technicalDetails": "Technical details"
   },

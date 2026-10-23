@@ -214,6 +214,8 @@ function ChatInterface({
   const {
     input,
     setInput,
+    busySendMode,
+    setBusySendMode,
     textareaRef,
     inputHighlightRef,
     isTextareaExpanded,
@@ -592,6 +594,9 @@ function ChatInterface({
             sessionId={currentSessionId || selectedSession?.id} provider={provider}/>
           <ChatComposer
           extraActions={provider === 'claude' && (currentSessionId || selectedSession?.id) ? <CrossSessionDialog key={`bridge-${currentSessionId || selectedSession?.id}`} sourceSessionId={(currentSessionId || selectedSession?.id)!} draft={input} onInsert={insertComposerText}/> : undefined}
+          busySendMode={busySendMode}
+          onBusySendModeChange={setBusySendMode}
+          supportsLiveInput={supportsLiveInsertion(provider)}
           onSendLive={supportsLiveInsertion(provider)&&isProcessing&&!editingAnchorId?()=>{void handleSubmit({preventDefault:()=>{}} as never,undefined,{forceLive:true});}:undefined}
           onQueue={currentSessionId||selectedSession?.id?()=>{void handleSubmit({preventDefault:()=>{}} as never,undefined,{forceQueue:true});}:undefined}
           compact={isSideChat}

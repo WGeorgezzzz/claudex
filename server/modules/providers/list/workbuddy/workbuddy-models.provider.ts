@@ -32,9 +32,14 @@ export function buildWorkBuddyFreeModels(product: unknown, now = Date.now()): Pr
     // A cached zero-credit price must not outlive the promotion that made it free.
     if (freePromotions.length ? !activePromotion : !explicitlyFree) continue;
     seen.add(model.id);
+    const reasoning = readObjectRecord(model.reasoning);
+    const levels = Array.isArray(reasoning?.supportedEfforts) ? reasoning.supportedEfforts.filter((v: unknown): v is string =>
+      typeof v === 'string' && ['minimal', 'low', 'medium', 'high', 'xhigh', 'max'].includes(v)) : [];
     options.push({
       value: model.id,
       label: `${typeof model.name === 'string' ? model.name : model.id} · 免费`,
+      ...(levels.length ? { effort: { values: levels.map((value: string) => ({ value })),
+        default: levels.includes(reasoning?.defaultEffort) ? reasoning!.defaultEffort : levels[0] } } : {}),
       description: activePromotion
         ? `WorkBuddy 限时 0 积分，截止 ${new Date(activePromotion.schedule.validUntil).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}（北京时间）。`
         : 'WorkBuddy 客户端目录标价 0 积分；使用本机登录。',

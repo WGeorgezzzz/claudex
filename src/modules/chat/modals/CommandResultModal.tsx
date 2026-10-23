@@ -26,6 +26,7 @@ import type {
   ProviderModelsDefinition,CommandModalPayload,CostCommandData,HelpCommandData,ModelCommandData,StatusCommandData
 } from '@/shared/types';
 import ModelLibraryPanel from '@/modules/chat/modals/ModelLibraryPanel';
+import { ProviderQuotaPanel } from '@/modules/chat/modals/ProviderQuotaPanel';
 
 type CommandResultModalProps = {
   payload: CommandModalPayload | null;
@@ -316,6 +317,10 @@ function ModelsContent({
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">
+      <details className="shrink-0 rounded-xl border border-border px-3 py-2 text-xs">
+        <summary className="cursor-pointer">查看账号剩余用量 · 每 30 分钟更新</summary>
+        <div className="mt-2"><ProviderQuotaPanel /></div>
+      </details>
       <div className="flex items-center justify-between gap-3 rounded-2xl border border-border/70 bg-muted/20 px-3.5 py-2.5">
         <div className="min-w-0">
           <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">

@@ -6,7 +6,7 @@ import { AppError } from '@/shared/index.js';
 import type { LLMProvider } from '@/shared/types.js';
 
 /** Providers whose running turn accepts inserted user messages (Claude streaming input, Codex `turn/steer`). */
-const LIVE_INPUT_PROVIDERS = new Set<string>(['claude','codex']);
+const LIVE_INPUT_PROVIDERS = new Set<string>(['claude','codex','workbuddy']);
 
 /** Authenticated queue routes use this service to persist delivery before writing to an owned running turn. */
 export function createLiveInputService(runtime?: Pick<typeof providerRuntimeService, 'submitLiveInput'>) {

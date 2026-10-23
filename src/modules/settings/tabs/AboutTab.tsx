@@ -1,4 +1,4 @@
-import { ExternalLink, MessageSquare, Star } from 'lucide-react';
+import { ExternalLink, Star } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { CLOUDCLI_WORDMARK_FONT_FAMILY } from '@/shared/constants';
@@ -25,7 +25,7 @@ export default function AboutTab() {
       {/* Logo + name + version */}
       <div className="flex items-center gap-3">
         <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-primary/90 shadow-sm">
-          <MessageSquare className="h-5 w-5 text-primary-foreground" />
+          <img src="/gaci-mark.svg" alt="GACI" className="h-10 w-10 rounded-xl" />
         </div>
         <div>
           <div className="flex items-center gap-2">
@@ -33,7 +33,7 @@ export default function AboutTab() {
               className="text-base font-semibold text-foreground"
               style={{ fontFamily: CLOUDCLI_WORDMARK_FONT_FAMILY }}
             >
-              Claudex
+              GACI
             </span>
             <a
               href={releasesUrl}
@@ -56,8 +56,9 @@ export default function AboutTab() {
             )}
           </div>
           <p className="mt-0.5 text-sm text-muted-foreground">
-            {t('about.tagline')}
+            Your agents, one workspace.
           </p>
+          <p className="mt-1 text-xs text-muted-foreground">General Agent Cloud Integration</p>
         </div>
       </div>
 
