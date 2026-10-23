@@ -317,7 +317,7 @@ test('buildClaudeUserContent accepts a Windows short-name cwd after native path 
   const directory = await mkdtemp(path.join(os.tmpdir(), 'image-attachments-short-name-'));
   try {
     await writeFile(path.join(directory, 'shot.png'), PNG_BYTES);
-    const shortDirectory = execFileSync('cmd.exe', ['/d', '/c', `for %I in ("${directory}") do @echo %~sI`], { encoding: 'utf8', windowsHide: true }).trim();
+    const shortDirectory = execFileSync('cmd.exe', ['/d', '/c', `for %I in ("${directory}") do @echo %~sI`], { encoding: 'utf8', windowsHide: true, windowsVerbatimArguments: true }).trim();
     if (shortDirectory.toLowerCase() === directory.toLowerCase()) {
       t.skip('This Windows volume does not expose an 8.3 alias');
       return;
