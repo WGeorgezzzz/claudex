@@ -12,7 +12,7 @@ import type { ProviderRuntimeContext } from '@/shared/index.js';
 process.env.CLAUDEX_CODEX_TRANSPORT = 'exec';
 
 for (const resumed of [false, true]) {
-  for (const permissionMode of [undefined, 'default', 'unknown', 'acceptEdits', 'bypassPermissions']) {
+  for (const permissionMode of [undefined, 'default', 'unknown', 'acceptEdits', 'bypassPermissions', 'plan']) {
     test(`Codex ${resumed ? 'resumes' : 'starts'} with supported permissions (${permissionMode ?? 'omitted'})`, async (t) => {
       let capturedOptions: ThreadOptions | undefined;
       let capturedPrompt: unknown;
@@ -23,6 +23,7 @@ for (const resumed of [false, true]) {
           capturedPrompt = prompt;
           return { events: (async function* () {
             yield { type: 'thread.started', thread_id: 'native-thread' };
+            yield { type: 'turn.completed', usage: { input_tokens: 1, output_tokens: 1 } };
           })() };
         },
       } as unknown as Thread;
@@ -40,7 +41,7 @@ for (const resumed of [false, true]) {
         resolveProviderSessionId: () => resumed ? 'native-thread' : null,
         resolveResumeModel: async () => 'test-model',
         getProviderModels: async () => ({ OPTIONS: [], DEFAULT: 'test-model' }),
-        normalizeMessage: () => [],
+        normalizeMessage: (raw: any) => raw.type === 'turn_complete' ? [{ kind: 'complete', provider: 'codex' } as never] : [],
         isProviderInstalled: async () => true,
       };
 
@@ -53,9 +54,10 @@ for (const resumed of [false, true]) {
       assert.equal(start.mock.callCount(), resumed ? 0 : 1);
       assert.equal(resume.mock.callCount(), resumed ? 1 : 0);
       assert.equal(capturedPrompt, 'hey there');
-      assert.equal(capturedOptions?.sandboxMode, permissionMode === 'bypassPermissions' ? 'danger-full-access' : 'workspace-write');
+      assert.equal(capturedOptions?.sandboxMode, permissionMode === 'bypassPermissions' ? 'danger-full-access' : permissionMode === 'plan' ? 'read-only' : 'workspace-write');
       assert.equal(capturedOptions?.approvalPolicy, permissionMode === 'acceptEdits' || permissionMode === 'bypassPermissions' ? 'never' : 'on-request');
       assert.ok(messages.some((message: any) => message.kind === 'complete' && message.exitCode === 0));
+      assert.equal(messages.filter((message: any) => message.kind === 'complete').length, 1);
       assert.ok(!messages.some((message: any) => message.kind === 'error'));
     });
   }

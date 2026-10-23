@@ -44,8 +44,8 @@ function ComposerModelMenu({
 }: ComposerModelMenuProps) {
   const { t } = useTranslation('chat');
   const [isOpen, setIsOpen] = useState(false);
-  const isClaude = providerLabel === 'Claude';
-  const [isModelSectionOpen, setIsModelSectionOpen] = useState(isClaude);
+  // The catalog is visible on opening for every provider, including models without an effort selector.
+  const [isModelSectionOpen, setIsModelSectionOpen] = useState(true);
   const close = useCallback(() => setIsOpen(false), []);
   const { triggerRef, menuRef, anchor, updateAnchor } = useViewportMenuAnchor(isOpen, close);
 
@@ -53,9 +53,9 @@ function ComposerModelMenu({
   // shows reasoning first and keeps the longer model list one click away.
   useEffect(() => {
     if (!isOpen) {
-      setIsModelSectionOpen(isClaude);
+      setIsModelSectionOpen(true);
     }
-  }, [isOpen, isClaude]);
+  }, [isOpen, providerLabel]);
 
   const defaultEffortLabel = t('composer.effortDefault', { defaultValue: 'Default' });
   const resolvedEffortOptions = useMemo<EffortOption[]>(

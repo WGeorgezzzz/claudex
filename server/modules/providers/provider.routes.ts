@@ -9,6 +9,7 @@ import { claudeSettingsPermissionsService } from '@/modules/providers/services/c
 import { providerCapabilitiesService } from '@/modules/providers/services/provider-capabilities.service.js';
 import { providerMcpService } from '@/modules/providers/services/mcp.service.js';
 import { providerModelsService } from '@/modules/providers/services/provider-models.service.js';
+import { providerQuotaService } from '@/modules/providers/services/provider-quota.service.js';
 import { providerTokenUsageService } from '@/modules/providers/services/provider-token-usage.service.js';
 import { providerSkillsService } from '@/modules/providers/services/skills.service.js';
 import { sessionConversationsSearchService } from '@/modules/providers/services/session-conversations-search.service.js';
@@ -26,6 +27,15 @@ import type {
 import { AppError, asyncHandler, createApiSuccessResponse } from '@/shared/utils.js';
 
 const router = express.Router();
+// Host subscriptions belong to the administrator, never to unrelated member accounts.
+router.get('/usage-snapshot', requireSharedResourceAdministrator, asyncHandler(async (_request, response) => {
+  response.json(createApiSuccessResponse(await providerQuotaService.read()));
+}));
+router.post('/usage-login', requireSharedResourceAdministrator, asyncHandler(async (request, response) => {
+  const provider = request.body?.provider;
+  if (provider !== 'claude' && provider !== 'cursor') throw new AppError('Invalid quota login source.', { statusCode: 400 });
+  response.json(createApiSuccessResponse(providerQuotaService.openLogin(provider)));
+}));
 router.use((request, response, next) => {
   // Models, skills, MCP definitions and provider settings are explicitly shared
   // configuration. Session mutations remain available under ownership checks.

@@ -25,7 +25,7 @@ export const messageQueueService = {
     const options: Record<string,unknown>={};
     for (const key of ['model','effort','sessionSummary']) if (typeof raw[key]==='string') options[key]=String(raw[key]).slice(0,1000);
     const mode=raw.permissionMode??'default';
-    if (!['default','acceptEdits','plan','bypassPermissions','auto'].includes(String(mode))) throw new AppError('Invalid permission mode.',{statusCode:400});
+    if (!['default','acceptEdits','plan','bypassPermissions','auto','dontAsk'].includes(String(mode))) throw new AppError('Invalid permission mode.',{statusCode:400});
     options.permissionMode=mode;
     // Only the internal bridge service supplies provenance; HTTP payloads cannot forge it.
     if (bridgeSourceSessionId) options.cloudcliBridgeSourceSessionId = bridgeSourceSessionId;

@@ -476,6 +476,8 @@ export const api = {
 
   // Provider (coding agent) endpoints — models, capabilities, sessions, MCP, skills.
   providers: {
+    usageSnapshot: () => get('/api/providers/usage-snapshot'),
+    openUsageLogin: (provider: string) => post('/api/providers/usage-login', { provider }),
     capabilities: () => get('/api/providers/capabilities'),
     authStatus: (provider: string) =>
       get(`/api/providers/${encodeURIComponent(provider)}/auth/status`),

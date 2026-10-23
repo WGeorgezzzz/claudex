@@ -73,7 +73,7 @@ beforeEach(() => {
 });
 afterEach(() => { vi.unstubAllGlobals(); localStorage.clear(); });
 
-for (const provider of ['claude', 'codex'] as const) {
+for (const provider of ['claude', 'codex', 'workbuddy'] as const) {
   test(`Enter during a running ${provider} turn inserts into it and echoes an inserted row`, async () => {
     const { view, added, sent, sendLiveMessage, enqueueMessage } = renderComposer(provider);
     await type(view, '停止计数，直接回答：插入成功');
@@ -96,6 +96,17 @@ test('Alt+Enter during a running turn queues for after the turn instead of inser
   assert.equal(sendLiveMessage.mock.calls.length, 0);
   assert.equal(enqueueMessage.mock.calls.length, 1);
   assert.ok(!added.some((message) => message.insertedMidTurn));
+});
+
+test('the chosen queue mode controls Enter and can be switched back to native insertion', async () => {
+  const { view, sendLiveMessage, enqueueMessage } = renderComposer('workbuddy');
+  act(() => view.result.current.setBusySendMode('queue'));
+  await type(view, 'wait until this turn ends'); await pressEnter(view);
+  assert.equal(enqueueMessage.mock.calls.length, 1);
+  assert.equal(sendLiveMessage.mock.calls.length, 0);
+  act(() => view.result.current.setBusySendMode('insert'));
+  await type(view, 'change the current task'); await pressEnter(view);
+  assert.equal(sendLiveMessage.mock.calls.length, 1);
 });
 
 test('slash commands and providers without live input keep the next-turn queue', async () => {

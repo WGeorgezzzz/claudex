@@ -60,7 +60,8 @@ export default function PermissionRequestsBanner({
         }
 
         const rawInput = formatToolInputForDisplay(request.input);
-        const permissionEntry = buildClaudeToolPermissionEntry(request.toolName, rawInput);
+        // Native provider approvals must never write Claude's permission settings.
+        const permissionEntry = /^(codex|workbuddy)-/.test(request.requestId) ? null : buildClaudeToolPermissionEntry(request.toolName, rawInput);
         const settings = getClaudeSettings();
         const alreadyAllowed = permissionEntry ? settings.allowedTools.includes(permissionEntry) : false;
         const rememberLabel = alreadyAllowed ? 'Allow (saved)' : 'Allow & remember';
