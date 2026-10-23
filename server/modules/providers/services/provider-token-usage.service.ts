@@ -461,6 +461,23 @@ export function createProviderTokenUsageService(
         return readOpenCodeTokenUsage(databasePath, providerSessionId);
       }
 
+      if (session.provider === 'workbuddy') {
+        if (!session.jsonl_path || !dependencies.fileExists(session.jsonl_path)) return { used: 0, inputTokens: 0, outputTokens: 0, breakdown: { input: 0, output: 0 } };
+        const tail = await dependencies.readTextFileTail(session.jsonl_path, TOKEN_USAGE_TAIL_BYTES);
+        for (const line of tail.content.split('\n').reverse()) {
+          try {
+            const row = JSON.parse(line);
+            const used = row.type === 'result' ? Number(row._meta?.['codebuddy.ai/contextUsed']) : NaN;
+            if (Number.isFinite(used) && used >= 0) {
+              const inputTokens = Number(row.usage?.input_tokens) || 0;
+              const outputTokens = Number(row.usage?.output_tokens) || 0;
+              return { used, inputTokens, outputTokens, breakdown: { input: inputTokens, output: outputTokens } };
+            }
+          } catch { /* Incomplete trailing rows do not replace the latest recorded usage. */ }
+        }
+        return { used: 0, inputTokens: 0, outputTokens: 0, breakdown: { input: 0, output: 0 } };
+      }
+
       if (session.provider === 'codex') {
         const indexedFilePath = session.jsonl_path && dependencies.fileExists(session.jsonl_path)
           ? session.jsonl_path

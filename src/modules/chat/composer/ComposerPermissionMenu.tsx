@@ -35,6 +35,11 @@ const MODE_APPEARANCE: Record<PermissionMode, ModeAppearance> = {
     trigger: 'border-border/60 bg-muted/50 text-muted-foreground hover:bg-muted',
     item: 'text-foreground',
   },
+  dontAsk: {
+    icon: ShieldQuestion,
+    trigger: 'border-border/60 bg-muted/50 text-muted-foreground hover:bg-muted',
+    item: 'text-foreground',
+  },
   auto: {
     icon: Bot,
     trigger:
@@ -116,14 +121,14 @@ function ComposerPermissionMenu({
           updateAnchor();
           setIsOpen((current) => !current);
         }}
-        className={`flex h-8 shrink-0 items-center justify-center rounded-lg border transition-colors ${isClaude ? 'max-w-40 gap-1.5 px-2 text-xs' : 'w-8'} ${activeAppearance.trigger}`}
+        className={`flex h-8 max-w-40 shrink-0 items-center justify-center gap-1.5 rounded-lg border px-2 text-xs transition-colors ${activeAppearance.trigger}`}
         aria-haspopup="menu"
         aria-expanded={isOpen}
         aria-label={heading}
         title={isClaude ? t('input.claudeChangeMode', 'Change permissions (Shift+Tab)') : t('input.clickToChangeMode')}
       >
         <ActiveIcon className="h-4 w-4" />
-        {isClaude && <span className="truncate">{t(`claudeModes.modes.${permissionMode}`, {defaultValue:permissionMode})}</span>}
+        <span className="max-w-28 truncate">{t(`${modeNamespace}.modes.${permissionMode}`, {defaultValue:permissionMode})}</span>
       </button>
 
       {isOpen && anchor && createPortal(

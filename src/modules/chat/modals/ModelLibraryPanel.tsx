@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 
 import { Badge, Button, Input, LLMProviderLogo } from '@/shared/ui';
+import { ProviderQuotaPanel } from '@/modules/chat/modals/ProviderQuotaPanel';
 import type {
   CustomProviderModelInput,
   LLMProvider,
@@ -259,6 +260,7 @@ export default function ModelLibraryPanel({
         )}
       </div>
 
+      <ProviderQuotaPanel />
       <div className="scrollbar-thin flex shrink-0 gap-1 overflow-x-auto rounded-xl border border-border/70 bg-muted/25 p-1">
         {PROVIDERS.map((provider) => {
           const selected = provider.id === selectedProvider;

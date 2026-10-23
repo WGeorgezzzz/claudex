@@ -6,14 +6,17 @@ import readline from 'node:readline';
 
 import { sessionsDb } from '@/modules/database/index.js';
 import type { IProviderRuntime } from '@/shared/index.js';
-import { createCompleteMessage, createNormalizedMessage, readObjectRecord } from '@/shared/index.js';
+import { appendFilesInputTag, appendImagesInputTag, buildClaudeUserContent, normalizeImageDescriptors, createCompleteMessage, createNormalizedMessage, readObjectRecord } from '@/shared/index.js';
+import type { ProviderLiveInputResult } from '@/shared/types.js';
 import { resolveWorkBuddyInstallation } from '@/modules/providers/list/workbuddy/workbuddy-auth.provider.js';
 import { WorkBuddyProviderModels } from '@/modules/providers/list/workbuddy/workbuddy-models.provider.js';
 import { WorkBuddyPermissionBridge } from '@/modules/providers/list/workbuddy/workbuddy-permissions.provider.js';
 import { providerCapabilitiesService } from '@/modules/providers/services/provider-capabilities.service.js';
 import { workBuddyTranscriptPath } from '@/modules/providers/list/workbuddy/workbuddy-sessions.provider.js';
 
-const active = new Map<string, { child: ChildProcess; aborted: boolean }>();
+const active = new Map<string, { child: ChildProcess; aborted: boolean;
+  submit: (id: string, content: string, settled: (result: ProviderLiveInputResult) => void) => void;
+  settle: (result: ProviderLiveInputResult) => void }>();
 const permissions = new WorkBuddyPermissionBridge();
 
 /** Provider registry runs the official WorkBuddy CLI with local login and app-owned transcript persistence. */
@@ -22,7 +25,6 @@ export const workBuddyRuntime: IProviderRuntime = {
   async run(command, options, writer, context) {
     const install = resolveWorkBuddyInstallation();
     if (!install) throw new Error('WorkBuddy is not installed on this Windows host.');
-    if ((options.images?.length || options.files?.length)) throw new Error('WorkBuddy attachments are not supported by this integration yet.');
     const freeModels = await new WorkBuddyProviderModels().getSupportedModels();
     const model = await context.resolveResumeModel(options.sessionId, options.model) || freeModels.DEFAULT;
     if (!model || !freeModels.OPTIONS.some(option => option.value === model)) {
@@ -39,10 +41,16 @@ export const workBuddyRuntime: IProviderRuntime = {
     const transcript = workBuddyTranscriptPath(appId);
     mkdirSync(path.dirname(transcript), { recursive: true });
     const persist = (row: unknown) => appendFileSync(transcript, JSON.stringify(row) + '\n', 'utf8');
-    persist({ type: 'user', uuid: randomUUID(), __timestamp: new Date().toISOString(), message: { content: [{ type: 'text', text: command }] } });
+    const selectedModel = freeModels.OPTIONS.find(option => option.value === model)!;
+    const effort = typeof options.effort === 'string' && options.effort !== 'default' ? options.effort : undefined;
+    if (effort && !selectedModel.effort?.values.some(level => level.value === effort)) throw new Error('This WorkBuddy model does not support the selected reasoning effort.');
+    const prompt = appendFilesInputTag(command, options.files);
+    const content = await buildClaudeUserContent(prompt, options.images, options.cwd || options.projectPath);
+    if (content.filter(block => block.type === 'image').length !== normalizeImageDescriptors(options.images).length) throw new Error('A WorkBuddy image attachment could not be loaded.');
+    persist({ type: 'user', uuid: randomUUID(), __timestamp: new Date().toISOString(), message: { content: [{ type: 'text', text: appendImagesInputTag(prompt, options.images) }] } });
     const args = [install.launcher, '-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--model', model,
-      '--setting-sources', '', '--strict-mcp-config', '--mcp-config', '{"mcpServers":{}}',
-      '--tools', 'Read,Write,Edit,MultiEdit,Bash,Glob,Grep,WebFetch,WebSearch,AskUserQuestion,EnterPlanMode,ExitPlanMode,StructuredOutput',
+      '--setting-sources', 'user,project,local', '--replay-user-messages',
+      ...(effort ? ['--effort', effort] : []),
       '--permission-mode', permissionMode,
       ...(previous ? ['--resume', previous] : ['--session-id', nativeId]),
     ];
@@ -51,19 +59,38 @@ export const workBuddyRuntime: IProviderRuntime = {
       let stderr = '';
       let announced = false;
       let persistenceError = false;
+      let nativeRequestId = '';
+      const additions = new Map<string, { accepted: boolean; content: string; settled: (result: ProviderLiveInputResult) => void; timer: NodeJS.Timeout }>();
       const child = spawn(install.executable, args, {
         cwd: options.cwd || options.projectPath || process.cwd(), windowsHide: true,
         env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', CLAUDEX_WORKBUDDY_INSTALL: install.directory, NODE_OPTIONS: '' },
         stdio: ['pipe', 'pipe', 'pipe'],
       });
-      const entry = { child, aborted: false };
-      active.set(appId, entry);
       child.stdin.on('error', () => {});
       const send = (value: unknown) => {
         if (!entry.aborted && !child.stdin.destroyed && !child.stdin.writableEnded) child.stdin.write(JSON.stringify(value) + '\n');
       };
+      const entry = { child, aborted: false,
+        submit(id: string, content: string, settled: (result: ProviderLiveInputResult) => void) {
+          if (!announced || result || !nativeRequestId || child.stdin.writableEnded) throw new Error('WorkBuddy is not accepting insertions. Queue this message instead.');
+          if (additions.has(id)) return;
+          if (additions.size >= 20) throw new Error('Wait for pending WorkBuddy insertions before adding more.');
+          const timer = setTimeout(() => { const pending = additions.get(id); if (!pending || pending.accepted) return;
+            additions.delete(id); pending.settled({ status: 'failed', error: 'WorkBuddy did not confirm this insertion. Review before retrying.' }); }, 15000);
+          timer.unref();
+          additions.set(id, { accepted: false, content, settled, timer });
+          send({ type: 'control_request', request_id: id, request: { subtype: 'steer', session_id: nativeId,
+            expected_request_id: nativeRequestId, content_blocks: [{ type: 'text', text: content }] } });
+        },
+        settle(outcome: ProviderLiveInputResult) {
+          for (const pending of additions.values()) { clearTimeout(pending.timer);
+            pending.settled(pending.accepted ? outcome : { status: 'failed', error: 'The turn ended before WorkBuddy confirmed this insertion.' }); }
+          additions.clear();
+        },
+      };
+      active.set(appId, entry);
       send({ type: 'control_request', request_id: 'initialize', request: { subtype: 'initialize' } });
-      send({ type: 'user', session_id: nativeId, message: { role: 'user', content: command }, parent_tool_use_id: null });
+      send({ type: 'user', session_id: nativeId, message: { role: 'user', content }, parent_tool_use_id: null });
       child.stderr.on('data', chunk => { stderr = (stderr + chunk.toString()).slice(-4000); });
       const lines = readline.createInterface({ input: child.stdout });
       lines.on('line', line => {
@@ -71,6 +98,24 @@ export const workBuddyRuntime: IProviderRuntime = {
         let row: Record<string, unknown> | null;
         try { row = readObjectRecord(JSON.parse(line)); } catch { stderr = (stderr + line).slice(-4000); return; }
         if (!row) return;
+        if (!row.parent_tool_use_id && typeof row._requestId === 'string') nativeRequestId = row._requestId;
+        if (row.type === 'control_response') {
+          // The initialize response may include credentials. Never persist or forward it.
+          const response = readObjectRecord(row.response);
+          const id = String(response?.request_id ?? '');
+          const pending = additions.get(id);
+          if (pending) {
+            clearTimeout(pending.timer);
+            if (response?.subtype === 'success' && readObjectRecord(response.response)?.steered === true) {
+              pending.accepted = true;
+              try {
+                persist({ type: 'user', uuid: id, __timestamp: new Date().toISOString(), insertedMidTurn: true,
+                  message: { role: 'user', content: [{ type: 'text', text: pending.content }] } });
+              } catch { persistenceError = true; child.kill(); }
+            } else { additions.delete(id); pending.settled({ status: 'failed', error: 'WorkBuddy rejected this insertion because its active turn changed or ended.' }); }
+          }
+          return;
+        }
         if (row.type === 'control_request') { permissions.request(appId, row, writer, send); return; }
         if (row.type === 'control_cancel_request') { permissions.cancel(appId, String(row.request_id)); return; }
         if (row.type === 'system' && row.subtype === 'init' && !announced) {
@@ -84,7 +129,12 @@ export const workBuddyRuntime: IProviderRuntime = {
           && (readObjectRecord(row.message)!.content as unknown[]).some(block => readObjectRecord(block)?.type === 'tool_result');
         if (row.type === 'assistant' || row.type === 'result' || isToolResult) {
           try { persist(row); } catch { persistenceError = true; child.kill(); return; }
-          if (row.type === 'result') { result = row; child.stdin.end(); }
+          if (row.type === 'result') {
+            result = row; child.stdin.end();
+            const used = Number(readObjectRecord(row._meta)?.['codebuddy.ai/contextUsed']);
+            if (Number.isFinite(used) && used >= 0) writer.send(createNormalizedMessage({ kind: 'status', text: 'token_budget',
+              provider: 'workbuddy', sessionId: nativeId, tokenBudget: { used } }));
+          }
           else for (const message of context.normalizeMessage(row, nativeId)) writer.send(message);
         }
       });
@@ -94,6 +144,7 @@ export const workBuddyRuntime: IProviderRuntime = {
         if (entry.aborted) { resolve(); return; }
         // The bundled CLI can exit 0 on auth/model errors. Require its semantic result as well.
         const succeeded = code === 0 && result?.subtype === 'success' && result?.is_error === false && !persistenceError;
+        entry.settle({ status: succeeded ? 'succeeded' : 'failed', error: succeeded ? null : 'WorkBuddy failed before completing the inserted instruction.' });
         if (!succeeded) {
           const error = persistenceError ? 'Could not save the WorkBuddy conversation.'
             : typeof result?.result === 'string' ? result.result
@@ -106,10 +157,16 @@ export const workBuddyRuntime: IProviderRuntime = {
       });
     });
   },
+  submitLiveInput(sessionId, id, content, settled) {
+    const entry = active.get(sessionId);
+    if (!entry || entry.aborted) throw new Error('No running WorkBuddy turn accepts input. Queue this message instead.');
+    entry.submit(id, content, settled);
+  },
   async abort(sessionId) {
     const entry = active.get(sessionId);
     if (!entry) return false;
     entry.aborted = true;
+    entry.settle({ status: 'interrupted', error: 'WorkBuddy was stopped before this addition completed.' });
     permissions.cancel(sessionId);
     if (process.platform === 'win32' && entry.child.pid) {
       await new Promise<void>(resolve => {

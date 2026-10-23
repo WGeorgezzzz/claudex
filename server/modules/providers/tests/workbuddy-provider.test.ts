@@ -32,6 +32,14 @@ test('WorkBuddy never invents a free fallback when prices are absent or become n
   }
 });
 
+test('WorkBuddy exposes reasoning strengths from the selected native model only', () => {
+  const catalog = buildWorkBuddyFreeModels({ models: [{ id: 'deepseek-v4.1-flash', credits: 'x0.00', supportsToolCall: true,
+    reasoning: { supportedEfforts: ['low', 'high', 'max', 'invented'], defaultEffort: 'high' } },
+    { id: 'no-reasoning', credits: 'x0.00', supportsToolCall: true }] });
+  assert.deepEqual(catalog.OPTIONS[0].effort, { default: 'high', values: [{ value: 'low' }, { value: 'high' }, { value: 'max' }] });
+  assert.equal(catalog.OPTIONS[1].effort, undefined);
+});
+
 test('WorkBuddy includes remotely added Step 5 only inside its free promotion window', () => {
   const catalog = { models: [{ id: 'step-5-preview', name: 'Step 5', credits: 'x0.00', supportsToolCall: true }], modelPromotions: [
     { enabled: true, modelIds: ['step-5-preview'], discount: { factor: 0 }, schedule: { validFrom: '2026-10-12T00:00:00+08:00', validUntil: '2026-10-26T00:00:00+08:00' } },
@@ -117,9 +125,10 @@ test('WorkBuddy history uses the app id and preserves pagination across native s
 test('WorkBuddy exposes only capabilities implemented by the conversation adapter', () => {
   const caps = providerCapabilitiesService.getProviderCapabilities('workbuddy');
   assert.equal(caps.supportsAbort, true);
-  assert.equal(caps.supportsImages, false);
-  assert.equal(caps.supportsFiles, false);
+  assert.equal(caps.supportsImages, true);
+  assert.equal(caps.supportsFiles, true);
+  assert.equal(caps.supportsEffort, true);
   assert.equal(caps.supportsPermissionRequests, true);
   assert.equal(caps.supportsSessionForking, false);
-  assert.deepEqual(caps.permissionModes, ['default', 'acceptEdits', 'bypassPermissions', 'plan']);
+  assert.deepEqual(caps.permissionModes, ['default', 'auto', 'acceptEdits', 'bypassPermissions', 'dontAsk', 'plan']);
 });

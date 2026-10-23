@@ -24,6 +24,7 @@ import {
 } from '@/shared/index.js';
 import { notifyRunFailed, notifyRunStopped } from '@/modules/notifications/index.js';
 import { runCodexAppServerTurn, submitCodexLiveInput } from '@/modules/providers/list/codex/codex-app-server-turn.service.js';
+import { CodexPermissionBridge } from '@/modules/providers/list/codex/codex-permissions.provider.js';
 import type { AnyRecord, ProviderRuntimeContext, ProviderRuntimeWriter } from '@/shared/index.js';
 
 type ActiveCodexSession = {
@@ -35,6 +36,7 @@ type ActiveCodexSession = {
 };
 
 const activeCodexSessions = new Map<string, ActiveCodexSession>();
+const permissions = new CodexPermissionBridge();
 
 // Codex CLI requires non-whitespace stdin even when --image arguments are
 // present, so attachment-only turns need a small text instruction.
@@ -231,6 +233,8 @@ function transformCodexEvent(event: AnyRecord): AnyRecord {
  */
 function mapPermissionModeToCodexOptions(permissionMode: string): Pick<ThreadOptions, 'sandboxMode' | 'approvalPolicy'> {
   switch (permissionMode) {
+    case 'plan':
+      return { sandboxMode: 'read-only', approvalPolicy: 'on-request' };
     case 'acceptEdits':
       return {
         sandboxMode: 'workspace-write',
@@ -368,6 +372,9 @@ async function queryCodex(
         sandbox: sandboxMode || 'workspace-write',
         approvalPolicy: approvalPolicy || 'on-request',
         effort: resolvedEffort,
+        planMode: permissionMode === 'plan',
+        onRequest: (message, reply) => permissions.request(sessionKey() || '', message, ws, reply),
+        onRequestResolved: id => permissions.cancel(sessionKey() || '', id),
         input: turnInput as string | AnyRecord[],
         signal: abortController.signal,
         sessionKeys: () => [sessionId, capturedSessionId],
@@ -424,6 +431,9 @@ async function queryCodex(
       // Normalize the transformed event into NormalizedMessage(s) via adapter
       const normalizedMsgs = context.normalizeMessage(transformed, capturedSessionId || sessionId || null);
       for (const msg of normalizedMsgs) {
+        // Only the runtime's terminal event below carries a settled success/failure.
+        // A premature normalized completion could release the next queued turn.
+        if (msg.kind === 'complete') continue;
         sendMessage(ws, msg);
       }
 
@@ -508,6 +518,7 @@ async function queryCodex(
     }
 
   } finally {
+    permissions.cancel(sessionKey() || '');
     // Update session status
     if (sessionKey()) {
       const session = activeCodexSessions.get(sessionKey() || '');
@@ -542,6 +553,7 @@ function abortCodexSession(sessionId: string) {
 
 /** Used by the providers module's CodexProvider to run and abort SDK turns. */
 export const codexRuntime = {
+  permissions,
   run: queryCodex,
   abort: abortCodexSession,
   submitLiveInput: submitCodexLiveInput,

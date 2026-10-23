@@ -91,7 +91,7 @@ type CommandExecutionResult = {
 
 
 /** Providers whose running turn accepts inserted text (Claude streaming input, Codex `turn/steer`). */
-export const supportsLiveInsertion = (provider: string) => provider === 'claude' || provider === 'codex';
+export const supportsLiveInsertion = (provider: string) => ['claude', 'codex', 'workbuddy'].includes(provider);
 
 type SubmitOptions = {
   forceQueue?: boolean;
@@ -214,6 +214,10 @@ export function useChatComposerState({
   setPendingPermissionRequests,
 }: UseChatComposerStateArgs) {
   const { t } = useTranslation('chat');
+  // Per-provider choices control the next send while a turn runs; switching sessions never submits a draft.
+  const [busySendModes, setBusySendModes] = useState<Record<string, 'insert' | 'queue'>>({});
+  const busySendMode = supportsLiveInsertion(provider) ? busySendModes[provider] ?? 'insert' : 'queue';
+  const setBusySendMode = (mode: 'insert' | 'queue') => setBusySendModes(previous => ({ ...previous, [provider]: mode }));
   // The composer text together with the chat scope it belongs to. They are one
   // state rather than a value plus a ref because they have to move in lockstep:
   // on a session switch there is one commit where the scope has already changed
@@ -835,7 +839,7 @@ export function useChatComposerState({
         // Like the Claude Code / Codex CLIs: Enter during a running turn inserts
         // the text into that turn. Alt+Enter (forceQueue), attachments, slash
         // commands and providers without live input keep the next-turn queue.
-        const insertLive=Boolean(submitOptions?.forceLive) || (liveCapable && !submitOptions?.forceQueue
+        const insertLive=Boolean(submitOptions?.forceLive) || (busySendMode === 'insert' && liveCapable && !submitOptions?.forceQueue
           && !queuedSubmission && !currentInput.trimStart().startsWith('/'));
         // A run can restart in the tiny gap between scheduling and flushing a
         // queued submission. Put the same durable draft back without uploading
@@ -1086,6 +1090,7 @@ export function useChatComposerState({
       onSessionEstablished,
       provider,
       queueMessage,
+      busySendMode,
       recordSentMessage,
       resetCommandMenuState,
       scrollToBottom,
@@ -1459,6 +1464,8 @@ export function useChatComposerState({
 
   return {
     input,
+    busySendMode,
+    setBusySendMode,
     setInput,
     editingAnchorId,
     beginEditMessage,

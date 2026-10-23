@@ -1,4 +1,4 @@
-export { appendFilesInputTag, buildCodexInputItems, normalizeImageDescriptors } from './image-attachments.js';
+export { appendFilesInputTag, appendImagesInputTag, buildClaudeUserContent, buildCodexInputItems, normalizeImageDescriptors } from './image-attachments.js';
 export { AppError, createCompleteMessage, createNormalizedMessage } from './utils.js';
 export { asyncHandler, createApiSuccessResponse } from './utils.js';
 export type { AnyRecord, ProviderRuntimeContext, ProviderRuntimeWriter, ProviderPermissionDecision } from './types.js';

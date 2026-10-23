@@ -1,11 +1,20 @@
 {
   "workbuddyModes": {
-    "modes": { "default": "默认审批", "acceptEdits": "自动编辑", "bypassPermissions": "跳过常规审批", "plan": "计划模式" },
+    "modes": {
+      "default": "默认审批",
+      "acceptEdits": "自动编辑",
+      "bypassPermissions": "跳过常规审批",
+      "plan": "计划模式",
+      "auto": "自动审批",
+      "dontAsk": "拒绝需审批操作"
+    },
     "descriptions": {
       "default": "按 WorkBuddy 规则请求审批；需要确认时在对话中选择允许或拒绝。",
       "acceptEdits": "自动批准常规文件编辑；其他需要审批的操作仍会询问。",
       "bypassPermissions": "自动批准常规操作；WorkBuddy 判定为高风险的操作仍可能要求审批。",
-      "plan": "分析与规划，可使用获准的只读工具；修改前需退出计划模式并确认。"
+      "plan": "分析与规划，可使用获准的只读工具；修改前需退出计划模式并确认。",
+      "auto": "使用 WorkBuddy 原生自动审批；敏感操作仍可能需要确认。",
+      "dontAsk": "不弹出审批；需要许可的工具会被拒绝。"
     }
   },
   "liveInput": {
@@ -20,7 +29,11 @@
     "insertHint": "插入到正在进行的回合（Enter）。Alt+Enter 改为排队到本轮之后。",
     "enterHint": "Enter 插入到当前回合 · Alt+Enter 排队到本轮之后",
     "inserted": "插入",
-    "insertedHint": "在助手回复过程中发送，并已送入该回合"
+    "insertedHint": "在助手回复过程中发送，并已送入该回合",
+    "modeLabel": "运行中消息发送方式",
+    "modeInsert": "运行中：插入",
+    "modeQueue": "运行中：排队",
+    "modeHint": "插入当前任务，或等当前任务结束后排队发送。附件和命令始终排队。"
   },
   "fileLink": {
     "menu": "文件操作",
@@ -136,11 +149,11 @@
       "plan": "计划模式"
     },
     "descriptions": {
-      "default": "只有受信任的命令（ls、cat、grep、git status 等）自动运行。其他命令将被跳过。可以写入工作区。",
+      "default": "在工作区沙盒中执行；需要扩展权限时在对话里询问。",
       "auto": "A model classifier decides per tool call whether to approve or deny. Hands-off, but safer than Bypass — denials still happen.",
       "acceptEdits": "工作区内的所有命令自动运行。完全自动模式，具有沙盒执行功能。",
       "bypassPermissions": "完全的系统访问，无限制。所有命令自动运行，具有完整的磁盘和网络访问权限。请谨慎使用。",
-      "plan": "计划模式 - 不执行任何命令"
+      "plan": "使用 Codex 原生计划模式和只读沙盒；先分析与规划。"
     },
     "technicalDetails": "技术细节"
   },

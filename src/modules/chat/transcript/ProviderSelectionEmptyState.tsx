@@ -24,6 +24,7 @@ import {
 } from "@/shared/ui";
 import ModelGroupList, { type ModelGroup } from "@/modules/chat/composer/ModelGroupList";
 import ModelLibraryPanel from "@/modules/chat/modals/ModelLibraryPanel";
+import { ProviderQuotaPanel } from '@/modules/chat/modals/ProviderQuotaPanel';
 import { writeSelectedProvider } from '@/shared/selectedProvider';
 
 const PROVIDER_META: { id: LLMProvider; name: string }[] = [
@@ -230,7 +231,7 @@ export default function ProviderSelectionEmptyState({
               </Card>
             </DialogTrigger>
 
-            <DialogContent className="max-w-md overflow-hidden p-0">
+            <DialogContent className="max-h-[90dvh] max-w-md overflow-y-auto p-0">
               <DialogTitle>Model Selector</DialogTitle>
               <div className="flex items-center justify-between gap-3 border-b border-border/60 bg-muted/20 px-4 py-3">
                 <div>
@@ -260,6 +261,10 @@ export default function ProviderSelectionEmptyState({
                   {t("providerSelection.addModel", { defaultValue: "Add model" })}
                 </Button>
               </div>
+              <details className="border-b border-border px-3 py-2 text-xs">
+                <summary className="cursor-pointer">查看账号剩余用量 · 每 30 分钟更新</summary>
+                <div className="mt-2"><ProviderQuotaPanel /></div>
+              </details>
               <Command filter={modelSearchFilter}>
                 <CommandInput
                   value={modelSearch}
