@@ -47,6 +47,7 @@ export function createCliApplication(): CliApplication {
       const result = execFileSync('sbx', argumentsList, {
         encoding: 'utf8',
         stdio: inheritOutput ? 'inherit' : 'pipe',
+        windowsHide: true,
       });
       return result || '';
     },
@@ -54,6 +55,7 @@ export function createCliApplication(): CliApplication {
       const childProcess = spawn('sbx', argumentsList, {
         detached: true,
         stdio: ['ignore', 'ignore', 'ignore'],
+        windowsHide: true,
       });
       childProcess.unref();
     },
@@ -75,11 +77,11 @@ export function createCliApplication(): CliApplication {
       await new Promise<void>((resolve) => setImmediate(resolve));
       return execSync(
         'npm show @cloudcli-ai/cloudcli version',
-        { encoding: 'utf8' },
+        { encoding: 'utf8', windowsHide: true },
       ).trim();
     },
     updateGlobalPackage: () => {
-      execSync('npm update -g @cloudcli-ai/cloudcli', { stdio: 'inherit' });
+      execSync('npm update -g @cloudcli-ai/cloudcli', { stdio: 'inherit', windowsHide: true });
     },
     startServer: async () => {
       // The server executable is an entrypoint rather than a feature module,

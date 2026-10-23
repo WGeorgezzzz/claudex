@@ -22,7 +22,7 @@ export class CursorProviderAuth implements IProviderAuth {
    */
   private checkInstalled(): boolean {
     try {
-      spawn.sync('cursor-agent', ['--version'], { stdio: 'ignore', timeout: 5000 });
+      spawn.sync('cursor-agent', ['--version'], { stdio: 'ignore', timeout: 5000, windowsHide: true });
       return true;
     } catch {
       return false;
@@ -80,7 +80,7 @@ export class CursorProviderAuth implements IProviderAuth {
       }, STATUS_TIMEOUT_MS);
 
       try {
-        childProcess = spawn('cursor-agent', ['status']);
+        childProcess = spawn('cursor-agent', ['status'], { windowsHide: true });
       } catch {
         clearTimeout(timeout);
         processCompleted = true;

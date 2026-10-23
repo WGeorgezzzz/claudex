@@ -22,7 +22,7 @@ export class CodexProviderAuth implements IProviderAuth {
    */
   private checkInstalled(): boolean {
     try {
-      spawn.sync('codex', ['--version'], { stdio: 'ignore', timeout: 5000 });
+      spawn.sync('codex', ['--version'], { stdio: 'ignore', timeout: 5000, windowsHide: true });
       return true;
     } catch {
       return false;

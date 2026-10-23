@@ -157,6 +157,7 @@ async function spawnCursor(command, options = {}, ws, context) {
       }
 
       const cursorProcess = spawnFunction('cursor-agent', args, {
+        windowsHide: true,
         cwd: workingDir,
         stdio: ['pipe', 'pipe', 'pipe'],
         env: { ...process.env } // Inherit all environment variables

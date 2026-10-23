@@ -29,7 +29,7 @@ export class OpenCodeProviderAuth implements IProviderAuth {
    */
   private checkInstalled(): boolean {
     try {
-      const result = spawn.sync('opencode', ['--version'], { stdio: 'ignore', timeout: 5000 });
+      const result = spawn.sync('opencode', ['--version'], { stdio: 'ignore', timeout: 5000, windowsHide: true });
       return !result.error && result.status === 0;
     } catch {
       return false;

@@ -110,6 +110,7 @@ export function createAgentRouter(dependencies: AgentRouterDependencies): expres
   async function getGitRemoteUrl(repoPath) {
     return new Promise((resolve, reject) => {
       const gitProcess = spawn('git', ['config', '--get', 'remote.origin.url'], {
+        windowsHide: true,
         cwd: repoPath,
         stdio: ['pipe', 'pipe', 'pipe']
       });
@@ -268,6 +269,7 @@ export function createAgentRouter(dependencies: AgentRouterDependencies): expres
   async function getCommitMessages(projectPath, limit = 5) {
     return new Promise((resolve, reject) => {
       const gitProcess = spawn('git', ['log', `-${limit}`, '--pretty=format:%s'], {
+        windowsHide: true,
         cwd: projectPath,
         stdio: ['pipe', 'pipe', 'pipe']
       });
@@ -408,6 +410,7 @@ export function createAgentRouter(dependencies: AgentRouterDependencies): expres
           GIT_TERMINAL_PROMPT: '0'
         } : process.env;
         const gitProcess = spawn('git', ['clone', '--depth', '1', '--', cloneUrl, cloneDir], {
+          windowsHide: true,
           stdio: ['pipe', 'pipe', 'pipe'],
           env: gitEnvironment
         });
@@ -1141,6 +1144,7 @@ export function createAgentRouter(dependencies: AgentRouterDependencies): expres
             // Create and checkout the new branch locally
             console.log('🔄 Creating local branch...');
             const checkoutProcess = spawn('git', ['checkout', '-b', finalBranchName], {
+              windowsHide: true,
               cwd: finalProjectPath,
               stdio: 'pipe'
             });
@@ -1157,6 +1161,7 @@ export function createAgentRouter(dependencies: AgentRouterDependencies): expres
                   if (stderr.includes('already exists')) {
                     console.log(`ℹ️ Branch '${finalBranchName}' already exists locally, checking out...`);
                     const checkoutExisting = spawn('git', ['checkout', finalBranchName], {
+                      windowsHide: true,
                       cwd: finalProjectPath,
                       stdio: 'pipe'
                     });
@@ -1178,6 +1183,7 @@ export function createAgentRouter(dependencies: AgentRouterDependencies): expres
             // Push the branch to remote
             console.log('🔄 Pushing branch to remote...');
             const pushProcess = spawn('git', ['push', '-u', 'origin', finalBranchName], {
+              windowsHide: true,
               cwd: finalProjectPath,
               stdio: 'pipe'
             });
