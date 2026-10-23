@@ -14,6 +14,7 @@ import { providerTokenUsageService } from '@/modules/providers/services/provider
 import { providerSkillsService } from '@/modules/providers/services/skills.service.js';
 import { sessionConversationsSearchService } from '@/modules/providers/services/session-conversations-search.service.js';
 import { sessionsService } from '@/modules/providers/services/sessions.service.js';
+import { replySuggestionsRouter } from '@/modules/providers/reply-suggestions.routes.js';
 import type {
   CustomProviderModelEffort,
   CustomProviderModelInput,
@@ -65,6 +66,7 @@ router.param('sessionId', (_req, _res, next, id: string) => {
   if (owner !== null && owner !== getOwnerUserId()) return next(new AppError('无权访问此会话。', { statusCode: 403, code: 'SESSION_FORBIDDEN' }));
   next();
 });
+router.use(replySuggestionsRouter);
 
 const readPathParam = (value: unknown, name: string): string => {
   if (typeof value === 'string') {

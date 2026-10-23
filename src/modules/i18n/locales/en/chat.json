@@ -566,11 +566,10 @@
     }
   },
   "nextPrompts": {
-    "quickTitle": "Quick replies",
-    "continue": "Continue with the next step",
-    "explain": "Explain in more detail",
-    "review": "Check for anything missing",
-    "title": "Suggested next prompts",
+    "generating": "Generating replies from this conversation…",
+    "failed": "Reply suggestions could not be generated.",
+    "retry": "Retry",
+    "title": "Suggested replies",
     "hint": "Next steps · click to add to your draft"
   },
   "ui": {

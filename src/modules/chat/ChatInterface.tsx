@@ -590,7 +590,8 @@ function ChatInterface({
           <MessageQueuePanel key={currentSessionId||selectedSession?.id||'new'} items={messageQueue.items}
             error={messageQueue.error} update={messageQueue.update} attempts={messageQueue.attempts}
             paused={messageQueue.paused} setPaused={messageQueue.setPaused}/>
-          <NextPromptSuggestions messages={displayMessages} busy={isProcessing} onInsert={insertComposerText}/>
+          <NextPromptSuggestions messages={displayMessages} busy={isProcessing} onInsert={insertComposerText}
+            sessionId={currentSessionId || selectedSession?.id} provider={provider}/>
           <ChatComposer
           extraActions={provider === 'claude' && (currentSessionId || selectedSession?.id) ? <CrossSessionDialog key={`bridge-${currentSessionId || selectedSession?.id}`} sourceSessionId={(currentSessionId || selectedSession?.id)!} draft={input} onInsert={insertComposerText}/> : undefined}
           busySendMode={busySendMode}
