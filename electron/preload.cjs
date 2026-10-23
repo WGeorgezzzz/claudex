@@ -7,9 +7,8 @@ function isCloudCliAppOrigin(location) {
     return location.hostname === '127.0.0.1' || location.hostname === 'localhost';
   }
 
-  return location.protocol === 'https:' && (
-    location.hostname === 'cloudcli.ai' || location.hostname.endsWith('.cloudcli.ai')
-  );
+  // No hosted origin is trusted by default; the desktop bridge stays local.
+  return false;
 }
 
 function onDesktopStateUpdated(callback) {

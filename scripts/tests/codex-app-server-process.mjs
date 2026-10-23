@@ -18,7 +18,7 @@ const result=await new Promise((resolve,reject)=>{
   if(message.id===1){initialized=true;child.stdin.write(JSON.stringify({method:'initialized'})+'\n');child.stdin.write(JSON.stringify({id:2,method:'model/list',params:{}})+'\n');}
   if(message.id===2){clearTimeout(timer);resolve({initialized,modelCount:message.result?.data?.length??0,launcherHidden:true,nativeLauncherPatched});}
  });
- child.stdin.write(JSON.stringify({id:1,method:'initialize',params:{clientInfo:{name:'cloudcli_probe',title:'CloudCLI startup check',version:'0.2.0'},capabilities:{}}})+'\n');
+ child.stdin.write(JSON.stringify({id:1,method:'initialize',params:{clientInfo:{name:'cloudcli_probe',title:'Nexcode startup check',version:'0.2.0'},capabilities:{}}})+'\n');
 });
 child.stdin.end();
 await new Promise(resolve=>{const timer=setTimeout(()=>{child.kill();resolve();},3000);child.once('exit',()=>{clearTimeout(timer);resolve();});});

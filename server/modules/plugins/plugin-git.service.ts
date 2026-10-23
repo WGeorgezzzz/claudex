@@ -20,7 +20,7 @@ type PluginGitFailureRule = {
 // detached child gets a console window of its own there.
 const RUN_GIT_WITHOUT_TERMINAL = process.platform !== 'win32';
 
-const SERVER_USER = 'the user the CloudCLI server runs as';
+const SERVER_USER = 'the user the Nexcode server runs as';
 const CREDENTIAL_SETUP = 'Set up a credential helper for that user (for example "gh auth setup-git" or '
   + '~/.git-credentials), or an SSH key and known_hosts entry for git@ URLs, then try again.';
 
@@ -233,7 +233,7 @@ export function createPluginGitError(action: PluginGitAction, exitCode: number |
  */
 export function createPluginGitSpawnError(action: PluginGitAction, error: NodeJS.ErrnoException): AppError {
   const reason = error.code === 'ENOENT'
-    ? 'git is not installed or not on the PATH of the CloudCLI server.'
+    ? 'git is not installed or not on the PATH of the Nexcode server.'
     : `git could not be started: ${error.message}`;
   return new AppError(`Could not ${action} the plugin: ${reason}`, {
     code: 'PLUGIN_GIT_UNAVAILABLE',

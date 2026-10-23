@@ -16,7 +16,7 @@ type LiveClaudeCliSession = {
 
 /**
  * Claude Code keeps one file per running session here, named `<pid>.json`.
- * The directory belongs to the CLI, not to CloudCLI: it is only ever read.
+ * The directory belongs to the CLI, not to Nexcode: it is only ever read.
  */
 const registryDirectory = () => path.join(getClaudeConfigDir(), 'sessions');
 
@@ -98,8 +98,8 @@ async function readLiveBusySession(filePath: string): Promise<LiveClaudeCliSessi
  * Lists the Claude CLI sessions that are mid-turn right now.
  *
  * Used by the providers module's sessions service so the running-sessions poll
- * also reports turns driven outside CloudCLI's own chat runs — including the
- * `claude` processes CloudCLI itself spawns for the Shell view, which live in
+ * also reports turns driven outside Nexcode's own chat runs — including the
+ * `claude` processes Nexcode itself spawns for the Shell view, which live in
  * the PTY map rather than the chat-run registry. Liveness is ephemeral, so it
  * is recomputed on every read instead of being cached or persisted.
  */

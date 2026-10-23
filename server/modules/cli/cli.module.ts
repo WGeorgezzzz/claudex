@@ -76,7 +76,7 @@ export function createCliApplication(): CliApplication {
       // before this best-effort npm registry check runs.
       await new Promise<void>((resolve) => setImmediate(resolve));
       return execSync(
-        'npm show @cloudcli-ai/cloudcli version',
+        'npm show @cloudcli-ai/nexcode version',
         { encoding: 'utf8', windowsHide: true },
       ).trim();
     },
