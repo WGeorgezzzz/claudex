@@ -5,7 +5,7 @@ import { WorkBuddySessionsProvider } from '@/modules/providers/list/workbuddy/wo
 import { workBuddyRuntime } from '@/modules/providers/list/workbuddy/workbuddy-runtime.provider.js';
 import type { IProviderMcp, IProviderSkills } from '@/shared/index.js';
 
-const unavailable = async (): Promise<never> => { throw new Error('Manage WorkBuddy tools and skills in the WorkBuddy desktop client. This integration currently supports conversations only.'); };
+const unavailable = async (): Promise<never> => { throw new Error('Manage WorkBuddy skills and MCP in the WorkBuddy desktop client. This integration supports conversations and core tools.'); };
 
 /** Registry-owned local WorkBuddy integration. Native desktop sessions are never imported or modified. */
 export class WorkBuddyProvider extends AbstractProvider {

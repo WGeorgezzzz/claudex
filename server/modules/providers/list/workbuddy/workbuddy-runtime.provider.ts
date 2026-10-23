@@ -8,17 +8,30 @@ import { sessionsDb } from '@/modules/database/index.js';
 import type { IProviderRuntime } from '@/shared/index.js';
 import { createCompleteMessage, createNormalizedMessage, readObjectRecord } from '@/shared/index.js';
 import { resolveWorkBuddyInstallation } from '@/modules/providers/list/workbuddy/workbuddy-auth.provider.js';
+import { WorkBuddyProviderModels } from '@/modules/providers/list/workbuddy/workbuddy-models.provider.js';
+import { WorkBuddyPermissionBridge } from '@/modules/providers/list/workbuddy/workbuddy-permissions.provider.js';
+import { providerCapabilitiesService } from '@/modules/providers/services/provider-capabilities.service.js';
 import { workBuddyTranscriptPath } from '@/modules/providers/list/workbuddy/workbuddy-sessions.provider.js';
 
 const active = new Map<string, { child: ChildProcess; aborted: boolean }>();
+const permissions = new WorkBuddyPermissionBridge();
 
 /** Provider registry runs the official WorkBuddy CLI with local login and app-owned transcript persistence. */
 export const workBuddyRuntime: IProviderRuntime = {
+  permissions,
   async run(command, options, writer, context) {
     const install = resolveWorkBuddyInstallation();
     if (!install) throw new Error('WorkBuddy is not installed on this Windows host.');
     if ((options.images?.length || options.files?.length)) throw new Error('WorkBuddy attachments are not supported by this integration yet.');
-    const model = await context.resolveResumeModel(options.sessionId, options.model) || 'fast-model';
+    const freeModels = await new WorkBuddyProviderModels().getSupportedModels();
+    const model = await context.resolveResumeModel(options.sessionId, options.model) || freeModels.DEFAULT;
+    if (!model || !freeModels.OPTIONS.some(option => option.value === model)) {
+      const content = 'WorkBuddy 仅允许免费模型。请在模型菜单中选择标价 0 积分的模型后重试。';
+      writer.send(createNormalizedMessage({ kind: 'error', content, provider: 'workbuddy', sessionId: options.sessionId }));
+      throw new Error(content);
+    }
+    const permissionMode = options.permissionMode || 'default';
+    if (!providerCapabilitiesService.getProviderCapabilities('workbuddy').permissionModes.includes(permissionMode)) throw new Error('Unsupported WorkBuddy permission mode.');
     const previous = context.resolveProviderSessionId(options.sessionId);
     const nativeId = previous || randomUUID();
     const appId = options.sessionId || nativeId;
@@ -27,9 +40,10 @@ export const workBuddyRuntime: IProviderRuntime = {
     mkdirSync(path.dirname(transcript), { recursive: true });
     const persist = (row: unknown) => appendFileSync(transcript, JSON.stringify(row) + '\n', 'utf8');
     persist({ type: 'user', uuid: randomUUID(), __timestamp: new Date().toISOString(), message: { content: [{ type: 'text', text: command }] } });
-    const args = [install.launcher, '-p', '--output-format', 'stream-json', '--model', model,
+    const args = [install.launcher, '-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--model', model,
       '--setting-sources', '', '--strict-mcp-config', '--mcp-config', '{"mcpServers":{}}',
-      '--tools', 'StructuredOutput', '--permission-mode', 'default', '--max-turns', '1',
+      '--tools', 'Read,Write,Edit,MultiEdit,Bash,Glob,Grep,WebFetch,WebSearch,AskUserQuestion,EnterPlanMode,ExitPlanMode,StructuredOutput',
+      '--permission-mode', permissionMode,
       ...(previous ? ['--resume', previous] : ['--session-id', nativeId]),
     ];
     return new Promise<void>((resolve, reject) => {
@@ -45,7 +59,11 @@ export const workBuddyRuntime: IProviderRuntime = {
       const entry = { child, aborted: false };
       active.set(appId, entry);
       child.stdin.on('error', () => {});
-      child.stdin.end(command);
+      const send = (value: unknown) => {
+        if (!entry.aborted && !child.stdin.destroyed && !child.stdin.writableEnded) child.stdin.write(JSON.stringify(value) + '\n');
+      };
+      send({ type: 'control_request', request_id: 'initialize', request: { subtype: 'initialize' } });
+      send({ type: 'user', session_id: nativeId, message: { role: 'user', content: command }, parent_tool_use_id: null });
       child.stderr.on('data', chunk => { stderr = (stderr + chunk.toString()).slice(-4000); });
       const lines = readline.createInterface({ input: child.stdout });
       lines.on('line', line => {
@@ -53,6 +71,8 @@ export const workBuddyRuntime: IProviderRuntime = {
         let row: Record<string, unknown> | null;
         try { row = readObjectRecord(JSON.parse(line)); } catch { stderr = (stderr + line).slice(-4000); return; }
         if (!row) return;
+        if (row.type === 'control_request') { permissions.request(appId, row, writer, send); return; }
+        if (row.type === 'control_cancel_request') { permissions.cancel(appId, String(row.request_id)); return; }
         if (row.type === 'system' && row.subtype === 'init' && !announced) {
           if (row.session_id !== nativeId) { stderr = 'WorkBuddy returned an unexpected session id.'; child.kill(); return; }
           announced = true;
@@ -60,15 +80,17 @@ export const workBuddyRuntime: IProviderRuntime = {
           if (!previous) writer.send(createNormalizedMessage({ kind: 'session_created', newSessionId: nativeId, model, cwd: options.cwd || options.projectPath, sessionId: nativeId, provider: 'workbuddy' }));
           if (options.sessionId) sessionsDb.repointSessionToProviderSession(options.sessionId, { providerSessionId: nativeId, jsonlPath: transcript });
         }
-        if (row.type === 'assistant' || row.type === 'result') {
+        const isToolResult = row.type === 'user' && Array.isArray(readObjectRecord(row.message)?.content)
+          && (readObjectRecord(row.message)!.content as unknown[]).some(block => readObjectRecord(block)?.type === 'tool_result');
+        if (row.type === 'assistant' || row.type === 'result' || isToolResult) {
           try { persist(row); } catch { persistenceError = true; child.kill(); return; }
-          if (row.type === 'result') result = row;
+          if (row.type === 'result') { result = row; child.stdin.end(); }
           else for (const message of context.normalizeMessage(row, nativeId)) writer.send(message);
         }
       });
       child.once('error', () => { stderr = 'Could not start the installed WorkBuddy client.'; });
       child.once('close', code => {
-        if (active.get(appId) === entry) active.delete(appId);
+        if (active.get(appId) === entry) { permissions.cancel(appId); active.delete(appId); }
         if (entry.aborted) { resolve(); return; }
         // The bundled CLI can exit 0 on auth/model errors. Require its semantic result as well.
         const succeeded = code === 0 && result?.subtype === 'success' && result?.is_error === false && !persistenceError;
@@ -88,6 +110,7 @@ export const workBuddyRuntime: IProviderRuntime = {
     const entry = active.get(sessionId);
     if (!entry) return false;
     entry.aborted = true;
+    permissions.cancel(sessionId);
     if (process.platform === 'win32' && entry.child.pid) {
       await new Promise<void>(resolve => {
         const killer = spawn('taskkill.exe', ['/PID', String(entry.child.pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' });

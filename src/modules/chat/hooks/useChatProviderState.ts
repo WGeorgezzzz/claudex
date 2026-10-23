@@ -51,6 +51,7 @@ const FALLBACK_PERMISSION_MODES: Record<LLMProvider, PermissionMode[]> = {
 type ProviderCapabilities = {
   provider: LLMProvider;
   permissionModes: string[];
+  permissionModeNamespace?: string;
   defaultPermissionMode: string;
   supportsImages: boolean;
   supportsFiles: boolean;
@@ -851,6 +852,7 @@ export function useChatProviderState({ selectedSession, selectedProject }: UseCh
     pendingPermissionRequests,
     setPendingPermissionRequests,
     availablePermissionModes,
+    permissionModeNamespace: providerCapabilities?.[provider]?.permissionModeNamespace,
     selectPermissionMode,
     cyclePermissionMode,
     providerModelCatalog,

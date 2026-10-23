@@ -1,4 +1,13 @@
 {
+  "workbuddyModes": {
+    "modes": { "default": "默认审批", "acceptEdits": "自动编辑", "bypassPermissions": "跳过常规审批", "plan": "计划模式" },
+    "descriptions": {
+      "default": "按 WorkBuddy 规则请求审批；需要确认时在对话中选择允许或拒绝。",
+      "acceptEdits": "自动批准常规文件编辑；其他需要审批的操作仍会询问。",
+      "bypassPermissions": "自动批准常规操作；WorkBuddy 判定为高风险的操作仍可能要求审批。",
+      "plan": "分析与规划，可使用获准的只读工具；修改前需退出计划模式并确认。"
+    }
+  },
   "liveInput": {
     "send": "插入",
     "hint": "插入到正在进行的回合：助手在下一步读取，不中断正在执行的工具",

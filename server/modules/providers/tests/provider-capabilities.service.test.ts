@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { WORKBUDDY_PREDEFINED_MODELS } from '@/modules/providers/list/workbuddy/workbuddy-models.provider.js';
+import { buildWorkBuddyFreeModels } from '@/modules/providers/list/workbuddy/workbuddy-models.provider.js';
 import { CLAUDE_PREDEFINED_MODELS } from '@/modules/providers/list/claude/claude-models.provider.js';
 import { CODEX_PREDEFINED_MODELS } from '@/modules/providers/list/codex/codex-models.provider.js';
 import { CURSOR_PREDEFINED_MODELS } from '@/modules/providers/list/cursor/cursor-models.provider.js';
@@ -14,7 +14,7 @@ import type { LLMProvider, ProviderModelsDefinition } from '@/shared/types.js';
  * providers a machine has connected.
  */
 const CURATED_CATALOGS: Record<LLMProvider, ProviderModelsDefinition> = {
-  workbuddy: WORKBUDDY_PREDEFINED_MODELS,
+  workbuddy: buildWorkBuddyFreeModels({ models: [{ id: 'free-model', credits: 'x0.00', supportsToolCall: true }] }),
   claude: CLAUDE_PREDEFINED_MODELS,
   codex: CODEX_PREDEFINED_MODELS,
   cursor: CURSOR_PREDEFINED_MODELS,

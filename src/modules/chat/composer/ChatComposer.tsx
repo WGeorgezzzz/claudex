@@ -62,6 +62,7 @@ type ChatComposerProps = {
   onAbortSession: () => void;
   permissionMode: PermissionMode;
   availablePermissionModes: PermissionMode[];
+  permissionModeNamespace?: string;
   onSelectPermissionMode: (mode: PermissionMode) => void;
   providerLabel: string;
   effort: string;
@@ -144,6 +145,7 @@ export default function ChatComposer({
   onAbortSession,
   permissionMode,
   availablePermissionModes,
+  permissionModeNamespace,
   onSelectPermissionMode,
   providerLabel,
   effort,
@@ -555,7 +557,7 @@ export default function ChatComposer({
       </PromptInput>
       <div className="composer-statusbar mt-1.5 flex min-w-0 items-center gap-2 px-1 text-[11px] text-muted-foreground">
         <span className="flex shrink-0 items-center gap-1.5"><Monitor size={12}/>{t('ui.local')}</span>
-        <ComposerPermissionMenu permissionMode={permissionMode} permissionModes={availablePermissionModes} onSelectPermissionMode={onSelectPermissionMode} providerLabel={providerLabel}/>
+        <ComposerPermissionMenu permissionMode={permissionMode} permissionModes={availablePermissionModes} permissionModeNamespace={permissionModeNamespace} onSelectPermissionMode={onSelectPermissionMode} providerLabel={providerLabel}/>
         <span className="ml-auto hidden truncate opacity-60 xl:block">{submitHint}</span>
         <TokenUsageSummary usage={tokenBudget} onClick={onShowTokenUsage}/>
       </div>

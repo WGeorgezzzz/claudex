@@ -1,4 +1,13 @@
 {
+  "workbuddyModes": {
+    "modes": { "default": "Ask for approval", "acceptEdits": "Auto-approve edits", "bypassPermissions": "Skip routine approvals", "plan": "Plan mode" },
+    "descriptions": {
+      "default": "Follow WorkBuddy permission rules. Allow or deny requested actions in the conversation.",
+      "acceptEdits": "Automatically approve routine file edits; other actions can still require approval.",
+      "bypassPermissions": "Automatically approve routine actions. WorkBuddy can still request approval for high-risk actions.",
+      "plan": "Analyze and plan using permitted read-only tools. Changes require leaving plan mode and approval."
+    }
+  },
   "liveInput": {
     "send": "Insert",
     "hint": "Insert into the running turn: the agent reads it at its next step without stopping current tools",

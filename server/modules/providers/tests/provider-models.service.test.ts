@@ -168,6 +168,17 @@ test('provider catalogs merge source-controlled defaults with custom persistence
   assert.deepEqual(catalog.rows.get('codex'), undefined);
 });
 
+test('WorkBuddy custom rows and custom-only preference cannot expose paid models', async () => {
+  const { service, catalog, settings } = createTestService();
+  catalog.createCustomProviderModel('workbuddy', { id: 'fast-model', model: 'Paid Fast' });
+  settings.set('provider_models_custom_only:workbuddy', 'true');
+  const models = await service.getProviderModels('workbuddy');
+  assert.deepEqual(models.OPTIONS.map(option => option.value), ['workbuddy-default']);
+  assert.equal(models.DEFAULT, 'workbuddy-default');
+  assert.equal(models.CUSTOM_MODELS_ONLY, false);
+  assert.equal(catalog.listCustomProviderModels('workbuddy').length, 1, 'stored settings are preserved');
+});
+
 test('the custom-models-only flag is off by default and leaves the merged catalog unchanged', async () => {
   const { service } = createTestService();
   await service.createCustomModel('claude', { model: 'Gateway', id: 'gateway-model' });

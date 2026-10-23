@@ -104,6 +104,14 @@ const mergeProviderModels = (
   custom: CustomProviderModelRecord[],
   customModelsOnly: boolean,
 ): ProviderModelsDefinition => {
+  // WorkBuddy is free-only. Custom rows cannot reintroduce a paid model or
+  // override the verified catalog default, even with custom-only enabled.
+  if (provider === 'workbuddy') return {
+    ...predefined,
+    OPTIONS: predefined.OPTIONS.map(option => ({ ...option, isCustom: false })),
+    EFFORT_LEVELS: [],
+    CUSTOM_MODELS_ONLY: false,
+  };
   const customOptions = custom.map(toCustomProviderModelOption);
   const listOnlyCustomModels = customModelsOnly && customOptions.length > 0;
   return {

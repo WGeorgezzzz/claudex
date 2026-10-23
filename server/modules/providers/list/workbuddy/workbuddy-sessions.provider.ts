@@ -20,11 +20,22 @@ export class WorkBuddySessionsProvider implements IProviderSessions {
     if (row.type === 'claudex_error') return [createNormalizedMessage({ kind: 'error', content: row.content, id: row.uuid, provider: 'workbuddy', sessionId, timestamp: row.__timestamp })];
     if (row.type === 'assistant' || row.type === 'user') {
       const content = Array.isArray(message?.content) ? message.content : [];
-      return content.filter((block: { type?: string }) => block.type === 'text').map((block: { text?: string }, index: number) => createNormalizedMessage({
-        kind: 'text', content: block.text || '',
-        role: row.type, id: `${row.uuid || message?.id || row.id}-${index}`, provider: 'workbuddy', sessionId,
-        timestamp: row.__timestamp || row.timestamp, model: message?.model,
-      }));
+      return content.flatMap((value: unknown, index: number) => {
+        const block = readObjectRecord(value);
+        if (!block) return [];
+        const base = { role: row.type, id: `${row.uuid || message?.id || row.id}-${index}`, provider: 'workbuddy' as const, sessionId,
+          timestamp: row.__timestamp || row.timestamp, model: message?.model };
+        if (block.type === 'text') return [createNormalizedMessage({ ...base, kind: 'text', content: block.text || '' })];
+        if (block.type === 'thinking') return [createNormalizedMessage({ ...base, kind: 'thinking', content: block.thinking || '' })];
+        if (block.type === 'tool_use') return [createNormalizedMessage({ ...base, kind: 'tool_use', toolName: block.name, toolId: block.id, toolInput: block.input })];
+        if (block.type === 'tool_result') {
+          const result = typeof block.content === 'string' ? block.content : Array.isArray(block.content)
+            ? block.content.map(part => readObjectRecord(part)?.text || '').join('\n') : JSON.stringify(block.content ?? '');
+          return [createNormalizedMessage({ ...base, kind: 'tool_result', toolId: block.tool_use_id, content: result,
+            toolResult: { content: result, isError: block.is_error === true }, isError: block.is_error === true })];
+        }
+        return [];
+      });
     }
     return [];
   }
