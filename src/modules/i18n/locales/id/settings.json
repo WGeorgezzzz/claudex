@@ -536,7 +536,7 @@
     },
     "managed": {
       "badge": "Dikelola",
-      "hint": "Dikelola oleh CloudCLI."
+      "hint": "Dikelola oleh Claudex."
     },
     "help": {
       "title": "Tentang MCP Codex",
@@ -568,7 +568,7 @@
     "docs": "Dokumentasi",
     "sections": {
       "officialTitle": "Plugin Resmi",
-      "officialDescription": "Dikelola oleh tim CloudCLI dan siap langsung diinstal.",
+      "officialDescription": "Dikelola oleh tim Claudex dan siap langsung diinstal.",
       "unofficialTitle": "Plugin Lainnya",
       "unofficialDescription": "Plugin dan integrasi tidak resmi dari pengguna lain. Tinjau kode sumber sebelum menginstal."
     },
@@ -590,10 +590,10 @@
       "description": "Jadwalkan prompt workspace, tinjau riwayat proses, dan kelola tugas lokal berulang.",
       "install": "Instal"
     },
-    "prismCloudCLI": {
-      "name": "PRISM CloudCLI",
+    "prismClaudex": {
+      "name": "PRISM Claudex",
       "badge": "tidak resmi",
-      "description": "Intelijen sesi untuk Claude Code di dalam CloudCLI. Lihat penyebab penggunaan token tinggi tanpa meninggalkan browser.",
+      "description": "Intelijen sesi untuk Claude Code di dalam Claudex. Lihat penyebab penggunaan token tinggi tanpa meninggalkan browser.",
       "install": "Instal"
     },
     "sessionManagerPlugin": {
@@ -795,7 +795,7 @@
   "mcpTeamCard": {
     "title": "Konfigurasi MCP Tim",
     "description": "Bagikan konfigurasi server MCP di seluruh tim. Semua anggota tetap tersinkron otomatis.",
-    "proLink": "Tersedia dengan CloudCLI Pro"
+    "proLink": "Tersedia dengan Claudex Pro"
   },
   "mcpServersAddErrors": {
     "loadFailedProvider": "Gagal memuat server MCP {{provider}}",
@@ -812,15 +812,15 @@
     "tagline": "Antarmuka asisten coding AI open source",
     "starOnGitHub": "Beri Bintang di GitHub",
     "docs": "Dokumentasi",
-    "hostedTitle": "Coba CloudCLI Hosted",
+    "hostedTitle": "Coba Claudex Hosted",
     "hostedDescription": "Kolaborasi tim, konfigurasi MCP bersama, sinkronisasi pengaturan antar-environment, dan infrastruktur terkelola.",
     "learnMore": "Pelajari lebih lanjut",
-    "proFeaturesTitle": "Fitur CloudCLI Pro",
+    "proFeaturesTitle": "Fitur Claudex Pro",
     "syncSettingsTitle": "Sinkronkan Pengaturan",
     "syncSettingsDescription": "Jaga preferensi, konfigurasi MCP, dan tema tetap sinkron di semua environment.",
     "teamManagementTitle": "Manajemen Tim",
     "teamManagementDescription": "Banyak pengguna, akses berbasis peran, dan proyek bersama untuk tim.",
     "licensed": "Dilisensikan di bawah AGPL-3.0",
-    "proCta": "Tersedia dengan CloudCLI Pro"
+    "proCta": "Tersedia dengan Claudex Pro"
   }
 }

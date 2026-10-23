@@ -549,7 +549,7 @@
     },
     "managed": {
       "badge": "Gerenciado",
-      "hint": "Gerenciado pelo CloudCLI."
+      "hint": "Gerenciado pelo Claudex."
     },
     "help": {
       "title": "Sobre MCP do Codex",
@@ -581,7 +581,7 @@
     "docs": "Docs",
     "sections": {
       "officialTitle": "Plugins oficiais",
-      "officialDescription": "Mantidos pela equipe do CloudCLI e prontos para instalação direta.",
+      "officialDescription": "Mantidos pela equipe do Claudex e prontos para instalação direta.",
       "unofficialTitle": "Outros plugins",
       "unofficialDescription": "Plugins e integrações não oficiais de outros usuários. Revise o código-fonte antes de instalar."
     },
@@ -603,10 +603,10 @@
       "description": "Agende prompts de espaço de trabalho, revise histórico de execuções e gerencie tarefas locais recorrentes.",
       "install": "Instalar"
     },
-    "prismCloudCLI": {
-      "name": "PRISM CloudCLI",
+    "prismClaudex": {
+      "name": "PRISM Claudex",
       "badge": "não oficial",
-      "description": "Inteligência de sessão para o Claude Code, dentro do CloudCLI. Veja por que suas sessões estão queimando tokens sem sair do navegador.",
+      "description": "Inteligência de sessão para o Claude Code, dentro do Claudex. Veja por que suas sessões estão queimando tokens sem sair do navegador.",
       "install": "Instalar"
     },
     "sessionManagerPlugin": {
@@ -823,7 +823,7 @@
   "mcpTeamCard": {
     "title": "Configs MCP da equipe",
     "description": "Compartilhe configurações de servidores MCP com sua equipe. Todos ficam em sincronia automaticamente.",
-    "proLink": "Disponível com CloudCLI Pro"
+    "proLink": "Disponível com Claudex Pro"
   },
   "mcpServersAddErrors": {
     "loadFailedProvider": "Falha ao carregar servidores MCP do {{provider}}",
@@ -840,15 +840,15 @@
     "tagline": "Interface de assistente de codificação com IA de código aberto",
     "starOnGitHub": "Dar estrela no GitHub",
     "docs": "Docs",
-    "hostedTitle": "Experimente o CloudCLI hospedado",
+    "hostedTitle": "Experimente o Claudex hospedado",
     "hostedDescription": "Colaboração em equipe, configs MCP compartilhados, sincronização de configurações entre ambientes e infraestrutura gerenciada.",
     "learnMore": "Saiba mais",
-    "proFeaturesTitle": "Recursos do CloudCLI Pro",
+    "proFeaturesTitle": "Recursos do Claudex Pro",
     "syncSettingsTitle": "Sincronizar configurações",
     "syncSettingsDescription": "Mantenha suas preferências, configs MCP e tema em sincronia em todos os seus ambientes.",
     "teamManagementTitle": "Gerenciamento de equipe",
     "teamManagementDescription": "Múltiplos usuários, acesso baseado em funções e projetos compartilhados para sua equipe.",
     "licensed": "Licenciado sob AGPL-3.0",
-    "proCta": "Disponível com CloudCLI Pro"
+    "proCta": "Disponível com Claudex Pro"
   }
 }

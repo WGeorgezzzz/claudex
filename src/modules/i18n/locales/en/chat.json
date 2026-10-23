@@ -16,10 +16,10 @@
   "fileLink": {
     "menu": "File actions",
     "openLocally": "Open locally",
-    "preview": "Preview in CloudCLI",
+    "preview": "Preview in Claudex",
     "copyPath": "Copy file path",
     "noProject": "The project path is unavailable. Open this conversation in its project first.",
-    "desktopOnly": "Open this link in the CloudCLI desktop app to use a local program.",
+    "desktopOnly": "Open this link in the Claudex desktop app to use a local program.",
     "copyFailed": "Unable to copy the file path."
   },
   "codeBlock": {

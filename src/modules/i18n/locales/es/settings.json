@@ -519,7 +519,7 @@
     },
     "managed": {
       "badge": "Gestionado",
-      "hint": "Gestionado por CloudCLI."
+      "hint": "Gestionado por Claudex."
     },
     "help": {
       "title": "Acerca de MCP en Codex",
@@ -551,7 +551,7 @@
     "docs": "Docs",
     "sections": {
       "officialTitle": "Plugins oficiales",
-      "officialDescription": "Mantenidos por el equipo de CloudCLI y listos para instalar directamente.",
+      "officialDescription": "Mantenidos por el equipo de Claudex y listos para instalar directamente.",
       "unofficialTitle": "Otros plugins",
       "unofficialDescription": "Plugins e integraciones no oficiales de otros usuarios. Revisa el código fuente antes de instalar."
     },
@@ -573,10 +573,10 @@
       "description": "Programa prompts del espacio de trabajo, revisa el historial de ejecuciones y gestiona tareas locales recurrentes.",
       "install": "Instalar"
     },
-    "prismCloudCLI": {
-      "name": "PRISM CloudCLI",
+    "prismClaudex": {
+      "name": "PRISM Claudex",
       "badge": "no oficial",
-      "description": "Inteligencia de sesiones para Claude Code, dentro de CloudCLI. Descubre por qué tus sesiones queman tokens sin salir del navegador.",
+      "description": "Inteligencia de sesiones para Claude Code, dentro de Claudex. Descubre por qué tus sesiones queman tokens sin salir del navegador.",
       "install": "Instalar"
     },
     "sessionManagerPlugin": {

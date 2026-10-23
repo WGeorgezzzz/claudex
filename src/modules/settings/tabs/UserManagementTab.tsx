@@ -4,9 +4,9 @@ import { createPortal } from 'react-dom';
 import { FolderOpen, KeyRound, Pencil, Plus, Power, RefreshCw, Trash2, UserPlus, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-import { useAuth } from '@/modules/auth';
+import { readAuthErrorMessage, useAuth } from '@/modules/auth';
 import { FolderBrowserModal } from '@/modules/project-creation-wizard';
-import { api, readApiErrorMessage } from '@/shared/api';
+import { api } from '@/shared/api';
 import { Button } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 import SettingsCard from '@/modules/settings/SettingsCard';
@@ -82,7 +82,7 @@ export function UserManagementTab() {
 
   const read = useCallback(async (response: Response) => {
     const body = await response.json().catch(() => ({}));
-    if (!response.ok) throw Error(readApiErrorMessage(body) || t('users.failed'));
+    if (!response.ok) throw Error(readAuthErrorMessage(body) || t('users.failed'));
     return body;
   }, [t]);
   const load = useCallback(async () => {

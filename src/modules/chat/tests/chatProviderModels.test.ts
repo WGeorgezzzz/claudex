@@ -76,25 +76,21 @@ test('each provider gets its own model from its own storage key', async () => {
   assert.equal(result.current.providerModels.opencode, 'opencode-stored');
 });
 
-test('a provider with no stored model falls back to its own default, not another provider’s', async () => {
+test('a missing catalog does not fabricate models for an account with no stored selection', async () => {
   const { result } = await renderProviderState();
 
   await waitFor(() => {
-    assert.ok(result.current.providerModels.claude);
+    assert.equal(result.current.providerModelsLoading, false);
   });
 
   const models = result.current.providerModels;
-  assert.equal(
-    new Set(Object.values(models)).size,
-    Object.keys(models).length,
-    'each provider must have a distinct default model',
-  );
+  assert.ok(Object.values(models).every(model => model === ''));
 });
 
 test('choosing a model persists it under that provider’s key only', async () => {
   const { result } = await renderProviderState();
   await waitFor(() => {
-    assert.ok(result.current.providerModels.codex);
+    assert.equal(result.current.providerModelsLoading, false);
   });
   const claudeBefore = result.current.providerModels.claude;
 
@@ -115,7 +111,7 @@ test('choosing a model persists it under that provider’s key only', async () =
 test('setting the same model twice keeps the record identity stable', async () => {
   const { result } = await renderProviderState();
   await waitFor(() => {
-    assert.ok(result.current.providerModels.claude);
+    assert.equal(result.current.providerModelsLoading, false);
   });
 
   act(() => {
