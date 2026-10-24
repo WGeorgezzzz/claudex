@@ -258,5 +258,10 @@
       "archived": "Archived"
     },
     "quickSettings": "Quick settings"
+  },
+  "aiTitle": {
+    "regenerate": "Regenerate title",
+    "failed": "Could not generate a title. Try again later.",
+    "generating": "Generating title…"
   }
 }

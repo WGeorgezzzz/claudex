@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { NavigateFunction } from 'react-router-dom';
 
 import { api } from '@/shared/api';
+import { getPageTitle } from '@/shared/utils';
 import type { ServerEvent,
   AppTab,
   LLMProvider,
@@ -449,6 +450,8 @@ export function useProjectsState({
    */
   const selectedSessionRef = useRef(selectedSession);
   selectedSessionRef.current = selectedSession;
+  // The selected workspace owns the tab title even when the sidebar is collapsed or shows sections.
+  useEffect(() => { document.title = getPageTitle(selectedProject, selectedSession); }, [selectedProject, selectedSession]);
   const selectedProjectRef = useRef(selectedProject);
   selectedProjectRef.current = selectedProject;
   const projectsRef = useRef(projects);
@@ -849,10 +852,6 @@ export function useProjectsState({
         typeof upsert.providerSessionId === 'string' && upsert.providerSessionId !== upsert.sessionId
           ? upsert.providerSessionId
           : null;
-      if (!aliasedSelectedSessionId) {
-        return;
-      }
-
       const normalizedSelectedSession: ProjectSession = {
         ...upsert.session,
         id: upsert.sessionId,
@@ -861,14 +860,13 @@ export function useProjectsState({
       };
 
       setSelectedSession((previousSession) => {
-        if (previousSession?.id !== aliasedSelectedSessionId) {
+        if (!previousSession || (previousSession.id !== upsert.sessionId && previousSession.id !== aliasedSelectedSessionId)) {
           return previousSession;
         }
 
-        return {
-          ...previousSession,
-          ...normalizedSelectedSession,
-        };
+        if (previousSession.id === upsert.sessionId && previousSession.summary === upsert.session.summary && previousSession.__provider === upsert.provider && previousSession.__projectId === normalizedSelectedSession.__projectId) return previousSession;
+        const { __searchTargetSnippet: _snippet, __searchTargetTimestamp: _timestamp, ...selected } = previousSession;
+        return { ...selected, ...normalizedSelectedSession };
       });
 
       if (sessionId === aliasedSelectedSessionId) {

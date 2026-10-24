@@ -283,3 +283,17 @@ test('a superseded first load never renders the sidebar as empty', async () => {
     `the sidebar must never see a settled empty list while the load is still in flight: ${JSON.stringify(renderedStates)}`,
   );
 });
+
+
+test('AI title broadcast updates the selected canonical session and browser tab without navigation', async () => {
+  respondWith([buildProject({ sessions: [{ id: 'ai-title-session', summary: 'Temporary title', __provider: 'claude' }] })]);
+  const { result } = await renderProjectsState();
+  await waitFor(() => assert.equal(result.current.projects.length, 1));
+  act(() => { result.current.handleSessionSelect({ id: 'ai-title-session', summary: 'Temporary title', __provider: 'claude', __projectId: 'project-1' }); });
+  await act(async () => {
+    emit({ kind: 'session_upserted', sessionId: 'ai-title-session', providerSessionId: 'native-id', provider: 'claude',
+      session: { id: 'ai-title-session', summary: 'Generated task title' }, project: { projectId: 'project-1', path: '/repo', fullPath: '/repo', displayName: 'Original name', isStarred: false } } as {kind: string});
+  });
+  assert.equal(result.current.selectedSession?.summary, 'Generated task title');
+  await waitFor(() => assert.equal(document.title, 'Generated task title'));
+});

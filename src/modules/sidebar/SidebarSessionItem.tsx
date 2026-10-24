@@ -1,8 +1,9 @@
 import { memo, useState } from 'react';
 import type { KeyboardEvent } from 'react';
-import { Check, CheckSquare, Edit2, Loader2, MoreHorizontal, Square, Trash2, X } from 'lucide-react';
+import { Check, CheckSquare, Edit2, Loader2, MoreHorizontal, Sparkles, Square, Trash2, X } from 'lucide-react';
 import type { TFunction } from 'i18next';
 
+import { useSessionTitleGeneration } from '@/modules/sidebar/hooks/useSessionTitleGeneration';
 import { Badge, Dialog, DialogContent, DialogTitle, LLMProviderLogo, Tooltip, buttonVariants } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 import type { LLMProvider, Project, ProjectSession, SessionWithProvider } from '@/shared/types';
@@ -65,6 +66,7 @@ function SidebarSessionItem({
   onToggleSessionSelected,
   t,
 }: SidebarSessionItemProps) {
+  const { generatingTitle, regenerateTitle, titleActionLabel } = useSessionTitleGeneration(session.id);
   const isCompact = useCompactSidebar();
   const sessionView = createSessionViewModel(session, currentTime, t);
   const isSelected = selectedSession?.id === session.id;
@@ -322,6 +324,13 @@ function SidebarSessionItem({
                   <span className="text-sm font-medium">Rename session</span>
                 </button>
 
+                {['claude', 'codex'].includes(session.__provider) && (
+                  <button type="button" onClick={() => { void regenerateTitle(); }} disabled={isProcessing || generatingTitle}
+                    className="flex min-h-12 w-full items-center gap-3 rounded-xl border border-border bg-muted/35 px-4 py-3 text-left text-foreground disabled:opacity-50">
+                    <Sparkles className="h-5 w-5 flex-shrink-0" />
+                    <span className="text-sm font-medium">{titleActionLabel}</span>
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={handleCopyAction}

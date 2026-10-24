@@ -12,7 +12,7 @@ import cors from 'cors';
 
 import { monitorsRoutes, initializeMonitors, closeMonitors } from '@/modules/monitors/index.js';
 import { dotRoutes, initializeDot, closeDot } from '@/modules/dot/index.js';
-import { accessBoundaryMiddleware, initializeLocalIdentity } from '@/modules/auth/index.js';
+import { accessBoundaryMiddleware, initializeLocalIdentity, withUserContext } from '@/modules/auth/index.js';
 import { sideChatsRoutes } from '@/modules/side-chats/index.js';
 import { messageQueueRoutes, initializeMessageQueue, closeMessageQueue } from '@/modules/message-queue/index.js';
 import { sessionWorkspaceRoutes } from '@/modules/session-workspace/index.js';
@@ -25,6 +25,7 @@ import {
     closeSessionsWatcher,
     initializeSessionsWatcher,
     providerRuntimeService,
+    sessionTitlesService,
 } from '@/modules/providers/index.js';
 import { chatRunRegistry, createWebSocketServer } from '@/modules/websocket/index.js';
 
@@ -114,6 +115,11 @@ const agentRoutes = createAgentModule({
 // A completed run stays subscribable while its session's background work
 // (agents, workflows, backgrounded commands) is still reporting through it.
 chatRunRegistry.setRetentionGuard((sessionId) => providerRuntimeService.hasBackgroundWork(sessionId));
+chatRunRegistry.setCompletionListener((sessionId, userId) => {
+    if (userId === null) return;
+    try { withUserContext(userId, () => sessionTitlesService.automatic(sessionId, 'completed')); }
+    catch (error) { console.warn('[SessionTitles] Owner context unavailable:', String(error)); }
+});
 
 createWebSocketServer(server, {
     verifyClient: {

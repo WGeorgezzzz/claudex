@@ -50,7 +50,8 @@ export type CodexThreadFork = {
  * install, and the protocol this speaks is only guaranteed against the
  * version this package depends on.
  */
-function resolveCodexLauncher(): string {
+/** Codex app-server and auxiliary title calls use the same installed launcher. */
+export function resolveCodexLauncher(): string {
   const require_ = createRequire(import.meta.url);
   try {
     return require_.resolve('@openai/codex/bin/codex.js');

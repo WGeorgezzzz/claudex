@@ -1,8 +1,8 @@
 import os from 'node:os';
 import path from 'node:path';
 import { readFile } from 'node:fs/promises';
-import { getCurrentUserContext } from '@/modules/auth/index.js';
 
+import { getCurrentUserContext } from '@/modules/auth/index.js';
 import { sessionsDb } from '@/modules/database/index.js';
 import {
   buildLookupMap,
@@ -44,15 +44,7 @@ export class CodexSessionSynchronizer implements IProviderSessionSynchronizer {
         continue;
       }
 
-      const existingSession = sessionsDb.getSessionByProviderSessionId(parsed.sessionId)
-        ?? sessionsDb.getSessionById(parsed.sessionId);
-      if (existingSession) {
-        // If session name is untitled and we now have a name, update it
-        if (existingSession.custom_name === 'Untitled Codex Session' && parsed.sessionName && parsed.sessionName !== 'Untitled Codex Session') {
-          sessionsDb.updateSessionCustomName(existingSession.session_id, parsed.sessionName);
-        }
-      }
-
+      // createSession applies title-source priority, including provider-keyed legacy rows.
       const timestamps = await readFileTimestamps(filePath);
       sessionsDb.createSession(
         parsed.sessionId,

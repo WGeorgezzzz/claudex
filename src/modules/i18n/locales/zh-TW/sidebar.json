@@ -165,5 +165,10 @@
     "archiveSessions_other": "封存 {{count}} 個工作階段",
     "archiveSessionsNotice_one": "封存會將所選工作階段移出使用中清單，但保留其歷史記錄。",
     "archiveSessionsNotice_other": "封存會將所選工作階段移出使用中清單，但保留其歷史記錄。"
+  },
+  "aiTitle": {
+    "regenerate": "AI 重新命名",
+    "failed": "标题生成失败，请稍后重试。",
+    "generating": "正在生成标题…"
   }
 }

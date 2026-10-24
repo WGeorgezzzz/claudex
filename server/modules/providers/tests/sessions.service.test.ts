@@ -41,7 +41,7 @@ test('provider session id returns the mapped native id', { concurrency: false },
   });
 });
 
-test('app session names use at most four whole words from the initial message', { concurrency: false }, async () => {
+test('app session names use the first nonempty line', { concurrency: false }, async () => {
   await withIsolatedDatabase(() => {
     const result = sessionsService.createAppSession(
       'codex',
@@ -49,10 +49,10 @@ test('app session names use at most four whole words from the initial message', 
       '  supercalifragilisticexpialidocious\nsecond   third fourth fifth  ',
     );
 
-    assert.equal(result.sessionName, 'supercalifragilisticexpialidocious second third fourth');
+    assert.equal(result.sessionName, 'supercalifragilisticexpialidocious');
     assert.equal(
       sessionsDb.getSessionById(result.sessionId)?.custom_name,
-      'supercalifragilisticexpialidocious second third fourth',
+      'supercalifragilisticexpialidocious',
     );
   });
 });
@@ -61,8 +61,8 @@ test('app sessions without message text receive a stable fallback name', { concu
   await withIsolatedDatabase(() => {
     const result = sessionsService.createAppSession('claude', '/tmp/attachment-only-project', '  \n ');
 
-    assert.equal(result.sessionName, 'Untitled Session');
-    assert.equal(sessionsDb.getSessionById(result.sessionId)?.custom_name, 'Untitled Session');
+    assert.equal(result.sessionName, '新对话');
+    assert.equal(sessionsDb.getSessionById(result.sessionId)?.custom_name, '新对话');
   });
 });
 

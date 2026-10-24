@@ -313,3 +313,22 @@ test('startRun rejects a second concurrent run for the same session', async () =
     assert.ok(third);
   });
 });
+
+
+test('successful completion schedules auxiliary work once and never on abort or failure', async () => {
+  await withIsolatedDatabase(async () => {
+    const completed: string[] = [];
+    chatRunRegistry.setCompletionListener(id => completed.push(id));
+    try {
+      for (const [id, exitCode, aborted] of [['ok', 0, false], ['bad', 1, false], ['abort', 0, true]] as const) {
+        sessionsDb.createAppSession(id, 'claude', '/workspace/title-hooks');
+        const run = chatRunRegistry.startRun({ appSessionId: id, provider: 'claude', providerSessionId: null, connection: null, userId: 1 })!;
+        run.writer.sendComplete({ exitCode, aborted });
+        run.writer.sendComplete({ exitCode, aborted });
+      }
+      assert.deepEqual(completed, []);
+      await new Promise(resolve => setImmediate(resolve));
+      assert.deepEqual(completed, ['ok']);
+    } finally { chatRunRegistry.setCompletionListener(() => {}); }
+  });
+});

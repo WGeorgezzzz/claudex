@@ -1,7 +1,8 @@
 import { useEffect, useRef } from 'react';
-import { Check, Edit2, GitBranch, Mail, MailOpen, MoreHorizontal, Pin, PinOff, Trash2, X } from 'lucide-react';
+import { Check, Edit2, GitBranch, Mail, MailOpen, MoreHorizontal, Sparkles, Pin, PinOff, Trash2, X } from 'lucide-react';
 import type { TFunction } from 'i18next';
 
+import { useSessionTitleGeneration } from '@/modules/sidebar/hooks/useSessionTitleGeneration';
 import { ActionMenu } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 import type { LLMProvider } from '@/shared/types';
@@ -63,6 +64,7 @@ export default function SessionOptions({
   className,
   t,
 }: SessionOptionsProps) {
+  const { generatingTitle, regenerateTitle, titleActionLabel } = useSessionTitleGeneration(sessionId);
   const containerRef = useRef<HTMLDivElement>(null);
   const workspace=useSessionWorkspace();
   const organization=workspace?.byId.get(sessionId);
@@ -174,6 +176,11 @@ export default function SessionOptions({
               label: 'Rename session',
               icon: Edit2,
               onSelect: () => onStartEditingSession(projectId, sessionId, sessionName),
+            }] : []),
+            ...(['claude', 'codex'].includes(provider) ? [{
+              key: 'ai-title', label: titleActionLabel, icon: Sparkles,
+              disabled: isProcessing || generatingTitle, loading: generatingTitle,
+              closeOnSelect: false, onSelect: () => { void regenerateTitle(); },
             }] : []),
             {
               key: 'copy',

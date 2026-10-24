@@ -59,6 +59,7 @@ const MAX_BUFFERED_EVENTS_PER_RUN = 5000;
  * path all consult it instead of asking each provider runtime individually.
  */
 const runs = new Map<string, ChatRun>();
+let onCompleted: (sessionId: string, userId: string | number | null) => void = () => {};
 
 /**
  * Answers whether a completed run must stay registered a while longer. Set by
@@ -125,6 +126,9 @@ function decorateAndRecordEvent(run: ChatRun, message: NormalizedMessage): Norma
     run.status = 'completed';
     run.completedAt = Date.now();
     evictRunLater(run);
+    if (!message.aborted && (message.exitCode === undefined || message.exitCode === 0)) {
+      setImmediate(() => onCompleted(run.appSessionId, run.userId));
+    }
   }
   // Background agents can publish another answer after the foreground turn
   // completed. That result is new information even though the run stays retained.
@@ -189,6 +193,8 @@ function recordProviderSessionId(run: ChatRun, providerSessionId: string): void 
  * regardless of which provider runtime produced them.
  */
 export const chatRunRegistry = {
+  /** Server composition wires auxiliary title generation after successful terminal events. */
+  setCompletionListener(listener: typeof onCompleted): void { onCompleted = listener; },
   /** Installs the check that keeps a completed run registered while its session still has background work. */
   setRetentionGuard(guard: (appSessionId: string) => boolean): void {
     retainCompletedRun = guard;

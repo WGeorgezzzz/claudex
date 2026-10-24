@@ -567,6 +567,10 @@ export const runMigrations = (db: Database) => {
     addProviderSessionIdMapping(db);
     addSessionModelColumn(db);
     addSessionEffortColumn(db);
+    const titleColumns = getTableInfo(db, 'sessions').map(column => column.name);
+    addColumnToTableIfNotExists(db, 'sessions', titleColumns, 'title_source', "TEXT CHECK(title_source IN ('auto','ai','user'))");
+    addColumnToTableIfNotExists(db, 'sessions', titleColumns, 'title_auto_attempted', 'INTEGER NOT NULL DEFAULT 0');
+    addColumnToTableIfNotExists(db, 'sessions', titleColumns, 'title_revision', 'INTEGER NOT NULL DEFAULT 0');
     addForkedFromSessionIdColumn(db);
     ensureProjectsForSessionPaths(db);
     db.exec(SCHEDULED_MESSAGES_TABLE_SCHEMA_SQL);

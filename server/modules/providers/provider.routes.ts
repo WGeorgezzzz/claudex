@@ -1,9 +1,9 @@
+import express, { type Request, type Response } from 'express';
+
+import { sessionTitlesService } from '@/modules/providers/services/session-titles.service.js';
 import { getSessionOwnerId, getOwnerUserId } from '@/modules/database/index.js';
 import { userContextMiddleware } from '@/modules/access-control/index.js';
-import express, { type Request, type Response } from 'express';
-import { requireSharedResourceAdministrator } from '@/modules/auth/index.js';
-import { assertUserPath, getCurrentUserContext } from '@/modules/auth/index.js';
-
+import { requireSharedResourceAdministrator,assertUserPath,getCurrentUserContext } from '@/modules/auth/index.js';
 import { providerAuthService } from '@/modules/providers/services/provider-auth.service.js';
 import { claudeSettingsPermissionsService } from '@/modules/providers/services/claude-settings-permissions.service.js';
 import { providerCapabilitiesService } from '@/modules/providers/services/provider-capabilities.service.js';
@@ -972,6 +972,7 @@ router.get(
   asyncHandler(async (req: Request, res: Response) => {
     const sessionId = parseSessionId(req.params.sessionId);
     const result = sessionsService.getSessionDetailsById(sessionId);
+    sessionTitlesService.automatic(result.sessionId, 'opened');
     res.json(createApiSuccessResponse(result));
   }),
 );
@@ -1005,6 +1006,14 @@ router.post(
     const sessionId = parseSessionId(req.params.sessionId);
     const result = await sessionsService.forkSessionById(sessionId, parseSessionForkPayload(req.body));
     res.status(201).json(createApiSuccessResponse(result));
+  }),
+);
+
+router.post(
+  '/sessions/:sessionId/regenerate-title',
+  asyncHandler(async (req: Request, res: Response) => {
+    const result = await sessionTitlesService.generate(parseSessionId(req.params.sessionId), 'manual');
+    res.json(createApiSuccessResponse(result));
   }),
 );
 

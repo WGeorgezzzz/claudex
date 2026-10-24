@@ -2,7 +2,9 @@ import { randomUUID } from 'node:crypto';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
 
-import { projectsDb, sessionsDb } from '@/modules/database/index.js';
+import { buildTemporaryTitle } from '@/modules/providers/services/session-title-text.service.js';
+import { projectsDb, sessionsDb, userPreferencesDb } from '@/modules/database/index.js';
+import { getCurrentUserContext } from '@/modules/auth/index.js';
 import { broadcastSessionUpserted, chatRunRegistry } from '@/modules/websocket/index.js';
 import { providerRegistry } from '@/modules/providers/provider.registry.js';
 import { listBusyClaudeCliSessions } from '@/modules/providers/services/claude-cli-liveness.service.js';
@@ -94,12 +96,6 @@ type SessionDetails = {
   } | null;
 };
 
-const MAX_CLOUDCLI_SESSION_NAME_WORDS = 4;
-
-function buildCloudCliSessionName(initialMessage: string): string {
-  const words = initialMessage.trim().split(/\s+/).filter(Boolean);
-  return words.slice(0, MAX_CLOUDCLI_SESSION_NAME_WORDS).join(' ') || 'Untitled Session';
-}
 
 /**
  * Removes one file if it exists.
@@ -285,7 +281,7 @@ export const sessionsService = {
    * for the lifetime of the conversation. The provider-native id is mapped to
    * this row later, when the provider runtime announces it mid-run. Its title
    * comes directly from the first visible Nexcode message and is limited to
-   * four whole words before any provider-owned storage exists.
+   * a short placeholder before any provider-owned storage exists.
    */
   createAppSession(
     provider: LLMProvider,
@@ -301,7 +297,9 @@ export const sessionsService = {
     }
 
     const sessionId = randomUUID();
-    const sessionName = buildCloudCliSessionName(initialMessage);
+    const userId = getCurrentUserContext()?.userId;
+    const language = userId ? userPreferencesDb.getPreferences(userId).userLanguage : undefined;
+    const sessionName = buildTemporaryTitle(initialMessage, typeof language === 'string' ? language : 'zh');
     sessionsDb.createAppSession(sessionId, provider, normalizedProjectPath, sessionName);
 
     return {

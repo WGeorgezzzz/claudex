@@ -257,5 +257,10 @@
     "loadFailed": "无法加载最近对话",
     "loadMore": "加载更早的对话",
     "loadingMore": "正在加载…"
+  },
+  "aiTitle": {
+    "regenerate": "AI 重新命名",
+    "failed": "标题生成失败，请稍后重试。",
+    "generating": "正在生成标题…"
   }
 }

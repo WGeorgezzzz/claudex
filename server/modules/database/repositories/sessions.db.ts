@@ -1,7 +1,7 @@
-import { ownerPredicate } from '../ownership.js';
 import { getConnection } from '@/modules/database/connection.js';
 import { projectsDb } from '@/modules/database/repositories/projects.db.js';
 import { normalizeProjectPath } from '@/shared/utils.js';
+import { ownerPredicate } from '@/modules/database/ownership.js';
 
 type SessionRow = {
   owner_id: number | null;
@@ -11,6 +11,9 @@ type SessionRow = {
   project_path: string | null;
   jsonl_path: string | null;
   custom_name: string | null;
+  title_source: 'auto' | 'ai' | 'user' | null;
+  title_auto_attempted: number;
+  title_revision: number;
   /** Model this session runs with; NULL until the app records one for it. */
   model: string | null;
   /** Reasoning effort this session runs with; NULL until the app records one. */
@@ -28,7 +31,7 @@ type RecentSessionsPage = {
 };
 
 const SESSION_ROW_COLUMNS =
-  'owner_id, session_id, provider, provider_session_id, project_path, jsonl_path, custom_name, model, effort, forked_from_session_id, isArchived, created_at, updated_at';
+  'owner_id, session_id, provider, provider_session_id, project_path, jsonl_path, custom_name, title_source, title_auto_attempted, title_revision, model, effort, forked_from_session_id, isArchived, created_at, updated_at';
 
 const SQLITE_UTC_TIMESTAMP_REGEX = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/;
 
@@ -117,7 +120,7 @@ export const sessionsDb = {
            jsonl_path = ?,
            isArchived = CASE WHEN ? IS NULL OR julianday(?) > julianday(updated_at) THEN 0 ELSE isArchived END,
            custom_name = CASE
-             WHEN session_id <> provider_session_id AND custom_name IS NOT NULL THEN custom_name
+             WHEN title_source IN ('ai','user') OR (session_id <> provider_session_id AND custom_name IS NOT NULL) THEN custom_name
              ELSE COALESCE(?, custom_name)
            END
          WHERE ${ownerPredicate()} AND session_id = ?`
@@ -149,7 +152,7 @@ export const sessionsDb = {
          jsonl_path = excluded.jsonl_path,
          isArchived = CASE WHEN ? IS NULL OR julianday(excluded.updated_at) > julianday(sessions.updated_at) THEN 0 ELSE sessions.isArchived END,
          custom_name = CASE
-           WHEN sessions.session_id <> sessions.provider_session_id AND sessions.custom_name IS NOT NULL
+           WHEN sessions.title_source IN ('ai','user') OR (sessions.session_id <> sessions.provider_session_id AND sessions.custom_name IS NOT NULL)
              THEN sessions.custom_name
            ELSE COALESCE(excluded.custom_name, sessions.custom_name)
          END WHERE ${ownerPredicate('sessions')}`
@@ -189,8 +192,8 @@ export const sessionsDb = {
     projectsDb.createProjectPath(normalizedProjectPath);
 
     db.prepare(
-      `INSERT INTO sessions (session_id, provider, provider_session_id, custom_name, project_path, jsonl_path, isArchived, created_at, updated_at)
-       VALUES (?, ?, NULL, ?, ?, NULL, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+      `INSERT INTO sessions (session_id, provider, provider_session_id, custom_name, title_source, project_path, jsonl_path, isArchived, created_at, updated_at)
+       VALUES (?, ?, NULL, ?, 'auto', ?, NULL, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
     ).run(sessionId, provider, customName ?? null, normalizedProjectPath);
 
     return sessionId;
@@ -445,9 +448,19 @@ export const sessionsDb = {
     const db = getConnection();
     db.prepare(
       `UPDATE sessions
-       SET custom_name = ?
+       SET custom_name = ?, title_source = 'user', title_revision = title_revision + 1
        WHERE ${ownerPredicate()} AND session_id = ?`
     ).run(customName, sessionId);
+  },
+
+  /** Title generation claims persist across restarts; ownership is enforced for every claim. */
+  claimAutomaticTitle(sessionId: string): boolean {
+    return getConnection().prepare(`UPDATE sessions SET title_auto_attempted=1 WHERE ${ownerPredicate()} AND session_id=? AND title_auto_attempted=0 AND (title_source IS NULL OR title_source='auto')`).run(sessionId).changes === 1;
+  },
+
+  /** Compare-and-swap prevents even a rename made during a manual generation from being lost. */
+  applyAiTitle(sessionId: string, title: string, revision: number, manual: boolean, expectedName?: string | null): boolean {
+    return getConnection().prepare(`UPDATE sessions SET custom_name=?, title_source='ai', title_revision=title_revision+1 WHERE ${ownerPredicate()} AND session_id=? AND title_revision=? AND (?=1 OR ((title_source IS NULL OR title_source='auto') AND custom_name IS ?))`).run(title, sessionId, revision, manual ? 1 : 0, expectedName ?? null).changes === 1;
   },
 
   getSessionById(sessionId: string): SessionRow | null {

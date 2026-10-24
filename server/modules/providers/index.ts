@@ -17,3 +17,6 @@ export { assertSessionOwnerAvailable } from '@/modules/providers/services/sessio
 
 export { default as providerRoutes } from './provider.routes.js';
 export { createSessionHistoryCache } from './services/session-history-cache.service.js';
+
+// Server composition wires asynchronous titles without coupling websocket internals to providers.
+export { sessionTitlesService } from './services/session-titles.service.js';
