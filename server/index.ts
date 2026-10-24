@@ -1,6 +1,15 @@
 #!/usr/bin/env node
 // Load environment variables before other imports execute.
 import './load-env.js';
+
+import fs, { promises as fsPromises } from 'fs';
+import path from 'path';
+import os from 'os';
+import http from 'http';
+
+import express, { type NextFunction, type Request, type Response } from 'express';
+import cors from 'cors';
+
 import { monitorsRoutes, initializeMonitors, closeMonitors } from '@/modules/monitors/index.js';
 import { dotRoutes, initializeDot, closeDot } from '@/modules/dot/index.js';
 import { accessBoundaryMiddleware, initializeLocalIdentity } from '@/modules/auth/index.js';
@@ -11,15 +20,6 @@ import { workspaceSectionsRoutes } from '@/modules/workspace-sections/index.js';
 import { sessionBridgeRoutes } from '@/modules/session-bridge/index.js';
 import { sideChatsDb } from '@/modules/database/index.js';
 import { getCloudCliHomeDir } from '@/shared/index.js';
-
-import fs, { promises as fsPromises } from 'fs';
-import path from 'path';
-import os from 'os';
-import http from 'http';
-
-import express, { type NextFunction, type Request, type Response } from 'express';
-import cors from 'cors';
-
 import { AppError, findApplicationRoot, getModuleDirectory, IS_PLATFORM, terminalTextStyles } from '@/shared/utils.js';
 import {
     closeSessionsWatcher,
@@ -40,6 +40,7 @@ import {
 import { taskmasterRoutes } from './modules/taskmaster/index.js';
 import { commandsRoutes } from './modules/commands/index.js';
 import { settingsRoutes } from './modules/settings/index.js';
+import { usageRoutes, initializeUsage, closeUsage } from './modules/usage/index.js';
 import { createSystemModule } from './modules/system/index.js';
 import { createAgentModule } from './modules/agent/index.js';
 import projectModuleRoutes from './modules/projects/projects.routes.js';
@@ -168,6 +169,7 @@ app.use('/api', validateApiKey);
 
 // Authentication routes (public)
 app.use('/api/auth', authRoutes);
+app.use('/api/usage', authenticateToken, usageRoutes);
 
 // File Tree API Routes (protected)
 app.use('/api/file-tree', authenticateToken, fileTreeRoutes);
@@ -355,6 +357,7 @@ async function startServer() {
     try {
         // Initialize authentication database
         await initializeDatabase();
+        initializeUsage();
         initializeLocalIdentity();
 
         // Configure Web Push (VAPID keys)
@@ -418,6 +421,7 @@ async function startServer() {
         closeMessageQueue();
         // Clean up plugin processes on shutdown
         const shutdownRuntimeServices = async () => {
+            closeUsage();
             try {
                 await browserUseService.stopAllSessions();
             } catch (err) {

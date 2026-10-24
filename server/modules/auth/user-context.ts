@@ -8,6 +8,17 @@ import { getConnection } from '@/modules/database/index.js';
 import { AppError, userContextStorage } from '@/shared/utils.js';
 
 
+/** Auth runtime and Usage scanning share path rules; this resolver performs no filesystem writes or configuration sync. */
+export function resolveUserConfigPaths(id: number, role: string) {
+  const adminClaude = path.resolve(process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude'));
+  const adminCodex = path.resolve(process.env.CODEX_HOME || path.join(os.homedir(), '.codex'));
+  const configRoot = path.resolve(process.env.CLAUDEX_USER_CONFIG_ROOT || path.join(os.homedir(), '.cloudcli', 'users'));
+  const root = path.join(configRoot, String(id));
+  return { adminClaude, adminCodex, configRoot, root,
+    claudeConfigDir: role === 'admin' ? adminClaude : path.join(root, 'claude'),
+    codexHome: role === 'admin' ? adminCodex : path.join(root, 'codex') };
+}
+
 function denied(message: string): never {
   throw new AppError(message, { code: 'USER_PATH_FORBIDDEN', statusCode: 403 });
 }
@@ -99,12 +110,7 @@ export function getUserContext(userId: number | string): UserRuntimeContext {
   if (!Array.isArray(folders) || folders.some(folder => typeof folder !== 'string' || !path.isAbsolute(folder))) {
     return denied('Invalid allowed folder configuration.');
   }
-  const adminClaude = path.resolve(process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude'));
-  const adminCodex = path.resolve(process.env.CODEX_HOME || path.join(os.homedir(), '.codex'));
-  const configRoot = path.resolve(process.env.CLAUDEX_USER_CONFIG_ROOT || path.join(os.homedir(), '.cloudcli', 'users'));
-  const root = path.join(configRoot, String(id));
-  const claudeConfigDir = row.role === 'admin' ? adminClaude : path.join(root, 'claude');
-  const codexHome = row.role === 'admin' ? adminCodex : path.join(root, 'codex');
+  const { adminClaude, adminCodex, configRoot, root, claudeConfigDir, codexHome } = resolveUserConfigPaths(id, row.role);
   if (row.role === 'member') {
     fs.mkdirSync(claudeConfigDir, { recursive: true });
     fs.mkdirSync(codexHome, { recursive: true });

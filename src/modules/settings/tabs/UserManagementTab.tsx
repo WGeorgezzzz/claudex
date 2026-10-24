@@ -7,6 +7,8 @@ import { useTranslation } from 'react-i18next';
 import { readAuthErrorMessage, useAuth } from '@/modules/auth';
 import { FolderBrowserModal } from '@/modules/project-creation-wizard';
 import { api } from '@/shared/api';
+import { UsageBadge } from '@/modules/usage';
+import type { UsageUser } from '@/shared/types';
 import { Button } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 import SettingsCard from '@/modules/settings/SettingsCard';
@@ -65,10 +67,13 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
 }
 
 /** Settings renders this administrator-only section to list, create and manage member accounts. */
-export function UserManagementTab() {
+export function UserManagementTab({ onUsage }: { onUsage?: (id:number)=>void } = {}) {
   const { t } = useTranslation('settings');
   const { user } = useAuth();
   const currentId = Number((user as { id?: number } | null)?.id);
+  // One overview request supplies all account badges, avoiding per-row requests.
+  const [usageUsers, setUsageUsers] = useState<UsageUser[]>([]);
+  useEffect(() => { let mounted=true; void api.usage.overview({range:'30d'}).then(async r=>{if(r.ok&&mounted)setUsageUsers((await r.json()).perUser);}).catch(()=>{});return()=>{mounted=false;}; }, []);
   const [users, setUsers] = useState<ManagedUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -172,6 +177,7 @@ export function UserManagementTab() {
             <div className="min-w-0 flex-1">
               <div className="flex min-w-0 flex-wrap items-center gap-1.5">
                 <span className="truncate text-sm font-medium text-foreground" title={account.username}>{account.username}</span>
+                {usageUsers.find(u=>u.userId===account.id) && <UsageBadge user={usageUsers.find(u=>u.userId===account.id)!} onClick={()=>onUsage?.(account.id)} />}
                 {isSelf && <span className="text-xs text-muted-foreground">{t('users.you')}</span>}
                 <span className={cn('inline-flex h-5 items-center rounded-full px-2 text-[11px] font-medium', account.role === 'admin' ? 'bg-primary/10 text-primary dark:bg-primary/20' : 'bg-muted text-muted-foreground')}>{t(account.role === 'admin' ? 'users.admin' : 'users.member')}</span>
                 <span className={cn('inline-flex h-5 items-center gap-1 rounded-full px-2 text-[11px] font-medium', account.is_active ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300' : 'bg-amber-500/10 text-amber-700 dark:text-amber-300')}>

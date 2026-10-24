@@ -1,9 +1,10 @@
 import { Database } from 'better-sqlite3';
+
+import { initializeUsageTables } from '@/modules/usage/index.js';
 import { initializeMonitorTables } from '@/modules/database/repositories/monitors.db.js';
 import { initializeSideChatTables } from '@/modules/database/repositories/side-chats.db.js';
 import { initializeMessageQueueTables } from '@/modules/database/repositories/message-queue.db.js';
 import { initializeSessionWorkspaceTables } from '@/modules/database/repositories/session-workspace.db.js';
-
 import {
   APP_CONFIG_TABLE_SCHEMA_SQL,
   LAST_SCANNED_AT_SQL,
@@ -596,6 +597,7 @@ export const runMigrations = (db: Database) => {
     }
 
     db.exec(LAST_SCANNED_AT_SQL);
+    initializeUsageTables(db);
     console.log('Database migrations completed successfully');
   } catch (error: any) {
     console.error('Error running migrations:', error.message);

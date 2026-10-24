@@ -1389,7 +1389,7 @@ export type AgentContext = {
 };
 
 /** Identifier of a top-level section in the settings dialog; use it whenever a tab is stored, compared or requested so deep links, the sidebar and the command palette all agree on the same set of names. */
-export type SettingsMainTab = 'account' | 'users' | 'agents' | 'appearance' | 'git' | 'api' | 'voice' | 'tasks' | 'browser' | 'notifications' | 'plugins' | 'about';
+export type SettingsMainTab = 'account' | 'users' | 'usage' | 'agents' | 'appearance' | 'git' | 'api' | 'voice' | 'tasks' | 'browser' | 'notifications' | 'plugins' | 'about';
 
 /** The coding-agent CLI a settings screen is configuring, aliasing LLMProvider so agent-scoped settings read as being about an agent rather than a chat model. */
 export type AgentProvider = LLMProvider;
@@ -1942,3 +1942,13 @@ export type QueuedMessageAttempt = {
   started_at:string;finished_at:string|null;error:string|null;
 };
 // ---------------------------
+
+//----------------- USAGE ANALYTICS ------------
+/** Normalized token counts; total includes input, output, cache read and cache write exactly once. */
+export type UsageCounts = { requests:number; input:number; output:number; cacheRead:number; cacheWrite:number; total:number };
+/** One zero-filled chart series returned by the authenticated usage endpoint. */
+export type UsageSeries = {key:string;label:string;points:(UsageCounts & {t:string})[]};
+/** Account usage summary, retained for disabled and deleted accounts. */
+export type UsageUser = {userId:number;username:string;role:string;isActive:boolean;today:UsageCounts;last7d:UsageCounts;last30d:UsageCounts;topModel:string|null;lastActiveAt:string|null};
+/** Dashboard response shared by the settings badge and chart. */
+export type UsageOverview = {range:string;buckets:string[];series:UsageSeries[];totals:UsageCounts;perUser:UsageUser[];scannedAt:string|null;scanning:boolean};

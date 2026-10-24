@@ -20,6 +20,7 @@ type NavItem = {
 
 const NAV_ITEMS: NavItem[] = [
   { id: 'account', labelKey: 'mainTabs.account', icon: UserRound },
+  { id: 'usage', labelKey: 'mainTabs.usage', icon: MonitorPlay },
   { id: 'users', labelKey: 'mainTabs.users', icon: Users, adminOnly: true },
   { id: 'agents', labelKey: 'mainTabs.agents', icon: Bot },
   { id: 'appearance', labelKey: 'mainTabs.appearance', icon: Palette },

@@ -16,6 +16,7 @@ import TasksSettingsTab from '@/modules/settings/tabs/tasks-settings/TasksSettin
 import { PluginSettingsTab } from '@/modules/plugins';
 import { UsersSettingsTab } from '@/modules/settings/tabs/UsersSettingsTab';
 import { UserManagementTab } from '@/modules/settings/tabs/UserManagementTab';
+import { UsageDashboard } from '@/modules/usage';
 import { useAuth } from '@/modules/auth';
 import AboutTab from '@/modules/settings/tabs/AboutTab';
 import { useSettingsController } from '@/modules/settings/hooks/useSettingsController';
@@ -42,6 +43,11 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }: Set
   const { t } = useTranslation('settings');
   const { user } = useAuth();
   const isAdmin = (user as { role?: string } | null)?.role === 'admin';
+  // Retain the selected account while navigating between management and usage.
+  const [usageUserId, setUsageUserId] = useState<number | undefined>(() => {
+    const id = Number(new URLSearchParams(window.location.search).get('userId'));
+    return id > 0 ? id : undefined;
+  });
   const desktopNotificationsBridge = useMemo(() => (
     typeof window === 'undefined'
       ? null
@@ -280,7 +286,8 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }: Set
               {activeTab === 'plugins' && <PluginSettingsTab />}
 
               {(activeTab === 'account' || (activeTab === 'users' && !isAdmin)) && <UsersSettingsTab />}
-              {activeTab === 'users' && isAdmin && <UserManagementTab />}
+              {activeTab === 'users' && isAdmin && <UserManagementTab onUsage={id => { setUsageUserId(id); setActiveTab('usage'); }} />}
+              {activeTab === 'usage' && <UsageDashboard selectedUserId={usageUserId} onSelectUser={setUsageUserId} />}
               {activeTab === 'about' && <AboutTab />}
             </div>
           </main>

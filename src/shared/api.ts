@@ -200,6 +200,10 @@ const pluginAssetPath = (pluginName: string, assetFile: string) =>
 // import a named method instead of assembling URLs of their own.
 
 export const api = {
+  usage: {
+    overview: (params: {range?: string; groupBy?: string; userId?: number}) => get('/api/usage/overview' + query(params)),
+    rescan: () => post('/api/usage/rescan'),
+  },
   // Auth endpoints (no token required)
   auth: {
     users: () => get('/api/auth/users'),

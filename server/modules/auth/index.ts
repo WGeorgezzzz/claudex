@@ -14,4 +14,4 @@ export { initializeLocalIdentity } from '@/modules/auth/local-identity.service.j
 export { requireSharedResourceAdministrator } from './shared-resource-access.service.js';
 
 // Runtime, filesystem and WebSocket consumers share isolated user configuration.
-export { getUserContext, assertUserPath, withUserContext, getCurrentUserContext } from './user-context.js';
+export { getUserContext, assertUserPath, withUserContext, getCurrentUserContext, resolveUserConfigPaths } from './user-context.js';
