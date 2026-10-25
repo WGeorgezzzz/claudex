@@ -1,0 +1,7 @@
+**/tests/**
+test-support/**
+**/*.test.*
+**/*.map
+**/*.db
+**/*.sqlite*
+**/.env*

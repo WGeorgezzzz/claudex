@@ -74,7 +74,8 @@ jobs:
       - name: Verify npm archive installation
         if: runner.os == 'Linux'
         run: |
-          npm pack --pack-destination "$RUNNER_TEMP" --json > "$RUNNER_TEMP/npm-pack.json"
+          node scripts/release/prepare-npm.mjs
+          npm pack --ignore-scripts --pack-destination "$RUNNER_TEMP" --json > "$RUNNER_TEMP/npm-pack.json"
           node scripts/release/smoke-npm.mjs "$RUNNER_TEMP/npm-pack.json"
       - name: Stage release files
         shell: bash

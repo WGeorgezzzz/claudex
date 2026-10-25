@@ -67,6 +67,7 @@
     "start": "npm run build && npm run server",
     "release": "node scripts/release/request-draft.mjs",
     "prepublishOnly": "npm run build",
+    "prepack": "node scripts/release/prepare-npm.mjs",
     "postinstall": "node scripts/fix-node-pty.js && node scripts/fix-codex-windows-console.mjs",
     "prepare": "husky",
     "desktop:workbench:stage": "node scripts/release/prepare-workbench.mjs",

@@ -20,7 +20,7 @@ execFileSync('npm', ['install', '--prefix', directory, '--omit=dev', '--no-audit
 const listener = net.createServer(); await new Promise(resolve => listener.listen(0, '127.0.0.1', resolve));
 const port = listener.address().port; await new Promise(resolve => listener.close(resolve));
 const log = await fs.open(path.join(directory, 'server.log'), 'a');
-const child = spawn('npx', ['--no-install', 'nexagent', 'start', '--port', String(port)], { cwd: directory, env: environment, stdio: ['ignore', log.fd, log.fd] });
+const child = spawn('npx', ['--no-install', 'nexagent', 'start', '--port', String(port)], { cwd: directory, env: environment, detached: true, stdio: ['ignore', log.fd, log.fd] });
 let base = `http://127.0.0.1:${port}`;
 try {
   let ready = false;
@@ -42,4 +42,8 @@ try {
   const result = { passed: true, package: `${pack.name}@${pack.version}`, shasum: pack.shasum, port, freshSetup: true, adminCreated: true, authenticatedBusinessApi: 200, anonymous: 401, relayUnconfigured: true, npx: '--no-install nexagent start' };
   await fs.writeFile('release/workbench/npm-smoke.json', JSON.stringify(result, null, 2));
   console.log(JSON.stringify(result));
-} finally { child.kill(); await log.close(); }
+} finally {
+  try { process.kill(-child.pid, 'SIGTERM'); } catch { child.kill(); }
+  await Promise.race([new Promise(resolve => child.once('exit', resolve)), new Promise(resolve => setTimeout(resolve, 5000))]);
+  await log.close();
+}
