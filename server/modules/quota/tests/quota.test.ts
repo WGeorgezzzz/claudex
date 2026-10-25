@@ -8,7 +8,8 @@ import { initializeQuotaTables, recordCreditSnapshot } from '../quota.db.js';
 
 function fixture() {
   const db = new Database(':memory:'); initializeQuotaTables(db);
-  let now = Date.parse('2026-10-26T02:00:00Z'), failClaude = false, balance = '100000000000000000000.1234567890123', threshold = 0.95;
+  let now = Date.parse('2026-10-26T02:00:00Z'), failClaude = false, balance = '100000000000000000000.1234567890123';
+  let fiveHour: unknown = 0, sevenDay: unknown = 0.99, overrides: Record<string, unknown> = {};
   const calls: { url: string; init: RequestInit }[] = [];
   const secret = 'admin-key-secret', token = 'claude-token-secret', keys = ['member-key-secret', 'other-key-secret'];
   const paths = (id: number) => ({ adminClaude: '/claude', adminCodex: '/codex', configRoot: '/users', root: '/users/2', claudeConfigDir: '/claude', codexHome: '/codex/' + id });
@@ -23,12 +24,13 @@ function fixture() {
         const auth = (init.headers as Record<string, string>).Authorization;
         return Response.json({ balance: auth.endsWith(keys[0]) ? 123 : 321, daily_usage: [{ date: '2026-10-26', requests: 1, total_tokens: 20, actual_cost: 0.1 }, { date: '2026-10-20', requests: 2, total_tokens: 40, actual_cost: 0.2 }, { date: '2026-10-01', requests: 4, total_tokens: 80, actual_cost: 0.4 }], key: keys[0], credentials: secret });
       }
-      if (url.includes('advanced-settings')) return Response.json({ data: { openai_account_quota_auto_pause: { default_threshold_5h: threshold, default_threshold_7d: threshold } } });
+      if (url.includes('advanced-settings')) return Response.json({ data: { openai_account_quota_auto_pause: { default_threshold_5h: fiveHour, default_threshold_7d: sevenDay } } });
       if (url.includes('accounts?')) return Response.json({ data: { items: [{ id: 1, type: 'oauth', platform: 'openai' }, { id: 2, type: 'apikey', platform: 'openai' }] } });
       if (url.endsWith('/usage')) return Response.json({ data: { seven_day: { window_stats: { requests: 5, tokens: 100, cost: 0.01 } } } });
-      return Response.json({ data: { id: 1, name: 'qq', status: 'active', schedulable: false, credentials: secret, extra: { codex_5h_used_percent: 12, codex_7d_used_percent: 95, codex_usage_updated_at: new Date(now).toISOString(), codex_credits_snapshot: { credits: { balance }, fetched_at: Math.floor(now / 1000) } } } });
+      return Response.json({ data: { id: 1, name: 'qq', status: 'active', schedulable: false, credentials: secret, extra: { ...overrides, codex_5h_used_percent: 12, codex_7d_used_percent: 95, codex_usage_updated_at: new Date(now).toISOString(), codex_credits_snapshot: { credits: { balance }, fetched_at: Math.floor(now / 1000) } } } });
     } });
-  return { service, db, calls, keys, advance: () => { now += 120001; }, expire: () => { failClaude = true; now += 120001; }, debit: () => { balance = '100000000000000000000.1234567890122'; }, unsafe: (v: number) => { threshold = v; } };
+  return { service, db, calls, keys, advance: () => { now += 120001; }, expire: () => { failClaude = true; now += 120001; }, debit: () => { balance = '100000000000000000000.1234567890122'; },
+    thresholds: (five: unknown, seven: unknown) => { fiveHour = five; sevenDay = seven; }, overrides: (value: Record<string, unknown>) => { overrides = value; } };
 }
 
 test('Claude parsing, cache and concurrent single flight do not leak credentials', async () => {
@@ -74,10 +76,39 @@ test('sub-decimal credit debit is exact, durable, and unchanged balances do not 
     assert.equal((f.db.prepare('SELECT COUNT(*) n FROM quota_credit_snapshots').get() as { n: number }).n, 3);
   } finally { f.db.close(); }
 });
-test('unsafe or disabled thresholds warn at zero and above .95, .95 is accepted', async () => {
+test('only global seven-day thresholds warn when unknown, nonpositive or above .99', async () => {
   const f = fixture(); try {
     assert.equal((await f.service.refreshPool()).data?.warnings.length, 0);
-    for (const v of [0, 0.99]) { f.unsafe(v); f.advance(); assert.equal((await f.service.refreshPool()).data?.warnings.length, 2); }
+    for (const five of [null, 0, -1, 1, 'invalid']) {
+      for (const seven of [0.0001, 0.95, 0.99, '0.99']) {
+        f.thresholds(five, seven); f.advance();
+        assert.deepEqual((await f.service.refreshPool()).data?.warnings, [], `5h=${five}, 7d=${seven}`);
+      }
+    }
+    for (const seven of [null, undefined, '', 'invalid', -1, 0, 0.990001, 1]) {
+      f.thresholds(0, seven); f.advance();
+      const warnings = (await f.service.refreshPool()).data!.warnings;
+      assert.equal(warnings.length, 1); assert.match(warnings[0], /7 天.*不超过 0\.99/);
+      assert(!warnings[0].includes('0.95'));
+    }
+  } finally { f.db.close(); }
+});
+test('account seven-day disable and unsafe overrides warn; five-hour overrides only display', async () => {
+  const f = fixture(); try {
+    for (const five of [0, -1, 1, null]) {
+      f.overrides({ auto_pause_5h_disabled: true, auto_pause_5h_threshold: five, auto_pause_7d_threshold: 0.99 }); f.advance();
+      const result = (await f.service.refreshPool()).data!;
+      assert.deepEqual(result.warnings, []);
+      assert.deepEqual(result.accounts[0].autoPause, { fiveHour: { disabled: true, threshold: five }, sevenDay: { disabled: false, threshold: 0.99 } });
+    }
+    for (const extra of [{ auto_pause_7d_disabled: true }, ...[-1, 0, 0.990001, 1].map(v => ({ auto_pause_7d_threshold: v }))]) {
+      f.overrides(extra); f.advance();
+      const result = (await f.service.refreshPool()).data!;
+      assert.equal(result.warnings.length, 1); assert.match(result.warnings[0], /qq 7d/);
+    }
+    f.overrides({}); f.advance(); assert.deepEqual((await f.service.refreshPool()).data?.warnings, []);
+    f.overrides({ auto_reset_credit_enabled: true }); f.advance();
+    assert.match((await f.service.refreshPool()).data!.warnings.join(' '), /上游已启用点数重置/);
   } finally { f.db.close(); }
 });
 test('cache marks stale data, sanitizes raw errors and backs off from failed initial refresh', async () => {

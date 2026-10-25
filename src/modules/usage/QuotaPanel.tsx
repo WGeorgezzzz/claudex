@@ -1,4 +1,4 @@
-import type { QuotaCache, QuotaWindow } from '@/shared/types';
+import type { QuotaCache, QuotaOverview, QuotaWindow } from '@/shared/types';
 import { useQuota } from '@/modules/usage/hooks/useQuota';
 
 function Freshness({ value, now }: { value: QuotaCache<unknown>; now: number }) {
@@ -19,6 +19,9 @@ function WindowBar({ value, paused = false, now }: { value: QuotaWindow; paused?
     {value.stats && <p className="text-[11px] text-muted-foreground">{value.stats.requests ?? '—'} 请求 · {value.stats.tokens?.toLocaleString() ?? '—'} token · ${value.stats.cost ?? '—'}</p>}
   </div>;
 }
+function AccountThresholds({ value }: { value: NonNullable<QuotaOverview['pool']>['data'] | undefined }) {
+  return <>{value?.accounts.map(account => <p key={account.id} className="mt-1 text-xs text-muted-foreground">{account.name} 账号自动暂停配置：5h {account.autoPause.fiveHour.disabled ? '已禁用' : '启用'} · {account.autoPause.fiveHour.threshold ?? '继承全局'}；7 天 {account.autoPause.sevenDay.disabled ? '已禁用' : '启用'} · {account.autoPause.sevenDay.threshold ?? '继承全局'}</p>)}</>;
+}
 /** UsageDashboard places subscription and relay quota above the existing usage charts. */
 export function QuotaPanel() {
   const { data, error, busy, refresh, now } = useQuota();
@@ -28,7 +31,7 @@ export function QuotaPanel() {
     {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
     {pool && pool.warnings.length > 0 && <div role="alert" className="space-y-1 rounded-lg border border-red-500/40 bg-red-500/10 p-2 text-xs text-red-700 dark:text-red-300">{pool.warnings.map((warning, i) => <p key={i}>{warning}</p>)}</div>}
     <article className="rounded-lg border border-border bg-card p-3"><h3 className="mb-3 text-sm font-semibold">Claude 订阅</h3><div className="grid gap-4 sm:grid-cols-2">{data?.claude.data?.windows.map((w, i) => <WindowBar key={i} now={now} value={w}/>)}</div><p className="mt-3 text-xs text-muted-foreground">额外用量：{data?.claude.data ? data.claude.data.extraUsageEnabled ? '已开启' : '关闭' : '未知'}</p>{data && <Freshness now={now} value={data.claude}/>}</article>
-    {data?.pool && <article className="rounded-lg border border-border bg-card p-3"><h3 className="text-sm font-semibold">Codex 中转 · 上游账号</h3><p className="mt-1 text-xs text-muted-foreground">自动暂停阈值：5h {pool?.thresholds.fiveHour ?? '未知'} · 7 天 {pool?.thresholds.sevenDay ?? '未知'}</p>
+    {data?.pool && <article className="rounded-lg border border-border bg-card p-3"><h3 className="text-sm font-semibold">Codex 中转 · 上游账号</h3><p className="mt-1 text-xs text-muted-foreground">自动暂停阈值：5h {pool?.thresholds.fiveHour === 0 ? '0 · 未设置（账号无 5 小时限额）' : pool?.thresholds.fiveHour ?? '未知'} · 7 天 {pool?.thresholds.sevenDay ?? '未知'}</p><AccountThresholds value={pool}/>
       <div className="divide-y divide-border">{pool?.accounts.map(a => <div key={a.id} data-testid={`quota-account-${a.id}`} className="space-y-3 py-3"><div className="flex flex-wrap items-center justify-between gap-2 text-sm"><strong>{a.name}</strong><span className={a.schedulable && a.status === 'active' ? 'text-emerald-600' : 'text-red-600'}>{!a.schedulable ? '已暂停调度（可能自动暂停）' : a.status === 'active' ? '可调度' : a.status}</span></div><div className="grid gap-4 sm:grid-cols-2">{a.windows.map((w, i) => <WindowBar key={i} now={now} value={w} paused={!a.schedulable || a.status !== 'active'}/>)}</div><p className="break-all text-xs">点数余额 {a.balance ?? '未知'} · 本次变化 {a.balanceChange ?? '未检测到变化'}</p><p className="text-[11px] text-muted-foreground">用量采样 {a.usageUpdatedAt ? new Date(a.usageUpdatedAt).toLocaleString() : '未知'}{a.usageStale && ' · 数据已过期'}</p><p className={`text-[11px] ${a.creditStale ? 'text-amber-600' : 'text-muted-foreground'}`}>点数采样 {a.creditUpdatedAt ? new Date(a.creditUpdatedAt).toLocaleString() : '未知'}{a.creditStale && ' · 数据已过期，不能据此证明点数未消耗'}</p></div>)}</div><Freshness now={now} value={data.pool}/></article>}
     <article className="rounded-lg border border-border bg-card p-3"><h3 className="text-sm font-semibold">Codex 中转 · 我的 Key</h3>{key?.mode === 'not_relay' ? <p className="mt-2 text-sm">未走中转</p> : key && <><div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">{(['today', 'last7d', 'last30d'] as const).map((range, i) => <div key={range} className="rounded-lg bg-muted/40 p-2 text-xs"><strong>{['今日', '7 天', '30 天'][i]}</strong><p className="mt-1">{key[range]?.requests ?? '—'} 请求</p><p>{key[range]?.tokens?.toLocaleString() ?? '—'} token</p><p>${key[range]?.cost ?? '—'}</p>{!key[range] && <p>上游未提供统计</p>}</div>)}</div><p className="mt-2 break-words text-xs">余额 {key.balance ?? '—'} · 剩余 {key.remaining ?? '—'} · 限额 {key.quota ?? '—'} {key.unit}</p></>}{data && key?.mode !== 'not_relay' && <Freshness now={now} value={data.key}/>}</article>
   </section>;

@@ -108,9 +108,8 @@ export function createQuotaService(deps: {
     const policy = settings?.openai_account_quota_auto_pause;
     const thresholds = { fiveHour: num(policy?.default_threshold_5h), sevenDay: num(policy?.default_threshold_7d) };
     const warnings: string[] = [];
-    for (const [label, v] of [['5h', thresholds.fiveHour], ['7 天', thresholds.sevenDay]] as const) {
-      if (v === null || v <= 0 || v > 0.95) warnings.push(`${label} 自动暂停阈值 ${v ?? '未知'}，应大于 0 且不超过 0.95，存在点数消耗风险`);
-    }
+    const weeklyThreshold = thresholds.sevenDay;
+    if (weeklyThreshold === null || weeklyThreshold <= 0 || weeklyThreshold > 0.99) warnings.push(`7 天 自动暂停阈值 ${weeklyThreshold ?? '未知'}，应大于 0 且不超过 0.99，存在点数消耗风险`);
     const items: Json[] = [];
     for (let page = 1; ; page++) {
       const result = await adminGet(`/api/v1/admin/accounts?page=${page}&page_size=100`);
@@ -130,12 +129,14 @@ export function createQuotaService(deps: {
       const windows = [window('5h', { ...usage?.five_hour, utilization: extra.codex_5h_used_percent, resets_at: extra.codex_5h_reset_at }), window('7 天', { ...usage?.seven_day, utilization: extra.codex_7d_used_percent, resets_at: extra.codex_7d_reset_at })];
       const accountWarnings = [...history.alerts.map(a => `账号 ${a.accountName} 点数被消耗 ${a.consumed}`)];
       if (extra.auto_reset_credit_enabled === true) accountWarnings.push(`账号 ${account.name} 上游已启用点数重置`);
-      for (const key of ['5h', '7d']) {
-        const override = num(extra[`auto_pause_${key}_threshold`]);
-        if (extra[`auto_pause_${key}_disabled`] === true || (override !== null && (override <= 0 || override > 0.95))) accountWarnings.push(`账号 ${account.name} ${key} 自动暂停配置不安全`);
-      }
+      const autoPause = {
+        fiveHour: { disabled: extra.auto_pause_5h_disabled === true, threshold: num(extra.auto_pause_5h_threshold) },
+        sevenDay: { disabled: extra.auto_pause_7d_disabled === true, threshold: num(extra.auto_pause_7d_threshold) },
+      };
+      const weeklyOverride = autoPause.sevenDay;
+      if (weeklyOverride.disabled || (weeklyOverride.threshold !== null && (weeklyOverride.threshold <= 0 || weeklyOverride.threshold > 0.99))) accountWarnings.push(`账号 ${account.name} 7d 自动暂停配置不安全，应大于 0 且不超过 0.99，且不能禁用`);
       warnings.push(...accountWarnings);
-      accounts.push({ id: account.id as number, name: String(account.name), status: String(account.status), schedulable: account.schedulable === true, windows, balance, balanceChange: history.balanceChange, consumed: history.consumed, alerts: history.alerts, warnings: accountWarnings,
+      accounts.push({ id: account.id as number, name: String(account.name), status: String(account.status), schedulable: account.schedulable === true, autoPause, windows, balance, balanceChange: history.balanceChange, consumed: history.consumed, alerts: history.alerts, warnings: accountWarnings,
         usageUpdatedAt: date(extra.codex_usage_updated_at), creditUpdatedAt, creditStale: stale(creditUpdatedAt, now()), usageStale: stale(date(extra.codex_usage_updated_at), now()) });
     }
     return { thresholds, accounts, warnings };

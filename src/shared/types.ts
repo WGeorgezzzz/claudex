@@ -1974,6 +1974,6 @@ export type QuotaKeyStats = { requests: number | null; tokens: number | null; co
 export type QuotaOverview = {
   claude: QuotaCache<{ windows: QuotaWindow[]; extraUsageEnabled: boolean }>;
   key: QuotaCache<{ mode: string; message?: string; balance?: number | null; remaining?: number | null; quota?: number | null; used?: number | null; unit?: string; today?: QuotaKeyStats | null; last7d?: QuotaKeyStats | null; last30d?: QuotaKeyStats | null }>;
-  pool?: QuotaCache<{ thresholds: { fiveHour: number | null; sevenDay: number | null }; warnings: string[]; accounts: { id: number; name: string; status: string; schedulable: boolean; windows: QuotaWindow[]; balance: string | null; balanceChange: string | null; consumed: string | null; warnings: string[]; creditUpdatedAt: string | null; usageUpdatedAt: string | null; creditStale: boolean; usageStale: boolean }[] }>;
+  pool?: QuotaCache<{ thresholds: { fiveHour: number | null; sevenDay: number | null }; warnings: string[]; accounts: { id: number; name: string; status: string; schedulable: boolean; autoPause: { fiveHour: { disabled: boolean; threshold: number | null }; sevenDay: { disabled: boolean; threshold: number | null } }; windows: QuotaWindow[]; balance: string | null; balanceChange: string | null; consumed: string | null; warnings: string[]; creditUpdatedAt: string | null; usageUpdatedAt: string | null; creditStale: boolean; usageStale: boolean }[] }>;
 };
 // ---------------------------
