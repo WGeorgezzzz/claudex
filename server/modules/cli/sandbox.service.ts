@@ -285,7 +285,7 @@ export function createSandboxCommandService(
             sandboxName,
             'bash',
             '-c',
-            'nohup nexagent start --port 3001 > /tmp/cloudcli-ui.log 2>&1 & disown',
+            'nohup cloudcli start --port 3001 > /tmp/cloudcli-ui.log 2>&1 & disown',
           ]);
           if (!publishSandboxPort(options, dependencies)) {
             return 1;
@@ -387,7 +387,7 @@ export function createSandboxCommandService(
             sandboxName,
             'bash',
             '-c',
-            'nohup nexagent start --port 3001 > /tmp/cloudcli-ui.log 2>&1 & disown',
+            'nohup cloudcli start --port 3001 > /tmp/cloudcli-ui.log 2>&1 & disown',
           ]);
           if (!publishSandboxPort(options, dependencies)) {
             return 1;

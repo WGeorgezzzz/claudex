@@ -37,6 +37,7 @@ test('creates a sandbox through injected filesystem, subprocess, and clock adapt
   ]]);
   assert.deepEqual(waits, [5_000]);
   assert.ok(commands.some((argumentsList) => argumentsList[0] === 'ports'));
+  assert.ok(commands.some(argumentsList => argumentsList[0] === 'exec' && argumentsList.some(value => value.includes('nohup cloudcli start'))), 'published sandbox images must use their compatible cloudcli executable');
 });
 
 test('does not spawn when the workspace does not exist', async () => {
