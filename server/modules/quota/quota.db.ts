@@ -1,7 +1,7 @@
 import type { Database } from 'better-sqlite3';
 
-/** Quota service and tests initialize additive history; never delete prior observations or alerts. */
-export function initializeQuotaTables(db: Database) {
+/** Quota lifecycle and tests retain all history; legacyRelayUrl must explicitly identify its former source, never a newly selected endpoint. */
+export function initializeQuotaTables(db: Database, legacyRelayUrl = '') {
   db.exec(`CREATE TABLE IF NOT EXISTS quota_credit_snapshots (
     id INTEGER PRIMARY KEY, account_id INTEGER NOT NULL, observed_at TEXT NOT NULL,
     balance TEXT NOT NULL, source_updated_at TEXT, consumed TEXT);
@@ -13,6 +13,11 @@ export function initializeQuotaTables(db: Database) {
     const columns = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
     if (!columns.some(column => column.name === 'relay_url')) db.exec(`ALTER TABLE ${table} ADD COLUMN relay_url TEXT NOT NULL DEFAULT ''`);
   }
+  if (legacyRelayUrl) db.transaction(() => {
+    for (const table of ['quota_credit_snapshots', 'quota_credit_alerts']) {
+      db.prepare(`UPDATE ${table} SET relay_url=? WHERE relay_url=''`).run(legacyRelayUrl);
+    }
+  })();
 }
 
 // Use scaled integers: converting decimal credits to floating point can hide a small debit.

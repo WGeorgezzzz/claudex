@@ -8,7 +8,7 @@ import { getCloudCliHomeDir } from '@/shared/index.js';
 
 import { initializeQuotaTables, recordCreditSnapshot } from './quota.db.js';
 import { quotaFetch } from './quota.http.js';
-import { normalizeRelayBaseUrl, readRelayConfiguration } from './quota.config.js';
+import { normalizeRelayBaseUrl, readRelayConfiguration, readLegacyRelayBaseUrl } from './quota.config.js';
 
 // Untrusted upstream JSON is projected field by field; never forward credentials or raw errors.
 type Json = Record<string, any>;
@@ -194,7 +194,7 @@ export function resetQuotaService() { service = undefined; }
 let interval: ReturnType<typeof setInterval> | undefined;
 /** Server lifecycle initializes history and polls read-only upstream metadata every ten minutes. */
 export function initializeQuota() {
-  initializeQuotaTables(getConnection());
+  initializeQuotaTables(getConnection(), readLegacyRelayBaseUrl());
   const refresh = () => { void getQuotaService().refreshPool().catch(() => console.error('[Quota] Background refresh failed')); };
   refresh(); interval = setInterval(refresh, 600000); interval.unref();
 }

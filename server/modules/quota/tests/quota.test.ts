@@ -136,6 +136,20 @@ test('credit history and alerts stay separate when two relays reuse an account i
   } finally { db.close(); }
 });
 
+test('an explicitly identified legacy relay retains its balance chain and durable alerts', () => {
+  const db = new Database(':memory:'); initializeQuotaTables(db);
+  try {
+    recordCreditSnapshot(db, 1, 'demo', '100', 'a', null);
+    recordCreditSnapshot(db, 1, 'demo', '99', 'b', null);
+    initializeQuotaTables(db, 'https://original.example.com');
+    const original = recordCreditSnapshot(db, 1, 'demo', '98', 'c', null, 'https://original.example.com');
+    assert.equal(original.consumed, '1'); assert.equal(original.alerts.length, 2);
+    const other = recordCreditSnapshot(db, 1, 'demo', '1', 'd', null, 'https://other.example.com');
+    assert.equal(other.consumed, null); assert.deepEqual(other.alerts, []);
+    assert.equal((db.prepare("SELECT COUNT(*) n FROM quota_credit_snapshots WHERE relay_url='' ").get() as { n: number }).n, 0);
+  } finally { db.close(); }
+});
+
 test('JWT fallback coalesces login, relogs once on 401 and never returns the password or JWT', async () => {
   let now = 0, loginCount = 0, rejectOld = false;
   const db = new Database(':memory:'); initializeQuotaTables(db);

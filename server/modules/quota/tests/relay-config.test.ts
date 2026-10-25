@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
 
-import { normalizeRelayBaseUrl, readRelayConfiguration, saveRelayConfiguration } from '../quota.config.js';
+import { normalizeRelayBaseUrl, readRelayConfiguration, saveRelayConfiguration, readLegacyRelayBaseUrl } from '../quota.config.js';
 import { createQuotaService } from '../quota.service.js';
 
 test('relay configuration persists, honors environment and rejects credential-bearing or insecure URLs', () => {
@@ -15,9 +15,13 @@ test('relay configuration persists, honors environment and rejects credential-be
     assert.equal(readRelayConfiguration().baseUrl, '');
     assert.equal(saveRelayConfiguration('https://relay.example.com/').baseUrl, 'https://relay.example.com');
     assert.equal(readRelayConfiguration().baseUrl, 'https://relay.example.com');
+    writeFileSync(path.join(directory, 'relay.json'), JSON.stringify({ baseUrl: 'https://relay.example.com', legacyBaseUrl: 'https://original.example.com' }));
+    saveRelayConfiguration('https://new.example.com');
+    assert.equal(readLegacyRelayBaseUrl(), 'https://original.example.com');
     process.env.NEXAGENT_RELAY_BASE_URL = 'https://another.example.com';
     assert.equal(readRelayConfiguration().source, 'environment');
     assert.equal(readRelayConfiguration().baseUrl, 'https://another.example.com');
+    assert.equal(readLegacyRelayBaseUrl(), 'https://original.example.com');
     assert.throws(() => saveRelayConfiguration(''));
     for (const url of ['http://relay.example.com', 'https://user:password@example.com', 'https://relay.example.com?key=secret', 'file:///tmp/a']) assert.throws(() => normalizeRelayBaseUrl(url));
     assert.equal(normalizeRelayBaseUrl('http://127.0.0.1:1234/'), 'http://127.0.0.1:1234');

@@ -53,9 +53,13 @@ Successes cache for 120 seconds; concurrent refreshes coalesce. Failures back of
 from 30 seconds to ten minutes. Relay requests time out after 30 seconds and retry
 transient failures at most twice. The configured pool is sampled every ten minutes.
 
-Snapshots and alerts are partitioned by relay URL and account ID. Existing history
-from before URL attribution is preserved without comparing it against an unknown
-destination. Decimal comparisons use scaled integers, retaining very small debits.
+Snapshots and alerts are partitioned by relay URL and account ID. When upgrading
+a known installation, explicitly add `legacyBaseUrl` to `relay.json` with its
+former relay URL before the first startup. Existing unattributed history and
+alerts are then assigned to that original relay, retaining the balance chain.
+Changing the current URL does not change this migration marker. Without an
+explicit marker, old history remains preserved without guessing its destination.
+Decimal comparisons use scaled integers, retaining very small debits.
 Warnings persist after a detected debit. No credit-reset endpoint is called.
 
 The global seven-day pause threshold warns if unknown, nonpositive, or above 0.99.
