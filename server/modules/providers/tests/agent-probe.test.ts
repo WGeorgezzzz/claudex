@@ -31,6 +31,11 @@ test('native Codex hash directories use install time, and newly installed CLI is
   files.add('C:\\local\\OpenAI\\Codex\\bin\\0000-new-hash\\codex.exe');
   assert.match((await probeAgent(['codex'], base))!.executable, /0000-new-hash/);
 });
+test('Unix custom npm global prefixes resolve the executable in their bin directory', async () => {
+  const result = await probeAgent(['gemini'], { platform:'linux', home:'/home/test', env:{NPM_CONFIG_PREFIX:'/opt/custom-npm'},
+    exists:async file=>file==='/opt/custom-npm/bin/gemini', version:async()=>'gemini 1.0' });
+  assert.equal(result?.executable, '/opt/custom-npm/bin/gemini');
+});
 test('version probe reports success, nonzero/ENOENT and kills a real timeout at five seconds', async () => {
   assert.match((await readAgentVersion(process.execPath))!, /^v\d/);
   assert.equal(await readAgentVersion(path.join(os.tmpdir(), 'nexagent-no-such-program.exe')), null);

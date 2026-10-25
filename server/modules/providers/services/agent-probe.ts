@@ -27,6 +27,7 @@ export async function probeAgent(commands: string[], options: ProbeOptions = {})
   const directories = [
     ...(env.PATH ?? env.Path ?? '').split(platform === 'win32' ? ';' : ':').map(v => v.replace(/^"|"$/g, '')),
     env.npm_config_prefix, env.NPM_CONFIG_PREFIX,
+    ...(platform === 'win32' ? [] : [env.npm_config_prefix, env.NPM_CONFIG_PREFIX].filter((v): v is string => Boolean(v)).map(prefix => p.join(prefix, 'bin'))),
     p.join(home, '.npm-global', 'bin'), p.join(home, '.local', 'bin'), p.join(home, '.claude', 'local'),
     p.join(home, '.opencode', 'bin'), p.join(home, '.cursor', 'bin'), p.join(home, '.local', 'share', 'mise', 'shims'),
     ...(platform === 'win32' ? [p.join(env.APPDATA ?? p.join(home, 'AppData', 'Roaming'), 'npm'), p.dirname(process.execPath)]
