@@ -7,10 +7,13 @@ import { useAuth } from '@/modules/auth';
 /** QuotaPanel offers administrators the installation-wide relay endpoint. */
 export function RelaySettings({ onSaved }: { onSaved: () => Promise<void> }) {
   const { user } = useAuth();
-  // The editable URL and operation status track the administrator's unsaved input and request outcome.
+  // Preserve the administrator's unsaved endpoint until submission succeeds.
   const [baseUrl, setBaseUrl] = useState('');
+  // An environment-owned endpoint must remain read-only in the form.
   const [source, setSource] = useState('file');
+  // Report save and transport outcomes without replacing the quota data.
   const [status, setStatus] = useState('');
+  // Prevent overlapping configuration submissions.
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     if (user?.role !== 'admin') return;

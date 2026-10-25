@@ -13,11 +13,15 @@ export function DesktopSetup({ onComplete }: { onComplete: () => Promise<void> }
   const [step, setStep] = useState(0);
   // An installed but signed-out agent can reuse the normal provider login flow during setup.
   const [loginProvider, setLoginProvider] = useState<LLMProvider | null>(null);
+  // Keep the optional remote account name until its enrollment completes.
   const [username, setUsername] = useState('');
+  // Hold the password only while submitting the optional remote account.
   const [password, setPassword] = useState('');
   // A newly issued OTP seed is shown once for enrollment and never persisted in browser storage.
   const [enrollment, setEnrollment] = useState<{ secret: string; otpAuthUrl: string } | null>(null);
+  // Prevent account creation and wizard completion from overlapping.
   const [busy, setBusy] = useState(false);
+  // Keep a failed setup operation visible without discarding the current step.
   const [error, setError] = useState('');
   return <main className="h-dvh overflow-y-auto bg-background text-foreground"><div className="mx-auto max-w-3xl space-y-6 px-4 py-8 sm:py-12">
     <header className="flex items-center gap-3"><img src="/nexagent-mark.svg" alt="" className="h-12 w-12"/><div><h1 className="text-2xl font-semibold">Nexagent</h1><p className="text-sm text-muted-foreground">本机管理员已创建 · 操作系统身份保护</p></div></header>

@@ -93,15 +93,27 @@ try {
     await page.addInitScript(token=>{localStorage.setItem('auth-token',token);localStorage.setItem('userLanguage','zh-CN');},account.token);
     await page.goto(base);await page.getByRole('navigation',{name:'首次设置'}).waitFor();
     await page.getByRole('heading',{name:'本地 Agent',exact:true}).waitFor();
+    await page.getByTestId('discovered-claude').waitFor();
+    await page.getByText('正在扫描…',{exact:true}).waitFor({state:'hidden'});
     await page.screenshot({path:path.join(evidenceDirectory,'first-run-agents.png')});
     await page.getByRole('button',{name:'继续',exact:true}).click();
     await page.getByRole('heading',{name:'远程管理员',exact:true}).waitFor();
     await page.screenshot({path:path.join(evidenceDirectory,'first-run-admin.png')});
-    await page.getByRole('button',{name:'稍后设置',exact:true}).click();
+    await page.getByLabel('账号',{exact:true}).fill('demo-remote-admin');
+    await page.getByLabel('密码',{exact:true}).fill('ci-only-demo-password-1234');
+    await page.getByRole('button',{name:'创建远程账号',exact:true}).click();
+    await page.getByText('账号已创建。请将此密钥添加到验证器。',{exact:true}).waitFor();
+    await page.getByRole('button',{name:'继续',exact:true}).click();
     await page.getByText('Microsoft Dev Tunnels',{exact:false}).first().waitFor();
     await page.screenshot({path:path.join(evidenceDirectory,'first-run-remote.png')});
+    await page.setViewportSize({width:390,height:844});
+    await page.screenshot({path:path.join(evidenceDirectory,'first-run-remote-mobile.png')});
+    await page.setViewportSize({width:1440,height:1000});
     await page.getByRole('button',{name:'进入工作区',exact:true}).click();
     await page.getByRole('navigation',{name:'首次设置'}).waitFor({state:'hidden'});
+    await page.getByText('正在加载 Nexagent',{exact:true}).waitFor({state:'hidden',timeout:60000});
+    await page.getByText('加载项目中...',{exact:true}).waitFor({state:'hidden',timeout:60000});
+    await page.waitForTimeout(500);
     await page.screenshot({path:path.join(evidenceDirectory,'first-run-workspace.png')});
   } finally {await browser.close();}
   const forbidden=await fetch(base+'/api/message-queue?sessionId=none');
@@ -111,7 +123,7 @@ try {
     identityMatched:true,existingDatabaseUnchanged:true,unrelatedServerRequests:sentinelRequests,
     authenticatedApi:authorized.status,unauthenticatedQueue:forbidden.status,frontendAsset:asset,claudeVersion,
     localPasswordless:true,
-    firstRunWizard:true,agentDiscovery:true,remoteAdminPrompt:true,remoteAccessPrompt:true,
+    firstRunWizard:true,agentDiscovery:true,remoteAdminPrompt:true,remoteAdminCreated:true,remoteAccessPrompt:true,
   };
   await fs.mkdir(path.dirname(reportPath),{recursive:true});
   await fs.writeFile(reportPath,JSON.stringify(record,null,2));
