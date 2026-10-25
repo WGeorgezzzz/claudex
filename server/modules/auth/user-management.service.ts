@@ -2,10 +2,11 @@ import { mkdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 
-import { userDb, authSessionsDb, getConnection } from '@/modules/database/index.js';
+import { userDb, authSessionsDb, getConnection, projectsDb } from '@/modules/database/index.js';
 import { AppError } from '@/shared/index.js';
 
 import { authSessionEvents } from './auth.middleware.js';
+import { withUserContext } from './user-context.js';
 
 const bcrypt = createRequire(import.meta.url)('bcrypt') as {hash(p:string,n:number):Promise<string>;compare(p:string,h:string):Promise<boolean>};
 function fail(message:string, statusCode=400): never {throw new AppError(message,{statusCode});}
@@ -32,8 +33,17 @@ function activeAdmins():number {
   return (userDb.listUsers() as {role:string;is_active:number}[]).filter(u=>u.role==='admin'&&u.is_active).length;
 }
 function conflict(error:unknown): never {
+  if(error instanceof Error&&(('code' in error&&error.code==='PROJECT_FORBIDDEN')||error.message==='Project belongs to another user')) {
+    throw new AppError('Work root project belongs to another user',{code:'PROJECT_FORBIDDEN',statusCode:409});
+  }
   if(typeof error==='object'&&error!==null&&'code' in error&&error.code==='SQLITE_CONSTRAINT_UNIQUE')fail('Username or SSO email already exists',409);
   throw error;
+}
+function registerWorkRoot(id:number,root:string,username:string) {
+  withUserContext(id,()=>{
+    // Existing projects retain their display name, star and archive state.
+    if(!projectsDb.getProjectPath(root))projectsDb.createProjectPath(root,username);
+  });
 }
 /** Auth routes use this service for administrator operations and verified self password changes. */
 export const userManagementService = {
@@ -48,10 +58,14 @@ export const userManagementService = {
     try {
       const user=getConnection().transaction(()=>{
         const created=userDb.createUser(username,hash);
-        userDb.updateAccess(Number(created.id),a.root,a.folders,a.email,a.active);
+        // Context resolution requires an active row. Restore the requested state
+        // before this synchronous transaction commits, including disabled members.
+        userDb.updateAccess(Number(created.id),a.root,a.folders,a.email,true);
         // Members start in the workspace; Git identity is optional, not a login gate.
         userDb.completeOnboarding(Number(created.id));
         mkdirSync(a.root,{recursive:true});
+        registerWorkRoot(Number(created.id),a.root,username);
+        if(!a.active)userDb.updateAccess(Number(created.id),a.root,a.folders,a.email,false);
         return userDb.getUserById(Number(created.id));
       })();
       return {success:true,user};
@@ -71,11 +85,16 @@ export const userManagementService = {
     const {role:_role,...accessInput}=input;
     input=accessInput;
     const a=access({work_root:existing.work_root??undefined,allowed_folders:JSON.parse(existing.allowed_folders),access_sso_email:existing.access_sso_email,is_active:Boolean(existing.is_active),...input},existing.username);
+    const registerProject=role==='member'&&input.work_root!==undefined&&a.root!==existing.work_root;
     try {
       getConnection().transaction(()=>{
         mkdirSync(a.root,{recursive:true});
-        userDb.updateAccess(target,a.root,a.folders,a.email,role==='admin'?true:a.active);
+        userDb.updateAccess(target,a.root,a.folders,a.email,role==='admin'||registerProject?true:a.active);
         if(role!==existing.role)userDb.setRole(target,role as 'admin'|'member');
+        if(registerProject) {
+          registerWorkRoot(target,a.root,existing.username);
+          if(!a.active)userDb.updateAccess(target,a.root,a.folders,a.email,false);
+        }
       })();
     }catch(error){conflict(error);}
     // Disabled devices must not revive when the account is enabled again; a role
