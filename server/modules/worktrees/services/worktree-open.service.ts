@@ -26,7 +26,7 @@ function mapRowToProjectView(row: ProjectRepositoryRow): WorktreeProjectView {
 }
 
 /**
- * Ensures a Nexcode project exists (and is active) for a worktree directory
+ * Ensures a AgentHub project exists (and is active) for a worktree directory
  * and returns it, so the caller can switch the UI into that worktree.
  *
  * The path is only accepted when it is a registered worktree of the repository

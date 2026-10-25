@@ -1,6 +1,6 @@
-# Contributing to Nexcode
+# Contributing to AgentHub
 
-Thanks for your interest in contributing to Nexcode! Before you start, please take a moment to read through this guide.
+Thanks for your interest in contributing to AgentHub! Before you start, please take a moment to read through this guide.
 
 ## Before You Start
 

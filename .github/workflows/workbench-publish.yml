@@ -55,7 +55,7 @@ jobs:
           version = profile["version"]
           assert re.fullmatch(r"\d+\.\d+\.\d+", version)
           directory = pathlib.Path(".verification/release-artifact").resolve()
-          name = f"Nexcode-Workbench-{version}-win-x64.exe"
+          name = f"AgentHub-Workbench-{version}-win-x64.exe"
           checksum, recorded_name = (directory / "SHA256SUMS.txt").read_text().strip().split(maxsplit=1)
           assert recorded_name == name and re.fullmatch(r"[a-f0-9]{64}", checksum)
           installer = directory / name
@@ -88,4 +88,4 @@ jobs:
             .verification/release-artifact/SHA256SUMS.txt \
             .verification/release-artifact/installer-smoke.json \
             --repo "$GITHUB_REPOSITORY" --target "$SOURCE_SHA" \
-            --title "Nexcode $VERSION" --notes-file docs/WORKBENCH-WINDOWS.md
+            --title "AgentHub $VERSION" --notes-file docs/WORKBENCH-WINDOWS.md

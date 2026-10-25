@@ -535,7 +535,7 @@
     },
     "managed": {
       "badge": "מנוהל",
-      "hint": "מנוהל על ידי Nexcode."
+      "hint": "מנוהל על ידי AgentHub."
     },
     "help": {
       "title": "על Codex MCP",
@@ -567,7 +567,7 @@
     "docs": "תיעוד",
     "sections": {
       "officialTitle": "תוספים רשמיים",
-      "officialDescription": "מתוחזקים על ידי צוות Nexcode ומוכנים להתקנה ישירה.",
+      "officialDescription": "מתוחזקים על ידי צוות AgentHub ומוכנים להתקנה ישירה.",
       "unofficialTitle": "תוספים נוספים",
       "unofficialDescription": "תוספים ושילובים לא רשמיים ממשתמשים אחרים. כדאי לבדוק את קוד המקור לפני ההתקנה."
     },
@@ -590,9 +590,9 @@
       "install": "התקנה"
     },
     "prismClaudex": {
-      "name": "PRISM Nexcode",
+      "name": "PRISM AgentHub",
       "badge": "לא רשמי",
-      "description": "ניתוח סשנים של Claude Code בתוך Nexcode. אפשר לראות למה הסשנים צורכים טוקנים בלי לצאת מהדפדפן.",
+      "description": "ניתוח סשנים של Claude Code בתוך AgentHub. אפשר לראות למה הסשנים צורכים טוקנים בלי לצאת מהדפדפן.",
       "install": "התקנה"
     },
     "sessionManagerPlugin": {
@@ -803,7 +803,7 @@
   "mcpTeamCard": {
     "title": "תצורות MCP לצוות",
     "description": "שיתוף תצורות שרתי MCP עם כל הצוות. כולם נשארים מסונכרנים אוטומטית.",
-    "proLink": "זמין ב-Nexcode Pro"
+    "proLink": "זמין ב-AgentHub Pro"
   },
   "mcpServersAddErrors": {
     "loadFailedProvider": "טעינת שרתי ה-MCP של {{provider}} נכשלה",
@@ -820,15 +820,15 @@
     "tagline": "Your agents, one workspace.",
     "starOnGitHub": "כוכב ב-GitHub",
     "docs": "תיעוד",
-    "hostedTitle": "לנסות את Nexcode Hosted",
+    "hostedTitle": "לנסות את AgentHub Hosted",
     "hostedDescription": "שיתוף פעולה בצוות, תצורות MCP משותפות, סנכרון הגדרות בין סביבות ותשתית מנוהלת.",
     "learnMore": "מידע נוסף",
-    "proFeaturesTitle": "יכולות Nexcode Pro",
+    "proFeaturesTitle": "יכולות AgentHub Pro",
     "syncSettingsTitle": "סנכרון הגדרות",
     "syncSettingsDescription": "ההעדפות, תצורות ה-MCP וערכת הנושא נשארים מסונכרנים בכל הסביבות.",
     "teamManagementTitle": "ניהול צוות",
     "teamManagementDescription": "משתמשים מרובים, גישה מבוססת תפקידים ופרויקטים משותפים לצוות.",
     "licensed": "ברישיון AGPL-3.0",
-    "proCta": "זמין ב-Nexcode Pro"
+    "proCta": "זמין ב-AgentHub Pro"
   }
 }

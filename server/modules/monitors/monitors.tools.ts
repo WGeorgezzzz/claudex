@@ -57,7 +57,7 @@ export function executeMonitorTool(context:ToolContext,input:unknown): unknown {
   return {monitor:visible(monitorsService.action(context.userId,id,args.action==='run_now'?'run-now':args.action)!),note:'暂停或停止不会强制中断已开始的一轮。'};
 }
 
-const instructions=`Nexcode 的定期监测由 cloudcli_monitor MCP 工具持久保存。
+const instructions=`AgentHub 的定期监测由 cloudcli_monitor MCP 工具持久保存。
 用户要求定期检查、持续监测、创建/修改/暂停/恢复/停止监测时，优先调用此工具，不要用临时 CronCreate、sleep 循环、后台 shell 或口头承诺代替。
 只在用户明确要求时创建或修改。间隔或检查对象不明确时先询问。已有任务先 list，使用返回的 id；不得猜测其他会话的 id。
 只有工具返回成功才说已创建或已修改，告知名称、调度规则、状态和下次时间。nextRunAt 是 UTC，按日历规则的 timeZone 或用户本地时区描述。

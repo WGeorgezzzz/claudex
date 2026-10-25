@@ -163,7 +163,7 @@ test('an install from a host that wants credentials fails fast as PLUGIN_GIT_AUT
     assert.equal(error.code, 'PLUGIN_GIT_AUTH_REQUIRED');
     assert.equal(error.statusCode, 422);
     assert.match(error.message, /^Could not install the plugin: .*private or does not exist/);
-    assert.match(error.message, /credentials of the user the Nexcode server runs as/);
+    assert.match(error.message, /credentials of the user the AgentHub server runs as/);
     assert.match(error.message, /"gh auth setup-git"/);
     assert.match(error.message, /SSH key .* for git@ URLs/);
     // The message is shown as plain text.
@@ -231,7 +231,7 @@ test('a credential helper of the server user still installs a private plugin; wi
       const error = await rejection(updatePluginFromGit('private-demo'));
       assert.equal(error.code, 'PLUGIN_GIT_AUTH_REQUIRED');
       // The plugin was cloned from there before: no "private or does not exist".
-      assert.match(error.message, /^Could not update the plugin: .*credentials of the user the Nexcode server runs as are missing or have expired/);
+      assert.match(error.message, /^Could not update the plugin: .*credentials of the user the AgentHub server runs as are missing or have expired/);
       assert.ok(!/private or does not exist/.test(error.message), error.message);
       const details = error.details as GitErrorDetails;
       assert.equal(details.gitCommand, 'git pull');
@@ -332,7 +332,7 @@ test('rejected credentials get their own code and advice, on install and on upda
     const error = createPluginGitError(action, 128, stderr);
     assert.equal(error.code, 'PLUGIN_GIT_AUTH_REJECTED');
     assert.equal(error.statusCode, 422);
-    assert.match(error.message, new RegExp(`^Could not ${action} the plugin: the git host rejected the credentials of the user the Nexcode server runs as`));
+    assert.match(error.message, new RegExp(`^Could not ${action} the plugin: the git host rejected the credentials of the user the AgentHub server runs as`));
     assert.match(error.message, /Update or re-create them/);
     assert.ok(!/private or does not exist|set up a credential helper/i.test(error.message), error.message);
   }
@@ -397,7 +397,7 @@ test('an ssh login failure explains the SSH setup instead of calling the reposit
     const error = createPluginGitError('install', 128, stderr);
     assert.equal(error.code, 'PLUGIN_GIT_AUTH_REQUIRED');
     assert.equal(error.statusCode, 422);
-    assert.match(error.message, /^Could not install the plugin: ssh, run as the user the Nexcode server runs as, could not log in to the git host/);
+    assert.match(error.message, /^Could not install the plugin: ssh, run as the user the AgentHub server runs as, could not log in to the git host/);
     assert.match(error.message, /known_hosts/);
     assert.match(error.message, /no passphrase, or loaded into an ssh-agent/);
     assert.ok(!/private or does not exist/.test(error.message), error.message);
@@ -554,7 +554,7 @@ test('a missing git binary is a 503 PLUGIN_GIT_UNAVAILABLE, for install and upda
     for (const [error, action] of [[installError, 'install'], [updateError, 'update']] as const) {
       assert.equal(error.code, 'PLUGIN_GIT_UNAVAILABLE');
       assert.equal(error.statusCode, 503);
-      assert.equal(error.message, `Could not ${action} the plugin: git is not installed or not on the PATH of the Nexcode server.`);
+      assert.equal(error.message, `Could not ${action} the plugin: git is not installed or not on the PATH of the AgentHub server.`);
     }
   } finally {
     process.env.PATH = savedPath;

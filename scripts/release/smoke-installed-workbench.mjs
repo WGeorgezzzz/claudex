@@ -4,14 +4,13 @@ import path from 'node:path';
 import os from 'node:os';
 import http from 'node:http';
 import { spawn, execFileSync } from 'node:child_process';
-import { randomUUID } from 'node:crypto';
 
 // This exercises a generated installer on a disposable Windows CI machine.
 // It must never fabricate an "upstream" installation on a user's workstation.
 if (process.platform!=='win32' || process.env.CI!=='true') throw new Error('Run installer acceptance only on a disposable Windows CI runner.');
 const installDirectory=path.resolve(process.argv[2]||'');
 const reportPath=path.resolve(process.argv[3]||'release/workbench/installer-smoke.json');
-const executable=path.join(installDirectory,'Nexcode.exe');
+const executable=path.join(installDirectory,'AgentHub.exe');
 await fs.access(executable);
 const profileDirectory=await fs.mkdtemp(path.join(os.tmpdir(),'workbench-acceptance-'));
 const sentinelDatabase=path.join(profileDirectory,'existing-service.db');

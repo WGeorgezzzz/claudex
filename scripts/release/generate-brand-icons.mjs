@@ -4,11 +4,11 @@ import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 
 // A local tooling bundle can supply Sharp without altering live application dependencies.
-const sharp=createRequire(import.meta.url)(process.env.NEXCODE_SHARP_MODULE||process.env.GACI_SHARP_MODULE||process.env.CLAUDEX_SHARP_MODULE||'sharp');
+const sharp=createRequire(import.meta.url)(process.env.AGENTHUB_SHARP_MODULE||process.env.NEXCODE_SHARP_MODULE||process.env.GACI_SHARP_MODULE||process.env.CLAUDEX_SHARP_MODULE||'sharp');
 
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../..');
-// Canonical Nexcode 麻薯 mark: a round mochi whose face is </>, sized to stay legible at 16 px.
-const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512"><title>Nexcode 麻薯</title><rect width="512" height="512" rx="112" fill="#132B2B"/><path d="M52 318C52 176 144 92 256 92S460 176 460 318C460 396 374 424 256 424S52 396 52 318Z" fill="#F7F1E6"/><path d="M52 318C52 396 138 424 256 424S460 396 460 318C460 352 374 386 256 386S52 352 52 318Z" fill="#E3D7C3"/><ellipse cx="166" cy="164" rx="44" ry="22" transform="rotate(-26 166 164)" fill="#FFFFFF" opacity=".8"/><ellipse cx="124" cy="320" rx="30" ry="17" fill="#F4A7B9"/><ellipse cx="388" cy="320" rx="30" ry="17" fill="#F4A7B9"/><g fill="none" stroke="#132B2B" stroke-width="36" stroke-linecap="round" stroke-linejoin="round"><path d="M182 228L128 270L182 312"/><path d="M284 208L228 332"/><path d="M330 228L384 270L330 312"/></g></svg>
+// Canonical AgentHub mark: a round mochi whose face is </>, sized to stay legible at 16 px.
+const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512"><title>AgentHub</title><rect width="512" height="512" rx="112" fill="#132B2B"/><path d="M52 318C52 176 144 92 256 92S460 176 460 318C460 396 374 424 256 424S52 396 52 318Z" fill="#F7F1E6"/><path d="M52 318C52 396 138 424 256 424S460 396 460 318C460 352 374 386 256 386S52 352 52 318Z" fill="#E3D7C3"/><ellipse cx="166" cy="164" rx="44" ry="22" transform="rotate(-26 166 164)" fill="#FFFFFF" opacity=".8"/><ellipse cx="124" cy="320" rx="30" ry="17" fill="#F4A7B9"/><ellipse cx="388" cy="320" rx="30" ry="17" fill="#F4A7B9"/><g fill="none" stroke="#132B2B" stroke-width="36" stroke-linecap="round" stroke-linejoin="round"><path d="M182 228L128 270L182 312"/><path d="M284 208L228 332"/><path d="M330 228L384 270L330 312"/></g></svg>
 `;
 await fs.writeFile(path.join(root,'public/logo.svg'),svg);
 await fs.writeFile(path.join(root,'public/nexcode-mark.svg'),svg);
@@ -33,4 +33,4 @@ const entries=[['icp4',16],['icp5',32],['icp6',64],['ic07',128],['ic08',256],['i
 const chunks=[];for(const [kind,size] of entries){const png=await render(size),h=Buffer.alloc(8);h.write(kind,0,4,'ascii');h.writeUInt32BE(png.length+8,4);chunks.push(h,png);}
 const icnsHeader=Buffer.alloc(8);icnsHeader.write('icns');icnsHeader.writeUInt32BE(8+chunks.reduce((sum,part)=>sum+part.length,0),4);
 await fs.writeFile(path.join(root,'electron/assets/logo-macos.icns'),Buffer.concat([icnsHeader,...chunks]));
-console.log('Generated canonical Nexcode SVG, PNG, Windows ICO and macOS ICNS assets.');
+console.log('Generated canonical AgentHub SVG, PNG, Windows ICO and macOS ICNS assets.');

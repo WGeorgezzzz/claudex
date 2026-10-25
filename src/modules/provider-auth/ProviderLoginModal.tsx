@@ -89,7 +89,7 @@ export default function ProviderLoginModal({
       <div data-escape-layer className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50">
         <div role="dialog" aria-label="WorkBuddy" className="m-4 w-full max-w-md rounded-lg bg-background p-6 shadow-xl">
           <h3 className="mb-3 text-lg font-semibold">WorkBuddy</h3>
-          <p className="text-sm text-muted-foreground">{t('common:workbuddy.localLogin', { defaultValue: 'Open WorkBuddy on this Windows computer and sign in. Then refresh to reuse that local login in Nexcode. This connection currently supports conversations only.' })}</p>
+          <p className="text-sm text-muted-foreground">{t('common:workbuddy.localLogin', { defaultValue: 'Open WorkBuddy on this Windows computer and sign in. Then refresh to reuse that local login in AgentHub. This connection currently supports conversations only.' })}</p>
           <div className="mt-5 flex justify-end gap-3">
             <button onClick={onClose}>{t('common:buttons.close', { defaultValue: 'Close' })}</button>
             <button className="rounded bg-primary px-3 py-2 text-primary-foreground" onClick={() => { onComplete?.(0); onClose(); }}>{t('common:buttons.refresh', { defaultValue: 'Refresh' })}</button>

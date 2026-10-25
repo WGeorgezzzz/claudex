@@ -266,11 +266,11 @@ jobs:
         with:
           tag_name: ${{ needs.resolve-release.outputs.server_bundle_tag }}
           target_commitish: ${{ github.sha }}
-          name: Nexcode Local Server Runtime (${{ needs.resolve-release.outputs.tag }})
+          name: AgentHub Local Server Runtime (${{ needs.resolve-release.outputs.tag }})
           body: |
-            This prerelease contains the Local mode runtime for Nexcode Desktop.
+            This prerelease contains the Local mode runtime for AgentHub Desktop.
 
-            Download Nexcode Desktop from the main ${{ needs.resolve-release.outputs.tag }} release. When you open Local Nexcode, the desktop app automatically downloads the matching runtime from this prerelease.
+            Download AgentHub Desktop from the main ${{ needs.resolve-release.outputs.tag }} release. When you open Local AgentHub, the desktop app automatically downloads the matching runtime from this prerelease.
 
             You do not need to download these runtime files manually.
           prerelease: true

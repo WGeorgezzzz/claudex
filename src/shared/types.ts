@@ -160,7 +160,7 @@ export type ReleaseInfo = {
   publishedAt: string;
 };
 
-/** How this Nexcode install was obtained; decides whether the UI offers a self-update action. */
+/** How this AgentHub install was obtained; decides whether the UI offers a self-update action. */
 export type InstallMode = 'git' | 'npm';
 
 // ---------------------------
@@ -1241,7 +1241,7 @@ type McpImportMode = 'form' | 'json';
 
 //----------------- PLUGINS ------------
 
-/** An installed Nexcode plugin's manifest and runtime status (entry point, slot, permissions, enabled and server-running flags); always import this type explicitly from `@/shared/types`, because `Plugin` is also a DOM global and an unimported reference silently resolves to that instead. */
+/** An installed AgentHub plugin's manifest and runtime status (entry point, slot, permissions, enabled and server-running flags); always import this type explicitly from `@/shared/types`, because `Plugin` is also a DOM global and an unimported reference silently resolves to that instead. */
 export type Plugin = {
   name: string;
   displayName: string;
@@ -1459,7 +1459,7 @@ export type CodeEditorSettingsState = {
 
 //----------------- SETTINGS CREDENTIALS ------------
 
-/** One stored Nexcode API key as the server returns it, in snake_case, including its masked key, creation and last-used timestamps and active flag; render it, do not rebuild it. */
+/** One stored AgentHub API key as the server returns it, in snake_case, including its masked key, creation and last-used timestamps and active flag; render it, do not rebuild it. */
 export type ApiKeyItem = {
   id: string;
   key_name: string;
@@ -1952,3 +1952,17 @@ export type UsageSeries = {key:string;label:string;points:(UsageCounts & {t:stri
 export type UsageUser = {userId:number;username:string;role:string;isActive:boolean;today:UsageCounts;last7d:UsageCounts;last30d:UsageCounts;topModel:string|null;lastActiveAt:string|null};
 /** Dashboard response shared by the settings badge and chart. */
 export type UsageOverview = {range:string;buckets:string[];series:UsageSeries[];totals:UsageCounts;perUser:UsageUser[];scannedAt:string|null;scanning:boolean};
+//----------------- QUOTA RESPONSE ------------
+/** Sanitized quota window; missing upstream values remain null instead of suggesting zero usage. */
+export type QuotaWindow = { label: string; percent: number | null; resetsAt: string | null; severity: string; stats?: { requests: number | null; tokens: number | null; cost: number | null } };
+/** Last successful data and refresh health, used by both the settings panel and sidebar indicator. */
+export type QuotaCache<T> = { data: T | null; updatedAt: string | null; stale: boolean; error: string | null };
+/** Key-scoped relay statistics; unavailable daily history is null, never substituted with another key's totals. */
+export type QuotaKeyStats = { requests: number | null; tokens: number | null; cost: number | null };
+/** Public quota contract. Pool is absent for members; credentials and raw upstream payloads are never included. */
+export type QuotaOverview = {
+  claude: QuotaCache<{ windows: QuotaWindow[]; extraUsageEnabled: boolean }>;
+  key: QuotaCache<{ mode: string; message?: string; balance?: number | null; remaining?: number | null; quota?: number | null; used?: number | null; unit?: string; today?: QuotaKeyStats | null; last7d?: QuotaKeyStats | null; last30d?: QuotaKeyStats | null }>;
+  pool?: QuotaCache<{ thresholds: { fiveHour: number | null; sevenDay: number | null }; warnings: string[]; accounts: { id: number; name: string; status: string; schedulable: boolean; windows: QuotaWindow[]; balance: string | null; balanceChange: string | null; consumed: string | null; warnings: string[]; creditUpdatedAt: string | null; usageUpdatedAt: string | null; creditStale: boolean; usageStale: boolean }[] }>;
+};
+// ---------------------------

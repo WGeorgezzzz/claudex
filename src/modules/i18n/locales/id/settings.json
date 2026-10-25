@@ -536,7 +536,7 @@
     },
     "managed": {
       "badge": "Dikelola",
-      "hint": "Dikelola oleh Nexcode."
+      "hint": "Dikelola oleh AgentHub."
     },
     "help": {
       "title": "Tentang MCP Codex",
@@ -568,7 +568,7 @@
     "docs": "Dokumentasi",
     "sections": {
       "officialTitle": "Plugin Resmi",
-      "officialDescription": "Dikelola oleh tim Nexcode dan siap langsung diinstal.",
+      "officialDescription": "Dikelola oleh tim AgentHub dan siap langsung diinstal.",
       "unofficialTitle": "Plugin Lainnya",
       "unofficialDescription": "Plugin dan integrasi tidak resmi dari pengguna lain. Tinjau kode sumber sebelum menginstal."
     },
@@ -591,9 +591,9 @@
       "install": "Instal"
     },
     "prismClaudex": {
-      "name": "PRISM Nexcode",
+      "name": "PRISM AgentHub",
       "badge": "tidak resmi",
-      "description": "Intelijen sesi untuk Claude Code di dalam Nexcode. Lihat penyebab penggunaan token tinggi tanpa meninggalkan browser.",
+      "description": "Intelijen sesi untuk Claude Code di dalam AgentHub. Lihat penyebab penggunaan token tinggi tanpa meninggalkan browser.",
       "install": "Instal"
     },
     "sessionManagerPlugin": {
@@ -795,7 +795,7 @@
   "mcpTeamCard": {
     "title": "Konfigurasi MCP Tim",
     "description": "Bagikan konfigurasi server MCP di seluruh tim. Semua anggota tetap tersinkron otomatis.",
-    "proLink": "Tersedia dengan Nexcode Pro"
+    "proLink": "Tersedia dengan AgentHub Pro"
   },
   "mcpServersAddErrors": {
     "loadFailedProvider": "Gagal memuat server MCP {{provider}}",
@@ -812,15 +812,15 @@
     "tagline": "Your agents, one workspace.",
     "starOnGitHub": "Beri Bintang di GitHub",
     "docs": "Dokumentasi",
-    "hostedTitle": "Coba Nexcode Hosted",
+    "hostedTitle": "Coba AgentHub Hosted",
     "hostedDescription": "Kolaborasi tim, konfigurasi MCP bersama, sinkronisasi pengaturan antar-environment, dan infrastruktur terkelola.",
     "learnMore": "Pelajari lebih lanjut",
-    "proFeaturesTitle": "Fitur Nexcode Pro",
+    "proFeaturesTitle": "Fitur AgentHub Pro",
     "syncSettingsTitle": "Sinkronkan Pengaturan",
     "syncSettingsDescription": "Jaga preferensi, konfigurasi MCP, dan tema tetap sinkron di semua environment.",
     "teamManagementTitle": "Manajemen Tim",
     "teamManagementDescription": "Banyak pengguna, akses berbasis peran, dan proyek bersama untuk tim.",
     "licensed": "Dilisensikan di bawah AGPL-3.0",
-    "proCta": "Tersedia dengan Nexcode Pro"
+    "proCta": "Tersedia dengan AgentHub Pro"
   }
 }

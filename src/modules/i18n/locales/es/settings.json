@@ -519,7 +519,7 @@
     },
     "managed": {
       "badge": "Gestionado",
-      "hint": "Gestionado por Nexcode."
+      "hint": "Gestionado por AgentHub."
     },
     "help": {
       "title": "Acerca de MCP en Codex",
@@ -551,7 +551,7 @@
     "docs": "Docs",
     "sections": {
       "officialTitle": "Plugins oficiales",
-      "officialDescription": "Mantenidos por el equipo de Nexcode y listos para instalar directamente.",
+      "officialDescription": "Mantenidos por el equipo de AgentHub y listos para instalar directamente.",
       "unofficialTitle": "Otros plugins",
       "unofficialDescription": "Plugins e integraciones no oficiales de otros usuarios. Revisa el código fuente antes de instalar."
     },
@@ -574,9 +574,9 @@
       "install": "Instalar"
     },
     "prismClaudex": {
-      "name": "PRISM Nexcode",
+      "name": "PRISM AgentHub",
       "badge": "no oficial",
-      "description": "Inteligencia de sesiones para Claude Code, dentro de Nexcode. Descubre por qué tus sesiones queman tokens sin salir del navegador.",
+      "description": "Inteligencia de sesiones para Claude Code, dentro de AgentHub. Descubre por qué tus sesiones queman tokens sin salir del navegador.",
       "install": "Instalar"
     },
     "sessionManagerPlugin": {

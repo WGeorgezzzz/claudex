@@ -12,7 +12,7 @@ export function workBuddyTranscriptPath(sessionId: string): string {
   return path.join(getCloudCliHomeDir(), 'workbuddy', 'transcripts', `${sessionId}.jsonl`);
 }
 
-/** Registry-owned WorkBuddy event normalization and history. Only sessions started in Nexcode are indexed. */
+/** Registry-owned WorkBuddy event normalization and history. Only sessions started in AgentHub are indexed. */
 export class WorkBuddySessionsProvider implements IProviderSessions {
   normalizeMessage(raw: unknown, sessionId: string | null): NormalizedMessage[] {
     const row = readObjectRecord(raw);

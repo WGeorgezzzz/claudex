@@ -31,7 +31,7 @@ type SidebarProps = {
   isLoading: boolean;
   loadingProgress: LoadingProgress | null;
   onRefresh: () => Promise<void> | void;
-  onShowSettings: () => void;
+  onShowSettings: (tab?: string) => void;
   showSettings: boolean;
   settingsInitialTab: string;
   onCloseSettings: () => void;
@@ -265,7 +265,7 @@ function Sidebar({
       {isSidebarCollapsed ? (
         <SidebarCollapsed
           onExpand={handleExpandSidebar}
-          onShowSettings={onShowSettings}
+          onShowSettings={() => onShowSettings()}
           updateAvailable={updateAvailable}
           restartRequired={restartRequired}
           onShowVersionModal={() => setShowVersionModal(true)}

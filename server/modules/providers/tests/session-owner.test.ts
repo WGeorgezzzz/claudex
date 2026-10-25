@@ -12,7 +12,7 @@ test('side-by-side ownership blocks imported sessions while allowing independent
   try {
     await writeFile(filename,JSON.stringify({sessionIds:['legacy-running']}));
     process.env.CLOUDCLI_PROTECTED_SESSIONS_FILE=filename;
-    assert.throws(()=>assertSessionOwnerAvailable('legacy-running'),/original Nexcode/);
+    assert.throws(()=>assertSessionOwnerAvailable('legacy-running'),/original AgentHub/);
     assert.doesNotThrow(()=>assertSessionOwnerAvailable('new-independent-chat'));
     process.env.CLOUDCLI_PROTECTED_SESSIONS_FILE=path.join(directory,'missing.json');
     assert.throws(()=>assertSessionOwnerAvailable('legacy-running'));

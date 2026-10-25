@@ -9,7 +9,7 @@ on:
         default: "patch"
         type: string
       release_name:
-        description: 'Custom release name (optional, defaults to "Nexcode vX.Y.Z")'
+        description: 'Custom release name (optional, defaults to "AgentHub vX.Y.Z")'
         required: false
         type: string
 

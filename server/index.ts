@@ -42,6 +42,7 @@ import { taskmasterRoutes } from './modules/taskmaster/index.js';
 import { commandsRoutes } from './modules/commands/index.js';
 import { settingsRoutes } from './modules/settings/index.js';
 import { usageRoutes, initializeUsage, closeUsage } from './modules/usage/index.js';
+import { quotaRoutes, initializeQuota, closeQuota } from './modules/quota/index.js';
 import { createSystemModule } from './modules/system/index.js';
 import { createAgentModule } from './modules/agent/index.js';
 import projectModuleRoutes from './modules/projects/projects.routes.js';
@@ -176,6 +177,7 @@ app.use('/api', validateApiKey);
 // Authentication routes (public)
 app.use('/api/auth', authRoutes);
 app.use('/api/usage', authenticateToken, usageRoutes);
+app.use('/api/quota', authenticateToken, quotaRoutes);
 
 // File Tree API Routes (protected)
 app.use('/api/file-tree', authenticateToken, fileTreeRoutes);
@@ -364,6 +366,7 @@ async function startServer() {
         // Initialize authentication database
         await initializeDatabase();
         initializeUsage();
+        initializeQuota();
         initializeLocalIdentity();
 
         // Configure Web Push (VAPID keys)
@@ -391,7 +394,7 @@ async function startServer() {
 
             console.log('');
             console.log(terminalTextStyles.dim('═'.repeat(63)));
-            console.log(`  ${terminalTextStyles.bright('Nexcode Server - Ready')}`);
+            console.log(`  ${terminalTextStyles.bright('AgentHub Server - Ready')}`);
             console.log(terminalTextStyles.dim('═'.repeat(63)));
             console.log('');
             console.log(`${terminalTextStyles.info('[INFO]')} Server URL:  ${terminalTextStyles.bright('http://' + DISPLAY_HOST + ':' + SERVER_PORT)}`);
@@ -428,6 +431,7 @@ async function startServer() {
         // Clean up plugin processes on shutdown
         const shutdownRuntimeServices = async () => {
             closeUsage();
+            closeQuota();
             try {
                 await browserUseService.stopAllSessions();
             } catch (err) {

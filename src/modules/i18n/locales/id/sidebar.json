@@ -20,7 +20,7 @@
     "runClaudeCli": "Jalankan Claude CLI di direktori proyek untuk memulai"
   },
   "app": {
-    "title": "Nexcode",
+    "title": "AgentHub",
     "subtitle": "Antarmuka asisten coding AI"
   },
   "sessions": {

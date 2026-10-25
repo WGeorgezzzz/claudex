@@ -127,7 +127,7 @@ type SidebarContentProps = {
   latestVersion: string | null;
   currentVersion: string;
   onShowVersionModal: () => void;
-  onShowSettings: () => void;
+  onShowSettings: (tab?: string) => void;
   projectListProps: SidebarProjectListProps;
   t: TFunction;
 };

@@ -19,7 +19,7 @@ import {
 } from '@/shared/utils.js';
 
 /**
- * Curated OpenCode catalog shipped as immutable Nexcode defaults.
+ * Curated OpenCode catalog shipped as immutable AgentHub defaults.
  *
  * OpenCode routes by `<providerID>/<modelID>`, so this list mirrors the
  * providers `opencode models --verbose` reports: the OpenCode Zen gateway, the
@@ -318,7 +318,7 @@ const OPENCODE_MODEL_REFERENCE_PATTERN = /^[a-z0-9][a-z0-9._-]*\/[a-z0-9][a-z0-9
  * Reads model references from the local OpenCode CLI without invoking a shell.
  *
  * Model availability can differ by account and changes independently of
- * Nexcode releases, so `opencode models` is the source of truth. The CLI
+ * AgentHub releases, so `opencode models` is the source of truth. The CLI
  * output is deliberately treated as untrusted: only standalone,
  * fully-qualified `<provider>/<model>` lines are accepted.
  */

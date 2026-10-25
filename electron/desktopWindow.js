@@ -431,9 +431,9 @@ export class DesktopWindowManager {
           },
           { type: 'separator' },
           {
-            label: 'Open Local Nexcode',
+            label: 'Open Local AgentHub',
             accelerator: 'CmdOrCtrl+L',
-            click: () => void this.actions.openLocalInDesktop().catch((error) => this.actions.showError('Could not open local Nexcode', error)),
+            click: () => void this.actions.openLocalInDesktop().catch((error) => this.actions.showError('Could not open local AgentHub', error)),
           },
           {
             label: 'Open Local Web UI in Browser',
@@ -536,8 +536,8 @@ export class DesktopWindowManager {
         label: 'Local',
         submenu: [
           {
-            label: localState.localServerRunning ? 'Open Local in Nexcode' : 'Start Local in Nexcode',
-            click: () => void this.actions.openLocalInDesktop().catch((error) => this.actions.showError('Could not open local Nexcode', error)),
+            label: localState.localServerRunning ? 'Open Local in AgentHub' : 'Start Local in AgentHub',
+            click: () => void this.actions.openLocalInDesktop().catch((error) => this.actions.showError('Could not open local AgentHub', error)),
           },
           {
             label: 'Open Local in Browser',

@@ -515,7 +515,7 @@
     },
     "managed": {
       "badge": "Spravováno",
-      "hint": "Spravuje Nexcode."
+      "hint": "Spravuje AgentHub."
     },
     "help": {
       "title": "O MCP pro Codex",
@@ -547,7 +547,7 @@
     "docs": "Dokumentace",
     "sections": {
       "officialTitle": "Oficiální pluginy",
-      "officialDescription": "Spravuje je tým Nexcode a jsou připravené k přímé instalaci.",
+      "officialDescription": "Spravuje je tým AgentHub a jsou připravené k přímé instalaci.",
       "unofficialTitle": "Další pluginy",
       "unofficialDescription": "Neoficiální pluginy a integrace od jiných uživatelů. Před instalací zkontrolujte zdrojový kód."
     },
@@ -570,9 +570,9 @@
       "install": "Instalovat"
     },
     "prismClaudex": {
-      "name": "PRISM Nexcode",
+      "name": "PRISM AgentHub",
       "badge": "neoficiální",
-      "description": "Analýza relací Claude Code přímo v Nexcode. Zjistěte, proč vaše relace spalují tokeny, aniž byste opustili prohlížeč.",
+      "description": "Analýza relací Claude Code přímo v AgentHub. Zjistěte, proč vaše relace spalují tokeny, aniž byste opustili prohlížeč.",
       "install": "Instalovat"
     },
     "sessionManagerPlugin": {
@@ -786,7 +786,7 @@
   "mcpTeamCard": {
     "title": "Týmové konfigurace MCP",
     "description": "Sdílejte konfigurace MCP serverů v rámci týmu. Všichni budou mít vše automaticky synchronizované.",
-    "proLink": "K dispozici v Nexcode Pro"
+    "proLink": "K dispozici v AgentHub Pro"
   },
   "mcpServersAddErrors": {
     "loadFailedProvider": "Nepodařilo se načíst MCP servery pro {{provider}}",
@@ -803,15 +803,15 @@
     "tagline": "Your agents, one workspace.",
     "starOnGitHub": "Dát hvězdičku na GitHubu",
     "docs": "Dokumentace",
-    "hostedTitle": "Vyzkoušejte Nexcode Hosted",
+    "hostedTitle": "Vyzkoušejte AgentHub Hosted",
     "hostedDescription": "Týmová spolupráce, sdílené konfigurace MCP, synchronizace nastavení napříč prostředími a spravovaná infrastruktura.",
     "learnMore": "Další informace",
-    "proFeaturesTitle": "Funkce Nexcode Pro",
+    "proFeaturesTitle": "Funkce AgentHub Pro",
     "syncSettingsTitle": "Synchronizace nastavení",
     "syncSettingsDescription": "Mějte předvolby, konfigurace MCP a motiv synchronizované ve všech svých prostředích.",
     "teamManagementTitle": "Správa týmu",
     "teamManagementDescription": "Více uživatelů, přístup podle rolí a sdílené projekty pro váš tým.",
     "licensed": "Šířeno pod licencí AGPL-3.0",
-    "proCta": "K dispozici v Nexcode Pro"
+    "proCta": "K dispozici v AgentHub Pro"
   }
 }

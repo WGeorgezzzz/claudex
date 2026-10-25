@@ -84,7 +84,7 @@ function showStatus(dependencies: CliServiceDependencies): void {
   const claudeProjectsPath = path.join(dependencies.homeDirectory, '.claude', 'projects');
   const environmentFilePath = path.join(dependencies.applicationRoot, '.env');
 
-  output.log(`\n${terminalTextStyles.bright('Nexcode - Status')}\n`);
+  output.log(`\n${terminalTextStyles.bright('AgentHub - Status')}\n`);
   output.log(terminalTextStyles.dim('═'.repeat(60)));
   output.log(`\n${terminalTextStyles.info('[INFO]')} Version: ${terminalTextStyles.bright(dependencies.packageMetadata.version)}`);
   output.log(`\n${terminalTextStyles.info('[INFO]')} Installation Directory:`);
@@ -127,7 +127,7 @@ function showStatus(dependencies: CliServiceDependencies): void {
 function showHelp(dependencies: CliServiceDependencies): void {
   dependencies.output.log(`
 ╔═══════════════════════════════════════════════════════════════╗
-║              Nexcode - Command Line Tool               ║
+║              AgentHub - Command Line Tool               ║
 ╚═══════════════════════════════════════════════════════════════╝
 
 Usage:
@@ -135,7 +135,7 @@ Usage:
   nexcode [command] [options]
 
 Commands:
-  start            Start the Nexcode server (default)
+  start            Start the AgentHub server (default)
   sandbox          Manage Docker sandbox environments
   browser-use-mcp  Run Browser MCP stdio server
   status           Show configuration and data locations

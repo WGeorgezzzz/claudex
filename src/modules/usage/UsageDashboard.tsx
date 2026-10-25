@@ -7,6 +7,7 @@ import { api } from '@/shared/api';
 import { Button } from '@/shared/ui';
 import type { UsageCounts, UsageOverview, UsageUser } from '@/shared/types';
 import { UsageChart } from '@/modules/usage/UsageChart';
+import { QuotaPanel } from '@/modules/usage/QuotaPanel';
 
 const compact=(n:number)=>n>=1e6?`${(n/1e6).toLocaleString(undefined,{maximumFractionDigits:1})}M`:n>=1e3?`${(n/1e3).toLocaleString(undefined,{maximumFractionDigits:1})}K`:n.toLocaleString();
 function NumberValue({value}:{value:number}) {return <span title={value.toLocaleString()}>{compact(value)}</span>;}
@@ -47,6 +48,7 @@ export function UsageDashboard({selectedUserId,onSelectUser}:{selectedUserId?:nu
   const rows=[...(data?.perUser||[])].sort((a,b)=>{const value=(u:UsageUser)=>['today','last7d','last30d'].includes(sort.key)?u[sort.key as 'today'].total:String(u[sort.key as 'username']||'');const av=value(a),bv=value(b);return (typeof av==='number'&&typeof bv==='number'?av-bv:String(av).localeCompare(String(bv)))*(sort.descending?-1:1);});
   const selectClass='h-9 min-w-0 max-w-full rounded-lg border border-border bg-background pl-2 pr-7 text-xs text-foreground';
   return <section className="space-y-5 text-foreground" data-testid="usage-dashboard">
+    <QuotaPanel/>
     <header><div className="flex items-center gap-2"><Activity size={20} className="text-blue-500"/><h2 className="text-lg font-semibold">{t('mainTabs.usage')}</h2></div><p className="mt-1 text-xs text-muted-foreground">{t('usage.description')}</p></header>
     <div className="flex flex-wrap items-center gap-2">
       <select aria-label={t('usage.range')} className={selectClass} value={range} onChange={e=>setRange(e.target.value)}>{['24h','7d','30d','90d'].map(r=><option key={r} value={r}>{t(`usage.range_${r}`)}</option>)}</select>

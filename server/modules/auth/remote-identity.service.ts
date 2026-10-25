@@ -22,7 +22,7 @@ export const remoteIdentityService={
     if(userDb.getUserByUsername(username)?.role==='member')throw new AppError('Username is already assigned to a member.',{statusCode:409});
     const secret=encode(randomBytes(20));const hash=await bcrypt.hash(password,12);
     authSessionsDb.configure(userId,username,hash,secret);
-    return {username,secret,otpAuthUrl:`otpauth://totp/Nexcode:${encodeURIComponent(username)}?secret=${secret}&issuer=Nexcode&algorithm=SHA1&digits=6&period=30`};
+    return {username,secret,otpAuthUrl:`otpauth://totp/AgentHub:${encodeURIComponent(username)}?secret=${secret}&issuer=AgentHub&algorithm=SHA1&digits=6&period=30`};
   },
   async login(username:unknown,password:unknown,otp:unknown){
     const member=typeof username==='string'?userDb.getUserByUsername(username):undefined;

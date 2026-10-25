@@ -1,15 +1,16 @@
 {
   "name": "@wgeorgezzzz/claudex",
   "version": "0.8.0",
-  "productName": "Nexcode",
-  "description": "Nexcode (麻薯): the code nexus for your agents. Your agents, one workspace.",
+  "productName": "AgentHub",
+  "description": "AgentHub: the code nexus for your agents. Your agents, one workspace.",
   "type": "module",
   "main": "dist-server/server/index.js",
   "bin": {
     "cloudcli": "dist-server/server/modules/cli/cli.js",
     "claudex": "dist-server/server/modules/cli/cli.js",
     "gaci": "dist-server/server/modules/cli/cli.js",
-    "nexcode": "dist-server/server/modules/cli/cli.js"
+    "nexcode": "dist-server/server/modules/cli/cli.js",
+    "agenthub": "dist-server/server/modules/cli/cli.js"
   },
   "files": [
     "electron/",
@@ -68,9 +69,9 @@
   },
   "build": {
     "appId": "ai.cloudcli.desktop",
-    "productName": "Nexcode",
+    "productName": "AgentHub",
     "asar": false,
-    "artifactName": "Nexcode-${version}-${os}-${arch}.${ext}",
+    "artifactName": "AgentHub-${version}-${os}-${arch}.${ext}",
     "directories": {
       "output": "release/desktop"
     },
@@ -89,7 +90,7 @@
     ],
     "protocols": [
       {
-        "name": "Nexcode",
+        "name": "AgentHub",
         "schemes": [
           "cloudcli"
         ]
@@ -103,11 +104,11 @@
         "dmg"
       ],
       "extendInfo": {
-        "CFBundleName": "Nexcode",
-        "CFBundleDisplayName": "Nexcode",
+        "CFBundleName": "AgentHub",
+        "CFBundleDisplayName": "AgentHub",
         "CFBundleURLTypes": [
           {
-            "CFBundleURLName": "Nexcode",
+            "CFBundleURLName": "AgentHub",
             "CFBundleURLSchemes": [
               "cloudcli"
             ]
@@ -142,7 +143,7 @@
     "ui",
     "mobile IDE"
   ],
-  "author": "Nexcode Contributors",
+  "author": "AgentHub Contributors",
   "license": "AGPL-3.0-or-later",
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "0.3.302",

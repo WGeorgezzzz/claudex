@@ -37,12 +37,12 @@ export default function AuthScreenLayout({
             <div className="mb-5 flex justify-center">
               {logo ?? (
                 <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-primary/80 shadow-lg shadow-primary/25 ring-1 ring-inset ring-white/20">
-                  <img src="/nexcode-mark.svg" alt="Nexcode" className="h-16 w-16 rounded-2xl" />
+                  <img src="/nexcode-mark.svg" alt="AgentHub" className="h-16 w-16 rounded-2xl" />
                 </div>
               )}
             </div>
             <h1 className="font-serif text-3xl font-bold tracking-tight text-foreground">{title}</h1>
-            <p className="mt-2 text-xs font-medium tracking-wide text-muted-foreground">Nexcode 麻薯 · Your agents, one workspace.</p>
+            <p className="mt-2 text-xs font-medium tracking-wide text-muted-foreground">AgentHub · Your agents, one workspace.</p>
             <p className="mx-auto mt-2 max-w-xs text-sm leading-relaxed text-muted-foreground">{description}</p>
           </div>
 

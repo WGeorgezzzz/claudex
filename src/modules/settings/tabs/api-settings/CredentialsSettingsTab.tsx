@@ -5,7 +5,7 @@ import ApiKeysSection from '@/modules/settings/tabs/api-settings/sections/ApiKey
 import GithubCredentialsSection from '@/modules/settings/tabs/api-settings/sections/GithubCredentialsSection';
 import NewApiKeyAlert from '@/modules/settings/tabs/api-settings/sections/NewApiKeyAlert';
 
-/** Rendered by Settings for the "api" tab, managing Nexcode API keys and GitHub credentials. */
+/** Rendered by Settings for the "api" tab, managing AgentHub API keys and GitHub credentials. */
 export default function CredentialsSettingsTab() {
   const { t } = useTranslation('settings');
   const {
