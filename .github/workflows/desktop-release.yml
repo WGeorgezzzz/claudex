@@ -47,9 +47,13 @@ jobs:
           RELEASE_TAG: ${{ inputs.tag }}
         run: test "$RELEASE_TAG" = "v$(node -p "require('./package.json').version")"
       - run: npm ci --no-audit --no-fund
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
       - run: npm run typecheck
       - run: npm run build
       - run: node scripts/release/prepare-workbench.mjs
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
       - name: Build self-contained installer
         run: node node_modules/electron-builder/cli.js --projectDir .desktop-build/workbench ${{ matrix.target }} --publish never
       - name: Archive Linux desktop
@@ -73,6 +77,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Installed application acceptance failed' }
       - name: Verify npm archive installation
         if: runner.os == 'Linux'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           node scripts/release/prepare-npm.mjs
           npm pack --ignore-scripts --pack-destination "$RUNNER_TEMP" --json > "$RUNNER_TEMP/npm-pack.json"

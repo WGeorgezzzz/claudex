@@ -23,6 +23,8 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci --no-audit --no-fund
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
       - run: npm run typecheck
       - run: npm run test
       - run: npm run test:client
