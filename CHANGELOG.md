@@ -1,6 +1,57 @@
 # Changelog
 
-All notable changes to CloudCLI UI will be documented in this file.
+User-visible changes to Nexagent. Earlier upstream releases are retained below.
+
+## v1.0.0
+
+October 26, 2026. First consolidated Nexagent release after the Nexcode and GACI
+branding stages. Existing profile, protocol, environment, and CLI compatibility
+identifiers remain supported.
+
+### Your agents, one workspace
+
+- Manage Claude Code, Codex, Cursor, OpenCode, and WorkBuddy from one backend.
+- Discover installed agents, versions, and sign-in status automatically; rescan
+  without restarting. Gemini CLI, Qwen Code, Aider, and Copilot CLI are detected
+  but are not integrated providers.
+- Continue on mobile with a responsive workspace, file previews, change review,
+  terminal, searchable sessions, and preferences that follow your account.
+- Create members with separate project access and credentials. Administrators
+  manage shared providers and accounts.
+- Keep durable prompt queues, side conversations, and scheduled monitors on the
+  server; interrupted work retains its attempt record instead of replaying blindly.
+
+### Quotas and remote access
+
+- Inspect Claude subscription windows and Key-scoped relay usage. Administrators
+  can inspect the upstream OAuth pool, pause policy, and exact credit changes.
+- Configure any sub2api-compatible relay in settings or through
+  `NEXAGENT_RELAY_BASE_URL`; unconfigured installations remain neutral.
+- Bind relay administrator credentials and credit history to their destination.
+- Connect without a custom domain through Dev Tunnels, Tailscale, or Cloudflare
+  quick tunnels, with QR addresses and supervised reconnects.
+- Require application login over tunnel ingress, including loopback forwarding.
+  Remote administrators use independent passwords and TOTP.
+
+### Installation and maintenance
+
+- Prepare self-contained Windows x64 NSIS, macOS arm64 DMG, and Linux x64 tar
+  installers with independent application data and bundled Node.js backends.
+- Guide new desktop owners through agent discovery and optional remote setup.
+- Provide bilingual setup documentation, sanitized demonstrations, and checksums.
+- Correct authentication test fixtures, provider-home isolation, and the immediate
+  session-title regression expectation; retain all regression tests.
+
+### Known limitations
+
+- Windows and macOS installers are unsigned; macOS is not notarized. Verify the
+  source and checksum before authorizing first launch.
+- The host must remain awake and running. Tunnel providers require their own
+  setup; Dev Tunnels needs device authorization and Funnel may need tailnet approval.
+- Quota views observe metadata; relay schedulers enforce spending policy.
+- Release 1.0.0 remains a GitHub draft pending review. npm publication is pending.
+
+## Upstream history
 
 
 ## [1.37.5](https://github.com/siteboon/claudecodeui/compare/v1.37.4...v1.37.5) (2026-10-17)

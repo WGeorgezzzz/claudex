@@ -1,6 +1,12 @@
 
 *.md
 !README.md
+!README.zh-CN.md
+!LICENSE
+!NOTICE
+**/tests/**
+**/*.test.*
+**/*.map
 .env*
 .gitignore
 .nvmrc

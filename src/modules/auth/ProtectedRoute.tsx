@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 
 import { IS_PLATFORM } from '@/shared/utils';
 import { useAuth } from '@/modules/auth/context/AuthContext';
-import { Onboarding } from '@/modules/onboarding';
+import { Onboarding, DesktopSetup } from '@/modules/onboarding';
 import AuthLoadingScreen from '@/modules/auth/AuthLoadingScreen';
 import LoginForm from '@/modules/auth/LoginForm';
 import SetupForm from '@/modules/auth/SetupForm';
@@ -13,7 +13,7 @@ type ProtectedRouteProps = {
 
 /** Used by App to gate the routed application behind setup, login and onboarding. */
 export default function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const { user, isLoading, needsSetup, hasCompletedOnboarding, refreshOnboardingStatus } = useAuth();
+  const { user, isLoading, needsSetup, hasCompletedOnboarding, refreshOnboardingStatus, localIdentity } = useAuth();
 
   if (isLoading) {
     return <AuthLoadingScreen />;
@@ -36,6 +36,7 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
   }
 
   if (!hasCompletedOnboarding) {
+    if (localIdentity) return <DesktopSetup onComplete={refreshOnboardingStatus} />;
     return <Onboarding onComplete={refreshOnboardingStatus} />;
   }
 

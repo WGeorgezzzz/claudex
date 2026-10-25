@@ -10,7 +10,7 @@ if (path.dirname(stage)!==expectedParent || path.basename(stage)!=='workbench') 
 const profile=JSON.parse(await fs.readFile(path.join(root,'workbench-profile.json'),'utf8'));
 const sourcePackage=JSON.parse(await fs.readFile(path.join(root,'package.json'),'utf8'));
 const electronVersion=JSON.parse(await fs.readFile(path.join(root,'node_modules/electron/package.json'),'utf8')).version;
-if (process.platform!=='win32' || process.arch!=='x64') throw new Error('This packaging entry currently targets Windows x64 only.');
+if (!['win32','darwin','linux'].includes(process.platform)) throw new Error('Unsupported desktop platform.');
 if (!process.versions.node.startsWith('22.')) throw new Error('Build with Node.js 22 so the bundled runtime and native dependencies have the same ABI.');
 
 // The only recursive removal targets this verified disposable build directory.
@@ -46,28 +46,33 @@ await new Promise((resolve,reject)=>{
 const moduleSource=path.resolve(serverRoot,'node_modules'), moduleTarget=path.resolve(stage,'node_modules');
 if (!moduleSource.startsWith(stage+path.sep) || !moduleTarget.startsWith(stage+path.sep)) throw new Error('Unsafe dependency move.');
 await fs.rename(moduleSource,moduleTarget);
-await fs.access(path.join(moduleTarget,'@anthropic-ai','claude-agent-sdk-win32-x64','claude.exe'));
+await fs.access(path.join(moduleTarget,'@anthropic-ai',`claude-agent-sdk-${process.platform}-${process.arch}`,process.platform==='win32'?'claude.exe':'claude'));
 await fs.mkdir(path.join(stage,'runtime'),{recursive:true});
-await fs.copyFile(process.execPath,path.join(stage,'runtime','node.exe'));
+const runtimeFile=path.join(stage,'runtime',process.platform==='win32'?'node.exe':'node');
+await fs.copyFile(process.execPath,runtimeFile);
+if (process.platform!=='win32') await fs.chmod(runtimeFile,0o755);
 await fs.writeFile(path.join(stage,'build-provenance.json'),JSON.stringify({
   product:profile.productName,version:profile.version,sourceCommit:process.env.GITHUB_SHA||'local',
   node:process.version,nodeAbi:process.versions.modules,electron:electronVersion,upstreamBaseVersion:profile.upstreamBaseVersion||'1.37.5',
 },null,2));
 await fs.writeFile(path.join(stage,'package.json'),JSON.stringify({
-  name:'claudex-desktop',version:profile.version,productName:profile.productName,
+  name:'nexagent-desktop',version:profile.version,productName:profile.productName,
   description:'Nexagent independent desktop distribution',
   author:sourcePackage.author,license:sourcePackage.license,type:'module',main:'electron/main.js',
   dependencies:sourcePackage.dependencies,optionalDependencies:sourcePackage.optionalDependencies,
   build:{
     appId:profile.appId,productName:profile.productName,asar:false,electronVersion,
     npmRebuild:false,nodeGypRebuild:false,
-    artifactName:'Nexagent-${version}-win-${arch}.${ext}',
+    artifactName:'Nexagent-${version}-${os}-${arch}.${ext}',
     directories:{output:'../../release/workbench'},
     files:['electron/**','public/**','dist/**','server/**','runtime/**','node_modules/**',
       'workbench-profile.json','build-provenance.json','package.json','LICENSE','NOTICE'],
     protocols:[{name:profile.productName,schemes:[profile.protocol]}],
     win:{target:[{target:'nsis',arch:['x64']}],icon:'electron/assets/logo-windows.ico',
       executableName:'Nexagent',signAndEditExecutable:true},
+    mac:{target:[{target:'dmg',arch:['arm64']}],icon:'electron/assets/logo-macos.icns',
+      category:'public.app-category.developer-tools',identity:null,notarize:false},
+    linux:{target:[{target:'tar.gz',arch:['x64']}],icon:'public/logo-512.png',category:'Development',executableName:'nexagent'},
     nsis:{oneClick:false,perMachine:false,allowToChangeInstallationDirectory:true,runAfterFinish:false,
       deleteAppDataOnUninstall:false,createDesktopShortcut:true,shortcutName:profile.productName},
   },

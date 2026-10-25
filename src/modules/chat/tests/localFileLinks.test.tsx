@@ -41,9 +41,9 @@ test('directory references still reveal files instead of reading a directory',()
 });
 
 test('screenshot-style Windows inline code becomes a right-side preview link',()=>{
-  render(<Markdown>{'报告已经写到本地：`D:\\embodied\\luna-physx-robust-20261018\\FINAL-REPORT.md`。'}</Markdown>);
-  fireEvent.click(screen.getByRole('link',{name:'D:\\embodied\\luna-physx-robust-20261018\\FINAL-REPORT.md'}));
-  assert.deepEqual(open.mock.calls[0],['D:/embodied/luna-physx-robust-20261018/FINAL-REPORT.md',null]);
+  render(<Markdown>{'报告已经写到本地：`D:\\workspace\\demo-project\\FINAL-REPORT.md`。'}</Markdown>);
+  fireEvent.click(screen.getByRole('link',{name:'D:\\workspace\\demo-project\\FINAL-REPORT.md'}));
+  assert.deepEqual(open.mock.calls[0],['D:/workspace/demo-project/FINAL-REPORT.md',null]);
 });
 test('inline relative paths and line suffixes are linked but commands and fenced code are not',()=>{
   render(<Markdown>{'`docs/中文 报告.md` `src/main.ts:8` `npm run test` `python script.py`\n\n```text\nD:\\report.md\n```'}</Markdown>);

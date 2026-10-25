@@ -13,9 +13,9 @@ function fixture() {
   const calls: { url: string; init: RequestInit }[] = [];
   const secret = 'admin-key-secret', token = 'claude-token-secret', keys = ['member-key-secret', 'other-key-secret'];
   const paths = (id: number) => ({ adminClaude: '/claude', adminCodex: '/codex', configRoot: '/users', root: '/users/2', claudeConfigDir: '/claude', codexHome: '/codex/' + id });
-  const service = createQuotaService({ paths, db: () => db, secretFile: '/secret', now: () => now,
+  const service = createQuotaService({ relayBaseUrl: 'https://relay.example.com', paths, db: () => db, secretFile: '/secret', now: () => now,
     password: async () => { throw Error('API key should take precedence'); },
-    readJson: async file => file === '/secret' ? { apiKey: secret } : file.endsWith('.credentials.json') ? { claudeAiOauth: { accessToken: token } } : file.replaceAll('\\', '/').includes('/4/') ? { tokens: { access_token: 'chatgpt-login-secret' } } : { OPENAI_API_KEY: file.replaceAll('\\', '/').includes('/3/') ? keys[1] : keys[0] },
+    readJson: async file => file === '/secret' ? { apiKey: secret, baseUrl: 'https://relay.example.com' } : file.endsWith('.credentials.json') ? { claudeAiOauth: { accessToken: token } } : file.replaceAll('\\', '/').includes('/4/') ? { tokens: { access_token: 'chatgpt-login-secret' } } : { OPENAI_API_KEY: file.replaceAll('\\', '/').includes('/3/') ? keys[1] : keys[0] },
     request: async (url, init) => {
       calls.push({ url, init });
       assert(!/reset|responses|messages/.test(url));
@@ -27,7 +27,7 @@ function fixture() {
       if (url.includes('advanced-settings')) return Response.json({ data: { openai_account_quota_auto_pause: { default_threshold_5h: fiveHour, default_threshold_7d: sevenDay } } });
       if (url.includes('accounts?')) return Response.json({ data: { items: [{ id: 1, type: 'oauth', platform: 'openai' }, { id: 2, type: 'apikey', platform: 'openai' }] } });
       if (url.endsWith('/usage')) return Response.json({ data: { seven_day: { window_stats: { requests: 5, tokens: 100, cost: 0.01 } } } });
-      return Response.json({ data: { id: 1, name: 'qq', status: 'active', schedulable: false, credentials: secret, extra: { ...overrides, codex_5h_used_percent: 12, codex_7d_used_percent: 95, codex_usage_updated_at: new Date(now).toISOString(), codex_credits_snapshot: { credits: { balance }, fetched_at: Math.floor(now / 1000) } } } });
+      return Response.json({ data: { id: 1, name: 'demo-account-a', status: 'active', schedulable: false, credentials: secret, extra: { ...overrides, codex_5h_used_percent: 12, codex_7d_used_percent: 95, codex_usage_updated_at: new Date(now).toISOString(), codex_credits_snapshot: { credits: { balance }, fetched_at: Math.floor(now / 1000) } } } });
     } });
   return { service, db, calls, keys, advance: () => { now += 120001; }, expire: () => { failClaude = true; now += 120001; }, debit: () => { balance = '100000000000000000000.1234567890122'; },
     thresholds: (five: unknown, seven: unknown) => { fiveHour = five; sevenDay = seven; }, overrides: (value: Record<string, unknown>) => { overrides = value; } };
@@ -61,7 +61,7 @@ test('members cannot trigger pool and user-scoped key history aggregates today, 
     assert(result.key.data && 'last7d' in result.key.data);
     assert.equal(result.key.data?.last7d.requests, 3); assert.equal(result.key.data?.last30d.requests, 7);
     assert.equal(result.key.data?.balance, 123);
-    assert(!JSON.stringify(result).includes('qq'));
+    assert(!JSON.stringify(result).includes('demo-account-a'));
     const other = await f.service.overview({ userId: 3, role: 'member' }); assert.equal(f.calls.filter(c => c.url.includes('/v1/usage')).length, 2);
     assert(other.key.data && 'balance' in other.key.data); assert.equal(other.key.data.balance, 321);
     const direct = await f.service.overview({ userId: 4, role: 'member' }); assert.equal(direct.key.data?.mode, 'not_relay'); assert.equal(f.calls.filter(c => c.url.includes('/v1/usage')).length, 2);
@@ -71,7 +71,7 @@ test('sub-decimal credit debit is exact, durable, and unchanged balances do not 
   const f = fixture(); try {
     await f.service.refreshPool(); f.debit(); f.advance();
     const result = await f.service.refreshPool(); assert.equal(result.data?.accounts[0].consumed, '0.0000000000001');
-    assert.match(result.data!.warnings.join(' '), /qq 点数被消耗 0\.0000000000001/);
+    assert.match(result.data!.warnings.join(' '), /demo-account-a 点数被消耗 0\.0000000000001/);
     f.advance(); const next = await f.service.refreshPool(); assert.equal(next.data?.accounts[0].consumed, null); assert.equal(next.data?.accounts[0].alerts.length, 1);
     assert.equal((f.db.prepare('SELECT COUNT(*) n FROM quota_credit_snapshots').get() as { n: number }).n, 3);
   } finally { f.db.close(); }
@@ -104,7 +104,7 @@ test('account seven-day disable and unsafe overrides warn; five-hour overrides o
     for (const extra of [{ auto_pause_7d_disabled: true }, ...[-1, 0, 0.990001, 1].map(v => ({ auto_pause_7d_threshold: v }))]) {
       f.overrides(extra); f.advance();
       const result = (await f.service.refreshPool()).data!;
-      assert.equal(result.warnings.length, 1); assert.match(result.warnings[0], /qq 7d/);
+      assert.equal(result.warnings.length, 1); assert.match(result.warnings[0], /demo-account-a 7d/);
     }
     f.overrides({}); f.advance(); assert.deepEqual((await f.service.refreshPool()).data?.warnings, []);
     f.overrides({ auto_reset_credit_enabled: true }); f.advance();
@@ -121,15 +121,26 @@ test('cache marks stale data, sanitizes raw errors and backs off from failed ini
 });
 test('decimal normalization avoids false debit and invalid balances do not corrupt history', () => {
   const db = new Database(':memory:'); initializeQuotaTables(db);
-  try { recordCreditSnapshot(db, 1, 'qq', '1.0', 'a', null); assert.equal(recordCreditSnapshot(db, 1, 'qq', '1.0000', 'b', null).consumed, null); assert.throws(() => recordCreditSnapshot(db, 1, 'qq', 'bad', 'c', null)); assert.equal(recordCreditSnapshot(db, 1, 'qq', '0.9', 'd', null).consumed, '0.1'); }
+  try { recordCreditSnapshot(db, 1, 'demo-account-a', '1.0', 'a', null); assert.equal(recordCreditSnapshot(db, 1, 'demo-account-a', '1.0000', 'b', null).consumed, null); assert.throws(() => recordCreditSnapshot(db, 1, 'demo-account-a', 'bad', 'c', null)); assert.equal(recordCreditSnapshot(db, 1, 'demo-account-a', '0.9', 'd', null).consumed, '0.1'); }
   finally { db.close(); }
+});
+
+test('credit history and alerts stay separate when two relays reuse an account id', () => {
+  const db = new Database(':memory:'); initializeQuotaTables(db);
+  try {
+    recordCreditSnapshot(db, 1, 'demo', '100', 'a', null, 'https://first.example.com');
+    const next = recordCreditSnapshot(db, 1, 'demo', '1', 'b', null, 'https://second.example.com');
+    assert.equal(next.consumed, null); assert.deepEqual(next.alerts, []);
+    assert.equal(recordCreditSnapshot(db, 1, 'demo', '99', 'c', null, 'https://first.example.com').consumed, '1');
+    assert.deepEqual(recordCreditSnapshot(db, 1, 'demo', '1', 'd', null, 'https://second.example.com').alerts, []);
+  } finally { db.close(); }
 });
 
 test('JWT fallback coalesces login, relogs once on 401 and never returns the password or JWT', async () => {
   let now = 0, loginCount = 0, rejectOld = false;
   const db = new Database(':memory:'); initializeQuotaTables(db);
   const service = createQuotaService({ db: () => db, paths: () => ({ adminClaude: '/claude', adminCodex: '/codex', configRoot: '/users', root: '/users/1', claudeConfigDir: '/claude', codexHome: '/codex' }),
-    secretFile: '/secret', now: () => now, password: async () => 'password-secret', readJson: async () => { throw Error('No credential file'); },
+    relayBaseUrl: 'https://relay.example.com', secretFile: '/secret', now: () => now, password: async () => 'password-secret', readJson: async () => ({ baseUrl: 'https://relay.example.com', email: 'admin@example.com' }),
     request: async (url, init) => {
       if (url.endsWith('/auth/login')) { loginCount++; assert.equal(init.method, 'POST'); return Response.json({ data: { access_token: 'jwt-secret-' + loginCount, expires_in: 3600 } }); }
       assert(!init.method || init.method === 'GET');
@@ -143,7 +154,7 @@ test('JWT fallback coalesces login, relogs once on 401 and never returns the pas
 test('relay transient failures stop after two retries and do not expose raw error payloads', async () => {
   let count = 0;
   const service = createQuotaService({ db: () => { throw Error('Unused'); }, paths: () => ({ adminClaude: '/claude', adminCodex: '/codex', configRoot: '/users', root: '/users/2', claudeConfigDir: '/claude', codexHome: '/codex' }),
-    secretFile: '/secret', password: async () => 'unused', readJson: async file => file.endsWith('auth.json') ? { OPENAI_API_KEY: 'key-secret' } : {},
+    relayBaseUrl: 'https://relay.example.com', secretFile: '/secret', password: async () => 'unused', readJson: async file => file.endsWith('auth.json') ? { OPENAI_API_KEY: 'key-secret' } : {},
     request: async (_url, init) => { count++; assert.equal(init.redirect, 'error'); assert(init.signal); return new Response('key-secret', { status: 503 }); } });
   const result = await service.overview({ userId: 2, role: 'member' }); assert.equal(count, 3); assert.equal(result.key.data, null); assert(!JSON.stringify(result).includes('key-secret'));
 });

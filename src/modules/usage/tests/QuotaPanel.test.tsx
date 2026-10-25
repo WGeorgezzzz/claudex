@@ -5,10 +5,11 @@ import { QuotaPanel } from '@/modules/usage/QuotaPanel';
 import { QuotaIndicator } from '@/modules/usage/QuotaIndicator';
 
 const fixture = vi.hoisted(() => ({ warnings: [] as string[] }));
+vi.mock('@/modules/auth', () => ({ useAuth: () => ({ user: { role: 'member' } }) }));
 vi.mock('@/modules/usage/hooks/useQuota', () => ({ useQuota: () => ({
   data: { claude: { data: { windows: [], extraUsageEnabled: false }, stale: false, updatedAt: '2026-10-26T02:00:00Z' },
     key: { data: { mode: 'not_relay' } }, pool: { data: { thresholds: { fiveHour: 0, sevenDay: 0.99 }, warnings: fixture.warnings,
-      accounts: [{ id: 1, name: 'qq', schedulable: true, status: 'active', windows: [],
+      accounts: [{ id: 1, name: 'demo-account-a', schedulable: true, status: 'active', windows: [],
         autoPause: { fiveHour: { disabled: true, threshold: 0 }, sevenDay: { disabled: false, threshold: 0.99 } } }] },
       stale: false, updatedAt: '2026-10-26T02:00:00Z' } },
   busy: false, error: null, now: Date.parse('2026-10-26T02:00:00Z'), refresh: vi.fn(),
@@ -25,9 +26,9 @@ describe('quota threshold display', () => {
   it('keeps the sidebar neutral for the accepted configuration and repeats real warnings', () => {
     const view = render(<QuotaIndicator onOpen={() => {}} />);
     expect(screen.getByTestId('quota-indicator').className).not.toContain('text-red-700');
-    fixture.warnings = ['账号 qq 点数被消耗 0.1'];
+    fixture.warnings = ['账号 demo-account-a 点数被消耗 0.1'];
     view.rerender(<QuotaIndicator onOpen={() => {}} />);
-    expect(screen.getByText('账号 qq 点数被消耗 0.1')).toBeTruthy();
+    expect(screen.getByText('账号 demo-account-a 点数被消耗 0.1')).toBeTruthy();
     expect(screen.getByTestId('quota-indicator').className).toContain('text-red-700');
   });
 });

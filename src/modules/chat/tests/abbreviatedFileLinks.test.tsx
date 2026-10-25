@@ -13,11 +13,11 @@ vi.mock('@/shared/api', () => ({ api: { readFileBlob, resolveFilePattern } }));
 vi.mock('@/modules/command-palette', () => ({ usePaletteOps: () => ({ openFileInEditor: preview, openDirectory: vi.fn() }) }));
 afterEach(() => { cleanup(); preview.mockReset(); readFileBlob.mockReset(); resolveFilePattern.mockReset(); });
 
-const directory = 'D:/embodied/clickbell-speed100-hot-20261023/preview-r6/';
+const directory = 'D:/workspace/demo-video/preview-r6/';
 const real = directory + '02-left-bell-52002800000-0000-clutter10.mp4';
-const message = '视频已拉到本机：`D:\\embodied\\clickbell-speed100-hot-20261023\\preview-r6\\`。文件名带臂别和杂物件数，比如 `02-left-…-clutter10.mp4`';
+const message = '视频已拉到本机：`D:\\workspace\\demo-video\\preview-r6\\`。文件名带臂别和杂物件数，比如 `02-left-…-clutter10.mp4`';
 const json = (matches: string[]) => ({ ok: true, status: 200, json: async () => ({ matches, truncated: false }) });
-const renderMessage = (text = message) => render(<MarkdownWorkspaceContext.Provider value={{ projectId: 'p1', projectPath: 'D:\\embodied' }}>
+const renderMessage = (text = message) => render(<MarkdownWorkspaceContext.Provider value={{ projectId: 'p1', projectPath: 'D:\\workspace' }}>
   <Markdown>{text}</Markdown>
 </MarkdownWorkspaceContext.Provider>);
 
@@ -62,7 +62,7 @@ test('no match keeps a visible error and opens nothing', async () => {
 
 test('an absolute abbreviated path also resolves through the server', async () => {
   resolveFilePattern.mockResolvedValue(json([real]));
-  renderMessage('`D:\\embodied\\clickbell-speed100-hot-20261023\\preview-r6\\02-left-...-clutter10.mp4`');
+  renderMessage('`D:\\workspace\\demo-video\\preview-r6\\02-left-...-clutter10.mp4`');
   fireEvent.click(screen.getByRole('link'));
   await waitFor(() => assert.deepEqual(preview.mock.calls, [[real, null]]));
   assert.equal(resolveFilePattern.mock.calls[0][1], directory + '02-left-...-clutter10.mp4');

@@ -6,13 +6,14 @@
     "requireCleanWorkingDir": true
   },
   "npm": {
-    "publish": true,
+    "publish": false,
     "skipChecks": true,
     "publishArgs": ["--access public", "--loglevel warn"]
   },
   "github": {
     "release": true,
-    "releaseName": "Nexagent v${version}"
+    "releaseName": "Nexagent v${version}",
+    "draft": true
   },
   "hooks": {
     "before:init": ["npm run build"]

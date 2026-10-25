@@ -9,6 +9,10 @@ export function initializeQuotaTables(db: Database) {
     CREATE TABLE IF NOT EXISTS quota_credit_alerts (
     id INTEGER PRIMARY KEY, account_id INTEGER NOT NULL, account_name TEXT NOT NULL,
     observed_at TEXT NOT NULL, consumed TEXT NOT NULL);`);
+  for (const table of ['quota_credit_snapshots', 'quota_credit_alerts']) {
+    const columns = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
+    if (!columns.some(column => column.name === 'relay_url')) db.exec(`ALTER TABLE ${table} ADD COLUMN relay_url TEXT NOT NULL DEFAULT ''`);
+  }
 }
 
 // Use scaled integers: converting decimal credits to floating point can hide a small debit.
@@ -19,10 +23,10 @@ function decimal(value: string) {
 }
 
 /** Quota service records each successful observation transactionally and returns durable debit warnings. */
-export function recordCreditSnapshot(db: Database, id: number, name: string, balance: string, at: string, sourceAt: string | null) {
+export function recordCreditSnapshot(db: Database, id: number, name: string, balance: string, at: string, sourceAt: string | null, relayUrl = '') {
   const current = decimal(balance);
   return db.transaction(() => {
-    const previous = db.prepare('SELECT balance FROM quota_credit_snapshots WHERE account_id=? ORDER BY id DESC LIMIT 1').get(id) as { balance: string } | undefined;
+    const previous = db.prepare('SELECT balance FROM quota_credit_snapshots WHERE account_id=? AND relay_url=? ORDER BY id DESC LIMIT 1').get(id, relayUrl) as { balance: string } | undefined;
     let consumed: string | null = null;
     let balanceChange: string | null = null;
     if (previous) {
@@ -35,11 +39,11 @@ export function recordCreditSnapshot(db: Database, id: number, name: string, bal
         if (delta > 0n) consumed = amount;
       }
       if (consumed) {
-        db.prepare('INSERT INTO quota_credit_alerts(account_id,account_name,observed_at,consumed) VALUES(?,?,?,?)').run(id, name, at, consumed);
+        db.prepare('INSERT INTO quota_credit_alerts(account_id,account_name,observed_at,consumed,relay_url) VALUES(?,?,?,?,?)').run(id, name, at, consumed, relayUrl);
         console.error(`[Quota] 账号 ${name} 点数被消耗 ${consumed}`);
       }
     }
-    db.prepare('INSERT INTO quota_credit_snapshots(account_id,observed_at,balance,source_updated_at,consumed) VALUES(?,?,?,?,?)').run(id, at, balance, sourceAt, consumed);
-    return { consumed, balanceChange, alerts: db.prepare('SELECT account_id accountId,account_name accountName,observed_at observedAt,consumed FROM quota_credit_alerts WHERE account_id=? ORDER BY id DESC LIMIT 20').all(id) as { accountId: number; accountName: string; observedAt: string; consumed: string }[] };
+    db.prepare('INSERT INTO quota_credit_snapshots(account_id,observed_at,balance,source_updated_at,consumed,relay_url) VALUES(?,?,?,?,?,?)').run(id, at, balance, sourceAt, consumed, relayUrl);
+    return { consumed, balanceChange, alerts: db.prepare('SELECT account_id accountId,account_name accountName,observed_at observedAt,consumed FROM quota_credit_alerts WHERE account_id=? AND relay_url=? ORDER BY id DESC LIMIT 20').all(id, relayUrl) as { accountId: number; accountName: string; observedAt: string; consumed: string }[] };
   })();
 }

@@ -1,61 +1,69 @@
-# Subscription and relay quota
+# Subscription and relay quotas
 
-Open **Settings → Usage → 额度** to inspect the shared Claude subscription,
-your own Codex relay Key, and (administrators only) the upstream OAuth pool.
-The sidebar indicator opens this section directly. Existing transcript-based
-usage charts remain below it.
+Open **Settings → Usage → 额度**. The shared Claude subscription and the current
+user's relay Key are separate. Only administrators receive the upstream account pool.
 
-## Credentials and access
+## Configure a relay
 
-- Claude reads `CLAUDE_CONFIG_DIR/.credentials.json` from the administrator
-  configuration, independently of the signed-in member. It never refreshes
-  tokens. A 401 asks you to wait for the Claude CLI to refresh credentials.
-  If `HTTPS_PROXY` is configured, this metadata request uses a dedicated native
-  proxy agent (Node 22.21+ or 24.5+). Other network clients are unaffected.
-- Store the relay administrator Key outside the repository at
-  `~/.cloudcli/secrets/sub2api-admin.json`:
+Use a sub2api-compatible service with `/v1/usage` and the `/api/v1/admin` management
+APIs. A generic model-generation gateway may not provide these endpoints.
 
-  ```json
-  { "apiKey": "<administrator API Key>" }
-  ```
+Set `NEXAGENT_RELAY_BASE_URL=https://relay.example.com`, or save the URL in the
+administrator's quota settings. The environment variable takes precedence and
+makes the field read-only. The persisted setting is outside Git at
+`$CLOUDCLI_HOME/relay.json`, defaulting to `~/.cloudcli/relay.json`:
 
-  This Key takes precedence over the JWT fallback. Without it, the server uses
-  AWS profile `sub2api-ops` to read SSM parameter `/sub2api/admin-password` in
-  `ap-southeast-1`, then signs in as `admin@sub2api.local`. JWTs stay in memory.
-- Personal Key usage reads only the authenticated user's Codex `auth.json`.
-  An administrator uses `CODEX_HOME`; a member uses the existing user config
-  resolver. ChatGPT login without `OPENAI_API_KEY` displays **未走中转**.
-- The relay origin is fixed to `https://api.qiaozhiw.com`. An unrelated
-  provider Key cannot retrieve another user's statistics.
-- Authenticated `GET /api/quota` never accepts a user ID or role override.
-  Members neither trigger nor receive upstream pool requests. Responses are
-  field projections and do not contain credentials or raw upstream errors.
+```json
+{ "baseUrl": "https://relay.example.com" }
+```
 
-## Refresh and warnings
+Use HTTPS. Plain HTTP is accepted only for localhost testing. Credentials, query
+parameters, and fragments are not accepted in the URL. An empty setting displays
+**未配置中转**, does not query the relay, and does not report a relay error.
 
-Successful results cache for 120 seconds. Concurrent requests share one
-refresh. Failures back off from 30 seconds to ten minutes. Relay requests
-have a 30-second timeout and at most two retries on transient failures.
-The background pool sampler runs at startup and every ten minutes, even if
-no administrator has the page open.
+Store administrator credentials at `$CLOUDCLI_HOME/secrets/sub2api-admin.json`:
 
-`quota_credit_snapshots` retains each successful balance observation by account
-and time. Scaled integer comparison preserves decimal precision.
-`quota_credit_alerts` retains detected debits across refreshes and restarts;
-the latest alerts appear in red in the quota panel and sidebar and are logged
-on detection. No reset-credit action or generation endpoint is exposed.
+```json
+{
+  "baseUrl": "https://relay.example.com",
+  "apiKey": "<relay administrator API key>"
+}
+```
 
-Global thresholds of zero, above 0.95, or unknown produce red warnings.
-Unsafe per-account pause overrides and enabled upstream credit resets also
-warn. Usage of at least 95% or paused scheduling uses red; upstream warning
-severity uses yellow. Disabled scheduling alone cannot prove auto-pause was
-the cause, so the page labels this explicitly.
+The matching `baseUrl` is required: editing the endpoint never forwards an old
+administrator key to a different relay. An API key takes precedence. For relays
+using JWT login, supply `email` and `password` instead, or put the password in
+`NEXAGENT_RELAY_ADMIN_PASSWORD`. Restrict access to this file to the service account.
+JWTs stay in memory. No cloud-provider credentials or password lookup is built in.
 
-Refresh timestamps and source usage/credit timestamps are separate. Values
-older than 15 minutes are marked stale. An old upstream credit snapshot
-cannot prove that credits have not been spent. This dashboard observes the
-relay; enforcement remains the relay scheduler's responsibility.
+Personal usage reads only the authenticated user's Codex `auth.json`. ChatGPT
+login without an API key displays **未走中转**. Members cannot override identity
+through query parameters, change the relay URL, or receive upstream account data.
 
-Personal today/7-day/30-day totals use Key-filtered daily usage from
-`GET /v1/usage?days=30&timezone=Asia%2FShanghai`. Missing upstream history is
-shown as unavailable. Reset timestamps use the browser's local timezone.
+## Claude subscription
+
+The dashboard reads the administrator's `CLAUDE_CONFIG_DIR/.credentials.json`.
+It never refreshes OAuth credentials. A 401 asks you to wait for Claude CLI's
+refresh. `HTTPS_PROXY` applies to this metadata request through a dedicated native
+agent, requiring Node 22.21+ or 24.5+. Credentials are never sent to the browser.
+
+## Refresh, history, and warnings
+
+Successes cache for 120 seconds; concurrent refreshes coalesce. Failures back off
+from 30 seconds to ten minutes. Relay requests time out after 30 seconds and retry
+transient failures at most twice. The configured pool is sampled every ten minutes.
+
+Snapshots and alerts are partitioned by relay URL and account ID. Existing history
+from before URL attribution is preserved without comparing it against an unknown
+destination. Decimal comparisons use scaled integers, retaining very small debits.
+Warnings persist after a detected debit. No credit-reset endpoint is called.
+
+The global seven-day pause threshold warns if unknown, nonpositive, or above 0.99.
+Seven-day account overrides warn if disabled or outside the same range. Five-hour
+zero or disabled values are displayed without a policy warning. Usage at 95% or
+more and paused scheduling remain red; upstream warning severity is yellow.
+
+Source timestamps and refresh timestamps are separate. Values older than fifteen
+minutes are marked stale. An old balance cannot establish that no credits were
+spent. The relay scheduler enforces spending policy; this dashboard observes it.
+Personal daily history is Key-filtered; absent upstream data stays unavailable.

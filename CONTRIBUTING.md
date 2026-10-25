@@ -18,8 +18,8 @@ Thanks for your interest in contributing to Nexagent! Before you start, please t
 1. Fork the repository
 2. Clone your fork:
    ```bash
-   git clone https://github.com/<your-username>/claudecodeui.git
-   cd claudecodeui
+   git clone https://github.com/<your-username>/claudex.git
+   cd claudex
    ```
 3. Install dependencies:
    ```bash
@@ -136,20 +136,18 @@ feat!: redesign settings page layout
 
 ## Releases
 
-Releases are managed by maintainers using [release-it](https://github.com/release-it/release-it) with the [conventional changelog plugin](https://github.com/release-it/conventional-changelog).
+Releases use the Desktop Release GitHub Actions workflow. It builds installers,
+checks a fresh Windows installation and an isolated npm archive installation,
+and uploads assets and SHA-256 checksums to a **draft** GitHub Release.
+The workflow never publishes npm or changes a release from draft to public.
 
 ```bash
-npm run release           # interactive (prompts for version bump)
-npm run release -- patch  # patch release
-npm run release -- minor  # minor release
+npm run release           # print the draft workflow entry point
 ```
 
-This automatically:
-- Bumps the version based on commit types (`feat` = minor, `fix` = patch)
-- Generates categorized release notes
-- Updates `CHANGELOG.md`
-- Creates a git tag and GitHub Release
-- Publishes to npm
+Maintainers update package and profile versions together and write user-facing
+notes in CHANGELOG.md. Review the draft, provenance, installed acceptance receipt,
+and checksums before making a separate publication decision.
 
 ## License
 

@@ -1,15 +1,14 @@
 import fs from 'node:fs/promises';
-import os from 'node:os';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
 
 import { getConnection } from '@/modules/database/index.js';
 import { resolveUserConfigPaths } from '@/modules/auth/index.js';
+import { getCloudCliHomeDir } from '@/shared/index.js';
 
 import { initializeQuotaTables, recordCreditSnapshot } from './quota.db.js';
 import { quotaFetch } from './quota.http.js';
+import { normalizeRelayBaseUrl, readRelayConfiguration } from './quota.config.js';
 
 // Untrusted upstream JSON is projected field by field; never forward credentials or raw errors.
 type Json = Record<string, any>;
@@ -44,9 +43,10 @@ export function createQuotaService(deps: {
   readJson: (file: string) => Promise<Json>; request: (url: string, init: RequestInit) => Promise<Response>;
   paths: typeof resolveUserConfigPaths; secretFile: string; password: () => Promise<string>;
   db: typeof getConnection; now?: () => number;
+  relayBaseUrl?: string;
 }) {
   const now = deps.now || Date.now;
-  const base = 'https://api.qiaozhiw.com';
+  const base = normalizeRelayBaseUrl(deps.relayBaseUrl ?? '');
   let jwt: string | null = null, expires = 0;
   let login: Promise<string> | null = null;
   async function request(url: string, init: RequestInit = {}, retry = false): Promise<Json> {
@@ -67,11 +67,13 @@ export function createQuotaService(deps: {
   }
   async function adminHeaders(): Promise<Record<string, string>> {
     const secret = await deps.readJson(deps.secretFile).catch(() => ({} as Json));
+    if (normalizeRelayBaseUrl(secret.baseUrl) !== base) throw new QuotaError('中转管理员凭据未绑定当前地址');
     if (typeof secret.apiKey === 'string' && secret.apiKey) return { 'x-api-key': secret.apiKey };
     if (!jwt || now() >= expires) {
       login ||= (async () => {
         const password = await deps.password();
-        const result = await request(base + '/api/v1/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: 'admin@sub2api.local', password }) }, true);
+        if (typeof secret.email !== 'string' || !password) throw new QuotaError('未配置中转管理员凭据');
+        const result = await request(base + '/api/v1/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: secret.email, password }) }, true);
         if (typeof result.data?.access_token !== 'string') throw new QuotaError('中转管理员登录失败');
         jwt = result.data.access_token; expires = now() + Math.max(30, (num(result.data.expires_in) || 300) - 30) * 1000;
         return jwt!;
@@ -125,7 +127,7 @@ export function createQuotaService(deps: {
       const extra = account.extra || {}, credit = extra.codex_credits_snapshot;
       const balance = typeof credit?.credits?.balance === 'string' ? credit.credits.balance : typeof credit?.credits?.balance === 'number' ? String(credit.credits.balance) : null;
       const observedAt = new Date(now()).toISOString(), creditUpdatedAt = date(credit?.fetched_at);
-      const history = balance === null ? { consumed: null, balanceChange: null, alerts: [] } : recordCreditSnapshot(deps.db(), account.id, String(account.name), balance, observedAt, creditUpdatedAt);
+      const history = balance === null ? { consumed: null, balanceChange: null, alerts: [] } : recordCreditSnapshot(deps.db(), account.id, String(account.name), balance, observedAt, creditUpdatedAt, base);
       const windows = [window('5h', { ...usage?.five_hour, utilization: extra.codex_5h_used_percent, resets_at: extra.codex_5h_reset_at }), window('7 天', { ...usage?.seven_day, utilization: extra.codex_7d_used_percent, resets_at: extra.codex_7d_reset_at })];
       const accountWarnings = [...history.alerts.map(a => `账号 ${a.accountName} 点数被消耗 ${a.consumed}`)];
       if (extra.auto_reset_credit_enabled === true) accountWarnings.push(`账号 ${account.name} 上游已启用点数重置`);
@@ -169,11 +171,12 @@ export function createQuotaService(deps: {
   }
   return {
     overview: async (identity: { userId: number; role: string }) => {
-      const [subscription, key] = await Promise.all([claude(), ownKey(identity)]);
+      const unconfigured = { data: null, updatedAt: null, stale: false, error: null };
+      const [subscription, key] = await Promise.all([claude(), base ? ownKey(identity) : Promise.resolve({ ...unconfigured, data: { mode: 'unconfigured', message: '未配置中转' } })]);
       // Members never trigger or receive the administrator account pool, names, balances or warnings.
-      return { claude: subscription, key, ...(identity.role === 'admin' ? { pool: await pool() } : {}) };
+      return { claude: subscription, key, relayConfigured: Boolean(base), ...(identity.role === 'admin' ? { pool: base ? await pool() : unconfigured } : {}) };
     },
-    refreshPool: pool,
+    refreshPool: () => base ? pool() : Promise.resolve({ data: null, updatedAt: null, stale: false, error: null }),
   };
 }
 
@@ -181,10 +184,13 @@ let service: ReturnType<typeof createQuotaService> | undefined;
 /** Quota routes obtain the process singleton; tests construct independent instances with mocks. */
 export function getQuotaService() {
   service ||= createQuotaService({ readJson: async file => JSON.parse(await fs.readFile(file, 'utf8')), request: quotaFetch, paths: resolveUserConfigPaths,
-    secretFile: path.join(os.homedir(), '.cloudcli', 'secrets', 'sub2api-admin.json'), db: getConnection,
-    password: async () => (await promisify(execFile)(process.platform === 'win32' ? 'C:/Program Files/Amazon/AWSCLIV2/aws.exe' : 'aws', ['ssm', 'get-parameter', '--name', '/sub2api/admin-password', '--with-decryption', '--query', 'Parameter.Value', '--output', 'text', '--profile', 'sub2api-ops', '--region', 'ap-southeast-1'], { windowsHide: true, timeout: 30000 })).stdout.trim() });
+    relayBaseUrl: readRelayConfiguration().baseUrl,
+    secretFile: path.join(getCloudCliHomeDir(), 'secrets', 'sub2api-admin.json'), db: getConnection,
+    password: async () => process.env.NEXAGENT_RELAY_ADMIN_PASSWORD || (JSON.parse(await fs.readFile(path.join(getCloudCliHomeDir(), 'secrets', 'sub2api-admin.json'), 'utf8')).password ?? '') });
   return service;
 }
+/** Admin configuration changes discard all cached upstream data and credentials before the next request. */
+export function resetQuotaService() { service = undefined; }
 let interval: ReturnType<typeof setInterval> | undefined;
 /** Server lifecycle initializes history and polls read-only upstream metadata every ten minutes. */
 export function initializeQuota() {

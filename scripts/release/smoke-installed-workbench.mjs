@@ -4,6 +4,7 @@ import path from 'node:path';
 import os from 'node:os';
 import http from 'node:http';
 import { spawn, execFileSync } from 'node:child_process';
+import { pathToFileURL } from 'node:url';
 
 // This exercises a generated installer on a disposable Windows CI machine.
 // It must never fabricate an "upstream" installation on a user's workstation.
@@ -17,6 +18,8 @@ const sentinelDatabase=path.join(profileDirectory,'existing-service.db');
 const sentinelContents='existing service must remain untouched';
 await fs.writeFile(sentinelDatabase,sentinelContents);
 let sentinelRequests=0, appProcess, ownedServerPid;
+const evidenceDirectory=path.join(path.dirname(reportPath),'acceptance');
+await fs.mkdir(evidenceDirectory,{recursive:true});
 const sentinel=http.createServer((_request,response)=>{
   sentinelRequests++;
   response.setHeader('content-type','application/json');
@@ -28,6 +31,9 @@ try {
   appProcess=spawn(executable,['--disable-gpu'],{windowsHide:true,stdio:'ignore',env:{
     ...process.env,
     WORKBENCH_USER_DATA_DIR:profileDirectory,
+    HOME:path.join(profileDirectory,'home'),USERPROFILE:path.join(profileDirectory,'home'),
+    APPDATA:path.join(profileDirectory,'appdata'),LOCALAPPDATA:path.join(profileDirectory,'localappdata'),
+    CLAUDEX_PASSIVE_INSTANCE:'1',
     CLOUDCLI_LOCAL_SERVER_URL:'http://127.0.0.1:3001',
     CLOUDCLI_DESKTOP_LOCAL_SERVER_URL:'http://127.0.0.1:3001',
     ELECTRON_LOCAL_SERVER_URL:'http://127.0.0.1:3001',
@@ -75,6 +81,29 @@ try {
   assert.ok(account.token);
   const authorized=await fetch(base+'/api/monitors',{headers:{Authorization:`Bearer ${account.token}`}});
   assert.equal(authorized.status,200,'business API must accept the isolated local account');
+  const headers={Authorization:`Bearer ${account.token}`};
+  const onboarding=await fetch(base+'/api/user/onboarding-status',{headers}).then(response=>response.json());
+  assert.equal(onboarding.hasCompletedOnboarding,false,'fresh desktop must offer the first-run wizard');
+  const discovered=await fetch(base+'/api/providers/discovery',{headers}).then(response=>response.json());
+  assert.ok(discovered.agents?.some(agent=>agent.id==='claude'&&agent.installed),'bundled Claude must be discovered');
+  const playwright=await import(pathToFileURL(process.env.NEXAGENT_PLAYWRIGHT_MODULE).href);
+  const browser=await playwright.chromium.launch({channel:'chrome',headless:true});
+  try {
+    const page=await browser.newPage({viewport:{width:1440,height:1000}});
+    await page.addInitScript(token=>{localStorage.setItem('auth-token',token);localStorage.setItem('userLanguage','zh-CN');},account.token);
+    await page.goto(base);await page.getByRole('navigation',{name:'首次设置'}).waitFor();
+    await page.getByRole('heading',{name:'本地 Agent',exact:true}).waitFor();
+    await page.screenshot({path:path.join(evidenceDirectory,'first-run-agents.png')});
+    await page.getByRole('button',{name:'继续',exact:true}).click();
+    await page.getByRole('heading',{name:'远程管理员',exact:true}).waitFor();
+    await page.screenshot({path:path.join(evidenceDirectory,'first-run-admin.png')});
+    await page.getByRole('button',{name:'稍后设置',exact:true}).click();
+    await page.getByText('Microsoft Dev Tunnels',{exact:false}).first().waitFor();
+    await page.screenshot({path:path.join(evidenceDirectory,'first-run-remote.png')});
+    await page.getByRole('button',{name:'进入工作区',exact:true}).click();
+    await page.getByRole('navigation',{name:'首次设置'}).waitFor({state:'hidden'});
+    await page.screenshot({path:path.join(evidenceDirectory,'first-run-workspace.png')});
+  } finally {await browser.close();}
   const forbidden=await fetch(base+'/api/message-queue?sessionId=none');
   assert.equal(forbidden.status,401);
   const record={
@@ -82,6 +111,7 @@ try {
     identityMatched:true,existingDatabaseUnchanged:true,unrelatedServerRequests:sentinelRequests,
     authenticatedApi:authorized.status,unauthenticatedQueue:forbidden.status,frontendAsset:asset,claudeVersion,
     localPasswordless:true,
+    firstRunWizard:true,agentDiscovery:true,remoteAdminPrompt:true,remoteAccessPrompt:true,
   };
   await fs.mkdir(path.dirname(reportPath),{recursive:true});
   await fs.writeFile(reportPath,JSON.stringify(record,null,2));

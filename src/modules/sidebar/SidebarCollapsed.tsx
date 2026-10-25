@@ -30,7 +30,7 @@ export default function SidebarCollapsed({
         aria-label={t('common:versionUpdate.ariaLabels.showSidebar')}
         title={t('common:versionUpdate.ariaLabels.showSidebar')}
       >
-        <img src="/nexcode-mark.svg" alt="Nexagent" className="h-6 w-6 rounded-md" />
+        <img src="/nexagent-mark.svg" alt="Nexagent" className="h-6 w-6 rounded-md" />
       </button>
 
       <div className="nav-divider my-1 w-6" />

@@ -30,13 +30,13 @@ export function createSystemUpdateService(dependencies: SystemUpdateDependencies
     /** Selects and executes the correct update workflow for this installation. */
     async updateSystem() {
       if (dependencies.environment.CLOUDCLI_DISTRIBUTION==='workbench') {
-        return {success:false as const,error:'This is Nexagent. Use its independent installer from https://github.com/WGeorgezzzz/claudecodeui/releases; upstream npm updates are disabled.'};
+        return {success:false as const,error:'Use the Nexagent installer from https://github.com/WGeorgezzzz/claudex/releases to update this desktop installation.'};
       }
       const updateCommand = dependencies.isPlatform
         ? 'npm run update:platform'
         : dependencies.installMode === 'git'
           ? 'git checkout main && git pull && npm install'
-          : 'npm install -g @cloudcli-ai/cloudcli@latest';
+          : 'npm install -g nexagent@latest';
       const workingDirectory = dependencies.isPlatform || dependencies.installMode === 'git'
         ? dependencies.appRoot
         : dependencies.homeDirectory;

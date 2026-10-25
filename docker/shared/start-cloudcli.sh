@@ -4,7 +4,7 @@
 # This script is sourced from ~/.bashrc on sandbox shell open.
 
 if ! pgrep -f "server/index.js" > /dev/null 2>&1; then
-  nohup nexcode start --port 3001 > /tmp/cloudcli-ui.log 2>&1 &
+  nohup nexagent start --port 3001 > /tmp/cloudcli-ui.log 2>&1 &
   disown
 
   echo ""

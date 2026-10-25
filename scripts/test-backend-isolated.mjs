@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const fixture = mkdtempSync(path.join(os.tmpdir(), 'claudex-backend-suite-'));
 const environment = Object.fromEntries(Object.entries(process.env).filter(([name]) =>
-  !/^(CLAUDE|CLAUDEX|CODEX|CLOUDCLI|ANTHROPIC|OPENAI|WORKBUDDY|VITE_|DATABASE_PATH|JWT_SECRET|API_KEY)/i.test(name)));
+  !/^(CLAUDE|CLAUDEX|CODEX|CLOUDCLI|NEXAGENT|NEXCODE|ANTHROPIC|OPENAI|WORKBUDDY|VITE_|DATABASE_PATH|JWT_SECRET|API_KEY)/i.test(name)));
 environment.USERPROFILE = fixture;
 environment.HOME = fixture;
 environment.CLOUDCLI_HOME = path.join(fixture, '.cloudcli');

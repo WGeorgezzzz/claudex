@@ -208,7 +208,11 @@ export const api = {
     start: (provider: string, publicAccess: boolean) => post('/api/remote-access/start', { provider, public: publicAccess }),
     stop: () => post('/api/remote-access/stop'),
   },
-  quota: { overview: () => get('/api/quota') },
+  quota: {
+    overview: () => get('/api/quota'),
+    relay: () => get('/api/quota/relay'),
+    saveRelay: (baseUrl: string) => put('/api/quota/relay', { baseUrl }),
+  },
   usage: {
     overview: (params: {range?: string; groupBy?: string; userId?: number}) => get('/api/usage/overview' + query(params)),
     rescan: () => post('/api/usage/rescan'),
@@ -227,6 +231,7 @@ export const api = {
     devices: () => get('/api/auth/devices'),
     revokeDevice: (id:string) => del('/api/auth/devices/'+encodeURIComponent(id)),
     remoteAccount: () => get('/api/auth/remote-account'),
+    configureRemoteAccount: (username: string, password: string) => post('/api/auth/remote-account', { username, password }),
     status: () => fetch('/api/auth/status'),
     login: (username: string, password: string, otp?:string) => fetch('/api/auth/login', {
       method: 'POST',

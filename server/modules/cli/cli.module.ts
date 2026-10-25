@@ -76,12 +76,12 @@ export function createCliApplication(): CliApplication {
       // before this best-effort npm registry check runs.
       await new Promise<void>((resolve) => setImmediate(resolve));
       return execSync(
-        'npm show @cloudcli-ai/nexcode version',
+        'npm show nexagent version',
         { encoding: 'utf8', windowsHide: true },
       ).trim();
     },
     updateGlobalPackage: () => {
-      execSync('npm update -g @cloudcli-ai/cloudcli', { stdio: 'inherit', windowsHide: true });
+      execSync('npm update -g nexagent', { stdio: 'inherit', windowsHide: true });
     },
     startServer: async () => {
       // The server executable is an entrypoint rather than a feature module,

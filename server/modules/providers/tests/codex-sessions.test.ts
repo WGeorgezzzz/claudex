@@ -10,9 +10,13 @@ import { CodexSessionsProvider, parseCodexExecScript, readCodexMemoryCitations }
 
 const patchHomeDir = (nextHomeDir: string) => {
   const original = os.homedir;
+  const previousCodexHome = process.env.CODEX_HOME;
+  process.env.CODEX_HOME = path.join(nextHomeDir, '.codex');
   (os as any).homedir = () => nextHomeDir;
   return () => {
     (os as any).homedir = original;
+    if (previousCodexHome === undefined) delete process.env.CODEX_HOME;
+    else process.env.CODEX_HOME = previousCodexHome;
   };
 };
 

@@ -29,7 +29,7 @@ export function initializeLocalIdentity() {
     const bcrypt=createRequire(import.meta.url)('bcrypt') as {hashSync(p:string,n:number):string};
     const user=userDb.createUser(userInfo().username||'local-owner',bcrypt.hashSync(randomBytes(32).toString('hex'),12));
     // Local identity must not force a global Git identity change before opening the workspace.
-    userDb.completeOnboarding(Number(user.id));
+    if (process.env.CLOUDCLI_DISTRIBUTION !== 'workbench') userDb.completeOnboarding(Number(user.id));
   }
 }
 

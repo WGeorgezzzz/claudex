@@ -89,7 +89,7 @@ export function createCliApplication() {
       await initializeDatabase();
       userDb.createUser('bootstrap-user', 'password-hash');
 
-      const request: any = { headers: {}, query: {} };
+      const request: any = { headers: { host: '127.0.0.1' }, socket: { remoteAddress: '127.0.0.1' }, query: {} };
       const response: any = {
         statusCode: 200,
         body: null,

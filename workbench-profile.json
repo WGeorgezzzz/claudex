@@ -1,6 +1,6 @@
 {
   "productName": "Nexagent",
-  "version": "0.8.0",
+  "version": "1.0.0",
   "appId": "io.github.wgeorgezzzz.cloudcli-workbench",
   "protocol": "cloudcli-workbench",
   "storageFolder": "CloudCLI Workbench",

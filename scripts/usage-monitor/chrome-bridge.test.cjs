@@ -5,7 +5,7 @@ const token = 'test-only-quota-token-0123456789abcdef';
 const payload = () => ({ sourceUrl: 'https://wenclaude.com/app', checkedAt: new Date().toISOString(), windows: [{ label: '5小时限制', usedPercent: 17, resetLabel: '今天 06:40' }] });
 
 test('loopback bridge rejects unauthenticated writes and stores only validated quota fields', async () => {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nexcode-quota-test-'));
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nexagent-quota-test-'));
   const server = createBridgeServer({ directory, token });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const url = `http://127.0.0.1:${server.address().port}/quota/wenclaude`;
@@ -21,7 +21,7 @@ test('loopback bridge rejects unauthenticated writes and stores only validated q
     assert.equal(readChromeQuota(directory).windows[0].remainingPercent, 83, 'bad updates preserve the last valid sample');
   } finally {
     await new Promise(resolve => server.close(resolve));
-    assert(path.resolve(directory).startsWith(path.resolve(os.tmpdir()) + path.sep + 'nexcode-quota-test-'));
+    assert(path.resolve(directory).startsWith(path.resolve(os.tmpdir()) + path.sep + 'nexagent-quota-test-'));
     fs.rmSync(directory, { recursive: true });
   }
 });

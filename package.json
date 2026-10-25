@@ -1,8 +1,8 @@
 {
-  "name": "@wgeorgezzzz/claudex",
-  "version": "0.8.0",
+  "name": "nexagent",
+  "version": "1.0.0",
   "productName": "Nexagent",
-  "description": "Nexagent: the code nexus for your agents. Your agents, one workspace.",
+  "description": "One backend for your coding agents, on desktop, mobile, and remote devices.",
   "type": "module",
   "main": "dist-server/server/index.js",
   "bin": {
@@ -20,7 +20,10 @@
     "dist/",
     "dist-server/",
     "scripts/",
-    "README.md"
+    "README.md",
+    "README.zh-CN.md",
+    "LICENSE",
+    "NOTICE"
   ],
   "homepage": "https://github.com/WGeorgezzzz/claudex",
   "repository": {
@@ -59,11 +62,10 @@
     "lint:client": "oxlint src/",
     "lint:fix": "oxlint src/ server/ --fix",
     "start": "npm run build && npm run server",
-    "release": "./release.sh",
+    "release": "node scripts/release/request-draft.mjs",
     "prepublishOnly": "npm run build",
     "postinstall": "node scripts/fix-node-pty.js && node scripts/fix-codex-windows-console.mjs",
     "prepare": "husky",
-    "update:platform": "./update-platform.sh",
     "desktop:workbench:stage": "node scripts/release/prepare-workbench.mjs",
     "desktop:workbench:win": "npm run build && npm run desktop:workbench:stage && electron-builder --projectDir .desktop-build/workbench --win nsis --x64 --publish never"
   },
@@ -128,6 +130,11 @@
     }
   },
   "keywords": [
+    "nexagent",
+    "multi-agent",
+    "self-hosted",
+    "remote-access",
+    "opencode",
     "claude code",
     "claude-code",
     "claude-code-ui",

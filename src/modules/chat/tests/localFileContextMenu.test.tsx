@@ -63,16 +63,16 @@ test('web links keep the browser context menu', () => {
   assert.equal(screen.queryByRole('menu'), null);
 });
 
-const sampleRoot = 'D:/embodied/piper-real-aligned-20261022/sample_videos/';
+const sampleRoot = 'D:/workspace/demo-video/sample_videos/';
 
 test('a short report beside an absolute report uses that report directory, not the broad project root', async () => {
-  const expected='D:/embodied/piper-real-aligned-act-left-20261022/simeval/REPORT_zh.md';
+  const expected='D:/workspace/demo-analysis/simeval/REPORT_zh.md';
   readFileBlob.mockImplementation(async (_project,path)=>({ok:path===expected,status:path===expected?200:404}));
   desktop.cloudcliDesktop={openLocalPath:vi.fn().mockResolvedValue({})};
-  const message='## 报告位置\n\n- 真机：`D:\\embodied\\piper-real-aligned-act-left-20261022\\real\\REPORT_zh.md`（E组）\n'
-    +'- 补采和训练：`D:\\embodied\\piper-act-left-centerbell-20261023\\REPORT_zh.md`\n'
-    +'- 训练和仿真评测：`D:\\embodied\\piper-real-aligned-act-left-20261022\\REPORT_zh.md`、`simeval\\REPORT_zh.md`';
-  render(<MarkdownWorkspaceContext.Provider value={{projectId:'one',projectPath:'D:/embodied'}}><Markdown>{message}</Markdown></MarkdownWorkspaceContext.Provider>);
+  const message='## 报告位置\n\n- 真机：`D:\\workspace\\demo-analysis\\real\\REPORT_zh.md`（E组）\n'
+    +'- 补采和训练：`D:\\workspace\\piper-act-left-centerbell-20261023\\REPORT_zh.md`\n'
+    +'- 训练和仿真评测：`D:\\workspace\\demo-analysis\\REPORT_zh.md`、`simeval\\REPORT_zh.md`';
+  render(<MarkdownWorkspaceContext.Provider value={{projectId:'one',projectPath:'D:/workspace'}}><Markdown>{message}</Markdown></MarkdownWorkspaceContext.Provider>);
   const link=screen.getByRole('link',{name:'simeval\\REPORT_zh.md'});
   fireEvent.contextMenu(link);fireEvent.click(screen.getByRole('menuitem',{name:/Open locally|本地打开/}));
   await waitFor(()=>assert.deepEqual(desktop.cloudcliDesktop?.openLocalPath.mock.calls,[[expected]]));
@@ -82,7 +82,7 @@ test('a short report beside an absolute report uses that report directory, not t
 
 test('multiple nearby absolute reports never pick an arbitrary existing relative file', async () => {
   desktop.cloudcliDesktop={openLocalPath:vi.fn().mockResolvedValue({})};readFileBlob.mockResolvedValue({ok:true,status:200});
-  render(<MarkdownWorkspaceContext.Provider value={{projectId:'one',projectPath:'D:/embodied'}}><Markdown>{'`D:/one/REPORT.md`、`D:/two/REPORT.md`、`simeval/REPORT.md`'}</Markdown></MarkdownWorkspaceContext.Provider>);
+  render(<MarkdownWorkspaceContext.Provider value={{projectId:'one',projectPath:'D:/workspace'}}><Markdown>{'`D:/one/REPORT.md`、`D:/two/REPORT.md`、`simeval/REPORT.md`'}</Markdown></MarkdownWorkspaceContext.Provider>);
   fireEvent.contextMenu(screen.getByRole('link',{name:'simeval/REPORT.md'}));fireEvent.click(screen.getByRole('menuitem',{name:/Open locally|本地打开/}));
   await waitFor(()=>assert.match(screen.getByRole('alert').textContent||'',/多个同名文件/));
   assert.equal(desktop.cloudcliDesktop?.openLocalPath.mock.calls.length,0);
@@ -93,7 +93,7 @@ const sampleMessage = '**样例视频**：`' + sampleRoot.replace(/\//g, '\\') +
 
 test('the screenshot table resolves its video under the row directory, preserving its short label', async () => {
   desktop.cloudcliDesktop = { openLocalPath: vi.fn().mockResolvedValue({}) };
-  render(<MarkdownWorkspaceContext.Provider value={{projectId: 'one', projectPath: 'D:/embodied'}}><Markdown>{sampleMessage}</Markdown></MarkdownWorkspaceContext.Provider>);
+  render(<MarkdownWorkspaceContext.Provider value={{projectId: 'one', projectPath: 'D:/workspace'}}><Markdown>{sampleMessage}</Markdown></MarkdownWorkspaceContext.Provider>);
   const link = screen.getByRole('link', {name: 'high.mp4'});
   fireEvent.contextMenu(link);
   fireEvent.click(screen.getByRole('menuitem', {name: /Open locally|本地打开/}));
@@ -108,7 +108,7 @@ test('a filename below the table resolves only the existing absolute candidate',
   const expected = sampleRoot + 'clean_bell-846000000-0001/_head_6frames.jpg';
   readFileBlob.mockImplementation(async (_project, path) => ({ok: path === expected, status: path === expected ? 200 : 404}));
   desktop.cloudcliDesktop = { openLocalPath: vi.fn().mockResolvedValue({}) };
-  render(<MarkdownWorkspaceContext.Provider value={{projectId: 'one', projectPath: 'D:/embodied'}}><Markdown>{sampleMessage}</Markdown></MarkdownWorkspaceContext.Provider>);
+  render(<MarkdownWorkspaceContext.Provider value={{projectId: 'one', projectPath: 'D:/workspace'}}><Markdown>{sampleMessage}</Markdown></MarkdownWorkspaceContext.Provider>);
   fireEvent.contextMenu(screen.getByRole('link', {name: '_head_6frames.jpg'}));
   fireEvent.click(screen.getByRole('menuitem', {name: /Open locally|本地打开/}));
   await waitFor(() => assert.deepEqual(desktop.cloudcliDesktop?.openLocalPath.mock.calls, [[expected]]));
@@ -119,7 +119,7 @@ test('a filename below the table resolves only the existing absolute candidate',
 test('ambiguous filenames never open an arbitrary matching file', async () => {
   readFileBlob.mockResolvedValue({ok: true, status: 200});
   desktop.cloudcliDesktop = { openLocalPath: vi.fn().mockResolvedValue({}) };
-  render(<MarkdownWorkspaceContext.Provider value={{projectId: 'one', projectPath: 'D:/embodied'}}><Markdown>{sampleMessage}</Markdown></MarkdownWorkspaceContext.Provider>);
+  render(<MarkdownWorkspaceContext.Provider value={{projectId: 'one', projectPath: 'D:/workspace'}}><Markdown>{sampleMessage}</Markdown></MarkdownWorkspaceContext.Provider>);
   fireEvent.contextMenu(screen.getByRole('link', {name: '_head_6frames.jpg'}));
   fireEvent.click(screen.getByRole('menuitem', {name: /Open locally|本地打开/}));
   await waitFor(() => assert.match(screen.getByRole('alert').textContent || '', /多个同名文件/));

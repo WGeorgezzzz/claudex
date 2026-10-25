@@ -109,8 +109,8 @@ function showSandboxHelp(output: CliOutput): void {
 ${terminalTextStyles.bright('Nexagent Sandbox')} — Run Nexagent inside Docker Sandboxes
 
 Usage:
-  nexcode sandbox <workspace>            Create and start a sandbox
-  nexcode sandbox <subcommand> [name]    Manage sandboxes
+  nexagent sandbox <workspace>            Create and start a sandbox
+  nexagent sandbox <subcommand> [name]    Manage sandboxes
 
 Subcommands:
   ${terminalTextStyles.bright('(default)')}    Create a sandbox and start the web UI
@@ -129,13 +129,13 @@ Options:
       --port <port>         Host port for the web UI (default: 3001)
 
 Examples:
-  $ nexcode sandbox ~/my-project
-  $ nexcode sandbox ~/my-project --agent codex --port 8080
-  $ nexcode sandbox ~/my-project --env SERVER_PORT=8080 --env HOST=0.0.0.0
-  $ nexcode sandbox ls
-  $ nexcode sandbox stop my-project
-  $ nexcode sandbox start my-project
-  $ nexcode sandbox rm my-project
+  $ nexagent sandbox ~/my-project
+  $ nexagent sandbox ~/my-project --agent codex --port 8080
+  $ nexagent sandbox ~/my-project --env SERVER_PORT=8080 --env HOST=0.0.0.0
+  $ nexagent sandbox ls
+  $ nexagent sandbox stop my-project
+  $ nexagent sandbox start my-project
+  $ nexagent sandbox rm my-project
 
 Prerequisites:
   1. Install sbx CLI: https://docs.docker.com/ai/sandboxes/get-started/
@@ -160,7 +160,7 @@ function requireSandboxName(options: SandboxOptions, output: CliOutput): string 
     return options.name;
   }
 
-  output.error(`\n${terminalTextStyles.error('❌')} Sandbox name required: nexcode sandbox ${options.subcommand} <name>\n`);
+  output.error(`\n${terminalTextStyles.error('❌')} Sandbox name required: nexagent sandbox ${options.subcommand} <name>\n`);
   return null;
 }
 
@@ -285,7 +285,7 @@ export function createSandboxCommandService(
             sandboxName,
             'bash',
             '-c',
-            'nohup nexcode start --port 3001 > /tmp/cloudcli-ui.log 2>&1 & disown',
+            'nohup nexagent start --port 3001 > /tmp/cloudcli-ui.log 2>&1 & disown',
           ]);
           if (!publishSandboxPort(options, dependencies)) {
             return 1;
@@ -298,9 +298,9 @@ export function createSandboxCommandService(
         case 'create': {
           if (!options.workspace) {
             dependencies.output.error(
-              `\n${terminalTextStyles.error('❌')} Workspace path required: nexcode sandbox <path>\n`,
+              `\n${terminalTextStyles.error('❌')} Workspace path required: nexagent sandbox <path>\n`,
             );
-            dependencies.output.log(`   Example: ${terminalTextStyles.bright('nexcode sandbox ~/my-project')}\n`);
+            dependencies.output.log(`   Example: ${terminalTextStyles.bright('nexagent sandbox ~/my-project')}\n`);
             return 1;
           }
 
@@ -387,7 +387,7 @@ export function createSandboxCommandService(
             sandboxName,
             'bash',
             '-c',
-            'nohup nexcode start --port 3001 > /tmp/cloudcli-ui.log 2>&1 & disown',
+            'nohup nexagent start --port 3001 > /tmp/cloudcli-ui.log 2>&1 & disown',
           ]);
           if (!publishSandboxPort(options, dependencies)) {
             return 1;
@@ -400,7 +400,7 @@ export function createSandboxCommandService(
           dependencies.output.log(`  ${terminalTextStyles.dim('$')} sbx stop ${sandboxName}`);
           dependencies.output.log(`  ${terminalTextStyles.dim('$')} sbx start ${sandboxName}`);
           dependencies.output.log(`  ${terminalTextStyles.dim('$')} sbx rm ${sandboxName}`);
-          dependencies.output.log(`\n${terminalTextStyles.dim('  Or install globally:')} npm install -g @cloudcli-ai/cloudcli\n`);
+          dependencies.output.log(`\n${terminalTextStyles.dim('  Or install globally:')} npm install -g nexagent\n`);
           return 0;
         }
 
