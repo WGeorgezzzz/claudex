@@ -4,6 +4,9 @@
   "productName": "Nexagent",
   "description": "One backend for your coding agents, on desktop, mobile, and remote devices.",
   "type": "module",
+  "engines": {
+    "node": "^22.21.0 || >=24.5.0"
+  },
   "main": "dist-server/server/index.js",
   "bin": {
     "cloudcli": "dist-server/server/modules/cli/cli.js",
