@@ -52,7 +52,7 @@ See [desktop profiles](docs/DESKTOP.md) for paths and upgrade behavior.
 ### npm
 
 Node.js **22.21+** or **24.5+** and Git are recommended. Native modules may require
-platform build tools. The `nexagent` npm name is reserved in this source metadata;
+platform build tools. The source package is named `nexagent`;
 **1.0.0 has not been published to npm yet**. After npm publication:
 
 ```bash

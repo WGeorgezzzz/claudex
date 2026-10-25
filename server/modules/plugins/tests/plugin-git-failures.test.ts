@@ -434,14 +434,14 @@ const UNRECOGNISED_SSH_FAILURES: Array<[string, string, string]> = [
       + '** This session may be vulnerable to "store now, decrypt later" attacks.\n'
       + '** The server may need to be upgraded. See https://openssh.com/pq.html\n'
       + 'This account is currently not available.\n'],
-  ['a login banner before the disconnect', 'Received disconnect from 10.0.0.5 port 22:2: Too many authentication failures',
+  ['a login banner before the disconnect', 'Received disconnect from 192.0.2.5 port 22:2: Too many authentication failures',
     '*******************************************************\n*  Authorised access only. All activity is monitored.  *\n'
       + '*******************************************************\n'
-      + 'Received disconnect from 10.0.0.5 port 22:2: Too many authentication failures\nDisconnected from 10.0.0.5 port 22\n'],
+      + 'Received disconnect from 192.0.2.5 port 22:2: Too many authentication failures\nDisconnected from 192.0.2.5 port 22\n'],
   ['ssh -v output', 'kex_exchange_identification: Connection closed by remote host',
     'OpenSSH_9.6p1 Ubuntu-3ubuntu13.18, OpenSSL 3.0.13 30 Jan 2024\ndebug1: Reading configuration data /etc/ssh/ssh_config\n'
       + 'debug1: Connecting to git.example.test port 22.\nkex_exchange_identification: Connection closed by remote host\n'
-      + 'Connection closed by 10.0.0.5 port 22\n'],
+      + 'Connection closed by 192.0.2.5 port 22\n'],
   ['the remote git\'s own fatal line', 'detected dubious ownership in repository at \'/srv/git/plugin.git\'',
     "fatal: detected dubious ownership in repository at '/srv/git/plugin.git'\nTo add an exception for this directory, call:\n\n"
       + '\tgit config --global --add safe.directory /srv/git/plugin.git\n'],

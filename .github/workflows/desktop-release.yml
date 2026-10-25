@@ -27,7 +27,7 @@ jobs:
             target: --mac dmg --arm64
           - os: ubuntu-latest
             platform: linux
-            target: --linux tar.gz --x64
+            target: --linux dir --x64
     runs-on: ${{ matrix.os }}
     timeout-minutes: 50
     env:
@@ -52,6 +52,11 @@ jobs:
       - run: node scripts/release/prepare-workbench.mjs
       - name: Build self-contained installer
         run: node node_modules/electron-builder/cli.js --projectDir .desktop-build/workbench ${{ matrix.target }} --publish never
+      - name: Archive Linux desktop
+        if: runner.os == 'Linux'
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          tar -I 'gzip -1' -cf "release/workbench/Nexagent-$VERSION-linux-x64.tar.gz" -C release/workbench linux-unpacked
       - name: Install and verify Windows first run
         if: runner.os == 'Windows'
         shell: pwsh
