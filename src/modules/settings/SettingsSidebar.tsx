@@ -1,4 +1,4 @@
-import { Bell, Bot, GitBranch, Info, Key, ListChecks, Mic, MonitorPlay, Palette, Puzzle, UserRound, Users } from 'lucide-react';
+import { Bell, Bot, GitBranch, Globe, Info, Key, ListChecks, Mic, MonitorPlay, Palette, Puzzle, UserRound, Users } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { useAuth } from '@/modules/auth';
@@ -23,6 +23,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'usage', labelKey: 'mainTabs.usage', icon: MonitorPlay },
   { id: 'users', labelKey: 'mainTabs.users', icon: Users, adminOnly: true },
   { id: 'agents', labelKey: 'mainTabs.agents', icon: Bot },
+  { id: 'remote', labelKey: '远程访问', icon: Globe, adminOnly: true },
   { id: 'appearance', labelKey: 'mainTabs.appearance', icon: Palette },
   { id: 'git', labelKey: 'mainTabs.git', icon: GitBranch },
   { id: 'api', labelKey: 'mainTabs.apiTokens', icon: Key },

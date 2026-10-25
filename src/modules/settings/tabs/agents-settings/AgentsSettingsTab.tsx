@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
+import { AgentDiscoveryPanel } from '@/modules/agent-discovery';
+import { useAuth } from '@/modules/auth';
 
 import type { AgentCategory, AgentContextByProvider, AgentProvider, AgentSettingsProject, ClaudePermissionsState, CodexPermissionMode, CursorPermissionsState, ProviderAuthStatus } from '@/shared/types';
 import AgentCategoryContentSection from '@/modules/settings/tabs/agents-settings/sections/AgentCategoryContentSection';
@@ -31,6 +33,8 @@ export default function AgentsSettingsTab({
   onCodexPermissionModeChange,
   projects,
 }: AgentsSettingsTabProps) {
+  const { user } = useAuth();
+  const isMember = (user as {role?: string} | null)?.role === 'member';
   const [selectedAgent, setSelectedAgent] = useState<AgentProvider>('claude');
   const [selectedCategory, setSelectedCategory] = useState<AgentCategory>('account');
   const visibleCategories = useMemo<AgentCategory[]>(() => (
@@ -40,8 +44,8 @@ export default function AgentsSettingsTab({
   ), [selectedAgent]);
 
   const visibleAgents = useMemo<AgentProvider[]>(() => {
-    return ['claude', 'cursor', 'codex', 'opencode', 'workbuddy'];
-  }, []);
+    return isMember ? ['claude', 'codex'] : ['claude', 'cursor', 'codex', 'opencode', 'workbuddy'];
+  }, [isMember]);
 
   const agentContextById = useMemo<AgentContextByProvider>(() => ({
     claude: {
@@ -77,7 +81,8 @@ export default function AgentsSettingsTab({
   }, [selectedCategory, visibleCategories]);
 
   return (
-    <div className="-mx-4 -mb-4 -mt-2 flex min-h-[300px] min-w-0 flex-col overflow-hidden md:-mx-6 md:-mb-6 md:-mt-2 md:min-h-[500px]">
+    <div className="flex min-h-[300px] min-w-0 flex-col overflow-hidden md:min-h-[500px]">
+      <AgentDiscoveryPanel onLogin={onProviderLogin} />
       <AgentSelectorSection
         agents={visibleAgents}
         selectedAgent={selectedAgent}

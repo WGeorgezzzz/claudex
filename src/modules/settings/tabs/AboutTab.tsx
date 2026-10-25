@@ -25,7 +25,7 @@ export default function AboutTab() {
       {/* Logo + name + version */}
       <div className="flex items-center gap-3">
         <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-primary/90 shadow-sm">
-          <img src="/nexcode-mark.svg" alt="AgentHub" className="h-10 w-10 rounded-xl" />
+          <img src="/nexcode-mark.svg" alt="Nexagent" className="h-10 w-10 rounded-xl" />
         </div>
         <div>
           <div className="flex items-center gap-2">
@@ -33,7 +33,7 @@ export default function AboutTab() {
               className="text-base font-semibold text-foreground"
               style={{ fontFamily: CLOUDCLI_WORDMARK_FONT_FAMILY }}
             >
-              AgentHub
+              Nexagent
             </span>
             <a
               href={releasesUrl}

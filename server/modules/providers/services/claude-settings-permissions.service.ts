@@ -110,11 +110,11 @@ async function readPermissionSource(
 
 /**
  * Read-only view of the permission rules the Claude CLI applies from its own
- * settings files, on top of the allowed/blocked lists AgentHub passes it.
+ * settings files, on top of the allowed/blocked lists Nexagent passes it.
  *
  * Used by provider.routes.ts for the Claude permissions panel in Settings.
  * Project-level files are left out on purpose: the panel has no project, and
- * those files only apply to chats started inside their project. AgentHub never
+ * those files only apply to chats started inside their project. Nexagent never
  * writes to any of these files.
  */
 export const claudeSettingsPermissionsService = {

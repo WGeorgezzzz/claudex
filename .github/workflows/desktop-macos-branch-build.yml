@@ -37,7 +37,7 @@ jobs:
         id: artifact
         run: |
           SAFE_REF="$(printf '%s' "${GITHUB_REF_NAME}" | tr -c 'A-Za-z0-9._-' '-')"
-          echo "name=AgentHub-macOS-${SAFE_REF}-${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+          echo "name=Nexagent-macOS-${SAFE_REF}-${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
           echo "server_bundle_tag=cloudcli-local-server-${SAFE_REF}" >> "$GITHUB_OUTPUT"
 
       - name: Configure branch server bundle source
@@ -79,11 +79,11 @@ jobs:
         uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3.0.0
         with:
           tag_name: ${{ steps.artifact.outputs.server_bundle_tag }}
-          name: AgentHub Desktop Local Runtime (${{ github.ref_name }})
+          name: Nexagent Desktop Local Runtime (${{ github.ref_name }})
           body: |
-            This prerelease is used by AgentHub Desktop branch builds to run Local mode.
+            This prerelease is used by Nexagent Desktop branch builds to run Local mode.
 
-            To test this branch, download the desktop app from this workflow run's artifacts. When you open Local AgentHub, the desktop app automatically downloads the matching runtime from this prerelease.
+            To test this branch, download the desktop app from this workflow run's artifacts. When you open Local Nexagent, the desktop app automatically downloads the matching runtime from this prerelease.
 
             You do not need to download these runtime files manually.
           prerelease: true

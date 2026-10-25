@@ -28,7 +28,7 @@ test('account lifecycle preserves roles, protects admin operations, and revokes 
   const admin=userDb.createUser('owner','unused');
   assert.equal(admin.role,'admin');
   let fallback=false;
-  await authenticateToken({headers:{},query:{},socket:{}},{},()=>{fallback=true;});
+  await authenticateToken({headers:{host:'127.0.0.1'},query:{},socket:{remoteAddress:'127.0.0.1'}},{},()=>{fallback=true;});
   assert.equal(fallback,true);
   assert.equal(authenticateWebSocket(undefined)?.userId,Number(admin.id));
   const a=await userManagementService.create(Number(admin.id),{username:'member-a',password:'initial-secret',access_sso_email:'a@example.com'});

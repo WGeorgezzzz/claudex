@@ -52,7 +52,7 @@ export function createQuotaService(deps: {
   async function request(url: string, init: RequestInit = {}, retry = false): Promise<Json> {
     for (let attempt = 0; ; attempt++) {
       try {
-        const response = await deps.request(url, { ...init, redirect: 'error', signal: AbortSignal.timeout(30000), headers: { 'User-Agent': 'agenthub-quota/1.0', ...init.headers } });
+        const response = await deps.request(url, { ...init, redirect: 'error', signal: AbortSignal.timeout(30000), headers: { 'User-Agent': 'nexagent-quota/1.0', ...init.headers } });
         if (response.status === 401) throw new QuotaError(url.startsWith('https://api.anthropic.com/') ? '凭据过期，等待 Claude CLI 自动刷新' : '中转凭据已失效');
         if (!response.ok) {
           if (response.status === 429 || response.status >= 500) throw new Error('Transient upstream failure');

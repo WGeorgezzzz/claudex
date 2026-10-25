@@ -8,7 +8,9 @@ export { authenticateWebSocket } from './auth.middleware.js';
 // validateApiKey: used by the server entrypoint for optional API-wide key validation.
 export { validateApiKey } from './auth.middleware.js';
 export { authSessionEvents, generateToken } from './auth.middleware.js';
-export { accessBoundaryMiddleware, validateAccessBoundary, isLocalRequest } from '@/modules/auth/access-boundary.js';
+export { accessBoundaryMiddleware, validateAccessBoundary, isLocalRequest, requiresRemoteLogin } from '@/modules/auth/access-boundary.js';
+// Remote Access runs a capability-marked ingress without changing the existing custom-domain gate.
+export { createManagedTunnelIngress, isManagedTunnelRequest } from './managed-tunnel-ingress.js';
 export { initializeLocalIdentity } from '@/modules/auth/local-identity.service.js';
 // System, Plugins and Providers restrict host-wide shared resources to administrators.
 export { requireSharedResourceAdministrator } from './shared-resource-access.service.js';

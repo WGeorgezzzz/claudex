@@ -1,7 +1,7 @@
 {
-  "name": "AgentHub",
-  "short_name": "AgentHub",
-  "description": "AgentHub: the code nexus for your agents. Your agents, one workspace.",
+  "name": "Nexagent",
+  "short_name": "Nexagent",
+  "description": "Nexagent: the code nexus for your agents. Your agents, one workspace.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",

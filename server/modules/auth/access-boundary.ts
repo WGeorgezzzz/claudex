@@ -4,6 +4,7 @@ import type { IncomingMessage } from 'node:http';
 import type { RequestHandler } from 'express';
 
 import { userDb } from '@/modules/database/index.js';
+import { isManagedTunnelRequest } from './managed-tunnel-ingress.js';
 
 let cachedKeys:{expires:number;keys:Array<{kid:string;kty:string;[key:string]:unknown}>}|undefined;
 let keyFetch:Promise<void>|undefined;
@@ -11,11 +12,25 @@ const loopback=new Set(['127.0.0.1','::1','::ffff:127.0.0.1']);
 
 /** Auth and websocket ingress distinguish actual local access from a loopback tunnel connection. */
 export function isLocalRequest(req:IncomingMessage):boolean {
-  try {const host=new URL('http://'+req.headers.host);return loopback.has(req.socket.remoteAddress??'')&&['localhost','127.0.0.1','[::1]'].includes(host.hostname)&&!req.headers['cf-access-jwt-assertion']&&!req.headers['cf-connecting-ip']&&!req.headers['x-forwarded-host'];}catch{return false;}
+  try {
+    const host = new URL('http://' + req.headers.host);
+    const forwarded = ['forwarded', 'x-forwarded-for', 'x-forwarded-host', 'x-forwarded-proto', 'x-real-ip',
+      'cf-access-jwt-assertion', 'cf-connecting-ip', 'tailscale-user-login', 'tailscale-user-name',
+      'x-tunnel-id', 'x-tunnel-authorization', 'x-tunnel-skip-antiphishing-page', 'x-devtunnel-id', 'x-ms-proxy', 'x-original-host', 'x-nexagent-managed-tunnel'];
+    return loopback.has(req.socket.remoteAddress ?? '') && ['localhost', '127.0.0.1', '[::1]'].includes(host.hostname)
+      && !forwarded.some(key => req.headers[key] !== undefined);
+  } catch { return false; }
 }
+
+/** HTTP/auth and WebSocket consumers require password/MFA sessions for every remote entry. */
+export function requiresRemoteLogin(req: IncomingMessage): boolean { return !isLocalRequest(req); }
 
 /** HTTP and websocket composition share host/origin checks and signed Cloudflare Access identity validation. */
 export async function validateAccessBoundary(req:IncomingMessage):Promise<boolean> {
+  if (isManagedTunnelRequest(req)) {
+    if (!req.headers.origin) return true;
+    try { const origin = new URL(req.headers.origin); return origin.protocol === 'https:' && origin.host === req.headers.host; } catch { return false; }
+  }
   if(process.env.CLAUDEX_PRIVATE_GATE!=='1')return true;
   const host=req.headers.host??'',origin=req.headers.origin;
   if(isLocalRequest(req)) {

@@ -54,7 +54,7 @@ type NotificationPreferencesResponse = {
 
 type ActiveLoginProvider = AgentProvider | '';
 
-const KNOWN_MAIN_TABS: SettingsMainTab[] = ['account', 'users', 'usage', 'agents', 'appearance', 'git', 'api', 'tasks', 'browser', 'notifications', 'plugins', 'about'];
+const KNOWN_MAIN_TABS: SettingsMainTab[] = ['account', 'users', 'usage', 'agents', 'remote', 'appearance', 'git', 'api', 'tasks', 'browser', 'notifications', 'plugins', 'about'];
 
 const normalizeMainTab = (tab: string): SettingsMainTab => {
   // Keep backwards compatibility with older callers that still pass "tools".
@@ -207,6 +207,8 @@ export function useSettingsController({ isOpen, initialTab }: UseSettingsControl
 
     void (async () => {
       const authStatus = await checkProviderAuthStatus(loginProvider);
+      await api.providers.rescan();
+      window.dispatchEvent(new Event('nexagent:discovery-updated'));
 
       if (exitCode !== 0) {
         console.warn(`Login process exited with code ${exitCode}; refreshing auth status before setting save status.`);

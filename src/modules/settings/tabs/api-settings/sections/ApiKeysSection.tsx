@@ -16,7 +16,7 @@ type ApiKeysSectionProps = {
   onDeleteApiKey: (keyId: string) => void;
 };
 
-/** Rendered by CredentialsSettingsTab to list, create and revoke AgentHub API keys. */
+/** Rendered by CredentialsSettingsTab to list, create and revoke Nexagent API keys. */
 export default function ApiKeysSection({
   apiKeys,
   showNewKeyForm,

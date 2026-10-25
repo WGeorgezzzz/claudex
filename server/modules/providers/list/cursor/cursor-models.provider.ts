@@ -12,7 +12,7 @@ import {
   sanitizeLeafDirectoryName,
 } from '@/shared/utils.js';
 
-/** Curated Cursor catalog shipped as immutable AgentHub defaults. */
+/** Curated Cursor catalog shipped as immutable Nexagent defaults. */
 export const CURSOR_PREDEFINED_MODELS: ProviderModelsDefinition = {
   OPTIONS: [
     { value: 'auto', label: 'Auto', description: 'Let Cursor choose the model.' },

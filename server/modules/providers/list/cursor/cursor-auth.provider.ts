@@ -22,8 +22,8 @@ export class CursorProviderAuth implements IProviderAuth {
    */
   private checkInstalled(): boolean {
     try {
-      spawn.sync('cursor-agent', ['--version'], { stdio: 'ignore', timeout: 5000, windowsHide: true });
-      return true;
+      const result = spawn.sync('cursor-agent', ['--version'], { stdio: 'ignore', timeout: 5000, windowsHide: true });
+      return !result.error && result.status === 0;
     } catch {
       return false;
     }

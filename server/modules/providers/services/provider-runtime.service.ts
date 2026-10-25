@@ -1,4 +1,5 @@
 import { getSessionOwnerId } from '@/modules/database/index.js';
+import { agentDiscoveryService } from './agent-discovery.service.js';
 import { AppError } from '@/shared/utils.js';
 import { withUserContext, assertUserPath } from '@/modules/auth/index.js';
 import { providerRegistry } from '@/modules/providers/provider.registry.js';
@@ -96,6 +97,7 @@ export function createProviderRuntimeService(
       ? {...options,toolsSettings:{allowedTools:options.allowedTools??[],disallowedTools:options.disallowedTools??[],skipPermissions:false}}
       : options;
     const execute = () => {
+      agentDiscoveryService.assertEnabled(providerName);
       if (writer.userId != null) {
         for (const candidate of [runtimeOptions.cwd, runtimeOptions.projectPath]) {
           if (candidate != null && candidate !== '') {

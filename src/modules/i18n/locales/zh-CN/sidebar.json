@@ -41,7 +41,7 @@
     "sessionCountShort": "{{display}} 个会话"
   },
   "app": {
-    "title": "AgentHub",
+    "title": "Nexagent",
     "subtitle": "AI 编程助手"
   },
   "sessions": {
@@ -241,7 +241,7 @@
     "searchChats": "搜索对话",
     "chats": "对话",
     "filterChats": "筛选对话",
-    "about": "关于 AgentHub",
+    "about": "关于 Nexagent",
     "view": {
       "projects": "项目",
       "conversations": "最近对话",

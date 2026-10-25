@@ -30,7 +30,7 @@ import { AppError, sliceTailPage } from '@/shared/utils.js';
  * abort — a task is stopped by id through `chat.stop-task` instead. `tasks`
  * rides along on both kinds whenever the session has any.
  *
- * A turn driven outside AgentHub — the Claude CLI in the Shell view, or a
+ * A turn driven outside Nexagent — the Claude CLI in the Shell view, or a
  * terminal the user opened themselves — is listed the same way, with
  * `canInterrupt: false` because there is no run here to abort, and a
  * `statusText` saying where the work is happening.
@@ -184,9 +184,9 @@ export const sessionsService = {
       }
     }
 
-    // The chat-run registry only knows about turns AgentHub drives itself, so
+    // The chat-run registry only knows about turns Nexagent drives itself, so
     // without this a session working under the Claude CLI — including one
-    // AgentHub spawned for its own Shell view — looks idle. A session already
+    // Nexagent spawned for its own Shell view — looks idle. A session already
     // listed above keeps its richer entry.
     for (const live of await listBusyClaudeCliSessions()) {
       const session = sessionsDb.getSessionByProviderSessionId(live.providerSessionId);
@@ -200,7 +200,7 @@ export const sessionsService = {
         startedAt: live.startedAt,
         lastSeq: chatRunRegistry.getRun(session.session_id)?.lastSeq ?? 0,
         // There is no run here to abort: the turn belongs to a CLI process
-        // AgentHub does not own, so it can be reported but not interrupted.
+        // Nexagent does not own, so it can be reported but not interrupted.
         canInterrupt: false,
         statusText: 'Running in the Claude CLI',
       });
@@ -280,7 +280,7 @@ export const sessionsService = {
    * chat, navigates to the returned id immediately, and the id never changes
    * for the lifetime of the conversation. The provider-native id is mapped to
    * this row later, when the provider runtime announces it mid-run. Its title
-   * comes directly from the first visible AgentHub message and is limited to
+   * comes directly from the first visible Nexagent message and is limited to
    * a short placeholder before any provider-owned storage exists.
    */
   createAppSession(

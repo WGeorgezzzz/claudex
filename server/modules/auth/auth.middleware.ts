@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken';
 
 import { IS_PLATFORM } from '@/shared/index.js';
 import { userDb, appConfigDb, authSessionsDb } from '@/modules/database/index.js';
-import { isLocalRequest } from '@/modules/auth/access-boundary.js';
+import { isLocalRequest, requiresRemoteLogin } from '@/modules/auth/access-boundary.js';
 
 import { withUserContext } from './user-context.js';
 
@@ -33,7 +33,7 @@ export const validateApiKey = (req, res, next) => {
 // Server and Auth routes verify account and device ownership before entering feature services.
 export const authenticateToken = async (req, res, next) => {
   // Preserve tokenless platform compatibility only for an actual single-account install.
-  if (IS_PLATFORM && !req.headers.authorization && !req.query.token && userDb.listUsers().length === 1) {
+  if (IS_PLATFORM && isLocalRequest(req) && !req.headers.authorization && !req.query.token && userDb.listUsers().length === 1) {
     try {
       const user = userDb.getFirstUser();
       if (!user) {
@@ -68,7 +68,7 @@ export const authenticateToken = async (req, res, next) => {
     const decoded = jwt.verify(token, jwtSecret());
     const device = decoded.sid ? authSessionsDb.get(decoded.sid) : null;
     if (decoded.sid && (!device || device.user_id !== decoded.userId)) throw new Error('Device session revoked.');
-    if (process.env.CLAUDEX_PRIVATE_GATE === '1' && !isLocalRequest(req) && device?.kind !== 'remote') throw new Error('Remote password and MFA login required.');
+    if (requiresRemoteLogin(req) && device?.kind !== 'remote') throw new Error('Remote password and MFA login required.');
 
     // Verify user still exists and is active
     const user = userDb.getUserById(decoded.userId);

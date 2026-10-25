@@ -4,7 +4,8 @@ import type { RequestHandler } from 'express';
 import { consumeLocalTicket, issueLocalTicket } from '@/modules/auth/local-identity.service.js';
 import { remoteIdentityService } from '@/modules/auth/remote-identity.service.js';
 import { authSessionEvents, generateToken } from '@/modules/auth/auth.middleware.js';
-import { isLocalRequest } from '@/modules/auth/access-boundary.js';
+import { isLocalRequest, requiresRemoteLogin } from '@/modules/auth/access-boundary.js';
+import { isManagedTunnelRequest } from './managed-tunnel-ingress.js';
 import { exchangeAccessIdentity, isAccessSsoEnabled } from '@/modules/auth/access-sso.service.js';
 import { authSessionsDb } from '@/modules/database/index.js';
 import { AppError, requireAuthenticatedUserId } from '@/shared/index.js';
@@ -32,7 +33,9 @@ export function createAuthRouter(
   const attempts=new Map<string,{count:number;until:number}>();
   // Bound password/OTP guessing independently of the external Access gate.
   router.use(['/login','/local-ticket','/local-exchange','/access-exchange'],(req,res,next)=>{
-    const key=String(process.env.CLAUDEX_PRIVATE_GATE==='1'&&!isLocalRequest(req)?req.headers['cf-connecting-ip']||req.socket.remoteAddress:req.socket.remoteAddress||'unknown');
+    // Managed tunnels may forward client-supplied CF headers. Keep their shared source budget unspoofable.
+    const trustedAccessIp = requiresRemoteLogin(req) && process.env.CLAUDEX_PRIVATE_GATE === '1' && !isManagedTunnelRequest(req);
+    const key=String(trustedAccessIp?req.headers['cf-connecting-ip']||req.socket.remoteAddress:req.socket.remoteAddress||'unknown');
     const now=Date.now();for(const [id,row] of attempts)if(row.until<now)attempts.delete(id);
     const row=attempts.get(key)??{count:0,until:now+60000};
     if(row.count>=10||attempts.size>10000)return void res.status(429).json({error:'Too many login attempts. Wait one minute.'});
@@ -56,7 +59,7 @@ export function createAuthRouter(
   router.get('/status', (_req, res, next) => {
     try {
       res.setHeader('Cache-Control','no-store');
-      res.json({...service.getStatus(),accessSso:isAccessSsoEnabled(_req),remoteLogin:process.env.CLAUDEX_PRIVATE_GATE==='1'&&!isLocalRequest(_req),localIdentity:process.env.CLAUDEX_LOCAL_IDENTITY==='1'&&isLocalRequest(_req)});
+      res.json({...service.getStatus(),accessSso:isAccessSsoEnabled(_req),remoteLogin:requiresRemoteLogin(_req),localIdentity:process.env.CLAUDEX_LOCAL_IDENTITY==='1'&&isLocalRequest(_req)});
     } catch (error) {
       next(error);
     }
@@ -64,7 +67,7 @@ export function createAuthRouter(
 
   router.post('/register', async (req, res, next) => {
     try {
-      if(process.env.CLAUDEX_PRIVATE_GATE==='1'&&!isLocalRequest(req))throw new AppError('Initial setup is available locally only.',{statusCode:403});
+      if(requiresRemoteLogin(req))throw new AppError('Initial setup is available locally only.',{statusCode:403});
       const body = req.body as { username?: unknown; password?: unknown };
       res.json(await service.register(body.username, body.password));
     } catch (error) {
@@ -75,7 +78,7 @@ export function createAuthRouter(
   router.post('/login', async (req, res, next) => {
     try {
       const body = req.body as { username?: unknown; password?: unknown; otp?:unknown };
-      if(process.env.CLAUDEX_PRIVATE_GATE==='1'&&!isLocalRequest(req)){
+      if(requiresRemoteLogin(req)){
         const user=await remoteIdentityService.login(body.username,body.password,body.otp);
         res.json({success:true,user,token:generateToken({...user,authKind:'remote'})});
       }else res.json(await service.login(body.username, body.password));

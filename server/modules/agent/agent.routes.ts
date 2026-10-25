@@ -1230,7 +1230,7 @@ export function createAgentRouter(dependencies: AgentRouterDependencies): expres
             } else {
               prBody += `Agent task: ${message}`;
             }
-            prBody += '\n\n---\n*This pull request was automatically created by AgentHub Agent.*';
+            prBody += '\n\n---\n*This pull request was automatically created by Nexagent Agent.*';
 
             console.log(`📝 PR Title: ${prTitle}`);
 

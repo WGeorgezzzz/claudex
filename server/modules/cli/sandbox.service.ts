@@ -106,7 +106,7 @@ function readCommandError(error: unknown): string {
 
 function showSandboxHelp(output: CliOutput): void {
   output.log(`
-${terminalTextStyles.bright('AgentHub Sandbox')} — Run AgentHub inside Docker Sandboxes
+${terminalTextStyles.bright('Nexagent Sandbox')} — Run Nexagent inside Docker Sandboxes
 
 Usage:
   nexcode sandbox <workspace>            Create and start a sandbox
@@ -118,7 +118,7 @@ Subcommands:
   ${terminalTextStyles.bright('start')}        Restart a stopped sandbox and re-launch the web UI
   ${terminalTextStyles.bright('stop')}         Stop a sandbox (preserves state)
   ${terminalTextStyles.bright('rm')}           Remove a sandbox
-  ${terminalTextStyles.bright('logs')}         Show AgentHub server logs
+  ${terminalTextStyles.bright('logs')}         Show Nexagent server logs
   ${terminalTextStyles.bright('help')}         Show this help
 
 Options:
@@ -279,7 +279,7 @@ export function createSandboxCommandService(
           );
           dependencies.spawnDetachedSandbox(['run', sandboxName]);
           await dependencies.wait(5_000);
-          dependencies.output.log(`${terminalTextStyles.info('▶')} Launching AgentHub web server...`);
+          dependencies.output.log(`${terminalTextStyles.info('▶')} Launching Nexagent web server...`);
           dependencies.runSandboxCommand([
             'exec',
             sandboxName,
@@ -290,7 +290,7 @@ export function createSandboxCommandService(
           if (!publishSandboxPort(options, dependencies)) {
             return 1;
           }
-          dependencies.output.log(`\n${terminalTextStyles.ok('✔')} ${terminalTextStyles.bright('AgentHub is ready!')}`);
+          dependencies.output.log(`\n${terminalTextStyles.ok('✔')} ${terminalTextStyles.bright('Nexagent is ready!')}`);
           dependencies.output.log(`  ${terminalTextStyles.info('→')} ${terminalTextStyles.bright(`http://localhost:${options.port}`)}\n`);
           return 0;
         }
@@ -330,7 +330,7 @@ export function createSandboxCommandService(
             // proceed and let sbx report a credential error itself.
           }
 
-          dependencies.output.log(`\n${terminalTextStyles.bright('AgentHub Sandbox')}`);
+          dependencies.output.log(`\n${terminalTextStyles.bright('Nexagent Sandbox')}`);
           dependencies.output.log(terminalTextStyles.dim('─'.repeat(50)));
           dependencies.output.log(`  Agent:     ${terminalTextStyles.info(options.agent)} ${terminalTextStyles.dim(`(${secret} credentials)`)}`);
           dependencies.output.log(`  Workspace: ${terminalTextStyles.dim(workspace)}`);
@@ -381,7 +381,7 @@ export function createSandboxCommandService(
             }
           }
 
-          dependencies.output.log(`${terminalTextStyles.info('▶')} Launching AgentHub web server...`);
+          dependencies.output.log(`${terminalTextStyles.info('▶')} Launching Nexagent web server...`);
           dependencies.runSandboxCommand([
             'exec',
             sandboxName,
@@ -393,7 +393,7 @@ export function createSandboxCommandService(
             return 1;
           }
 
-          dependencies.output.log(`\n${terminalTextStyles.ok('✔')} ${terminalTextStyles.bright('AgentHub is ready!')}`);
+          dependencies.output.log(`\n${terminalTextStyles.ok('✔')} ${terminalTextStyles.bright('Nexagent is ready!')}`);
           dependencies.output.log(`  ${terminalTextStyles.info('→')} Open ${terminalTextStyles.bright(`http://localhost:${options.port}`)}`);
           dependencies.output.log(`\n${terminalTextStyles.dim('  Manage with:')}`);
           dependencies.output.log(`  ${terminalTextStyles.dim('$')} sbx ls`);

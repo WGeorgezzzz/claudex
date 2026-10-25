@@ -275,7 +275,7 @@ export class ViewHost {
     const view = this.getOrCreateTabView(tabId);
     if (view.__cloudcliLoadingUrl) return;
     this.attach(view);
-    const html = buildPlaceholderHtml(target.name || this.appName, 'Starting Local AgentHub...', logs);
+    const html = buildPlaceholderHtml(target.name || this.appName, 'Starting Local Nexagent...', logs);
     if (view.__cloudcliStartupHtml === html) return;
     await view.webContents.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
     view.__cloudcliStartupHtml = html;

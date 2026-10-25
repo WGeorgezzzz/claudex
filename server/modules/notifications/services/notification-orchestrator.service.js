@@ -165,7 +165,7 @@ function buildNotificationPayload(event) {
   const message = CODE_MAP[normalizedEvent.code] || 'You have a new notification';
 
   return {
-    title: sessionName || 'AgentHub',
+    title: sessionName || 'Nexagent',
     body: `${providerLabel}: ${message}`,
     data: {
       sessionId: normalizedEvent.sessionId || null,

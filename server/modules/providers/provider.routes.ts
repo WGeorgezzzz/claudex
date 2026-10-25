@@ -1,4 +1,5 @@
 import express, { type Request, type Response } from 'express';
+import { agentDiscoveryService } from './services/agent-discovery.service.js';
 
 import { sessionTitlesService } from '@/modules/providers/services/session-titles.service.js';
 import { getSessionOwnerId, getOwnerUserId } from '@/modules/database/index.js';
@@ -49,6 +50,17 @@ router.use((request, response, next) => {
   next();
 });
 router.use(userContextMiddleware);
+router.get('/discovery', asyncHandler(async (_req, res) => {
+  res.set('Cache-Control', 'no-store').json(await agentDiscoveryService.read());
+}));
+router.post('/discovery/rescan', asyncHandler(async (_req, res) => {
+  res.set('Cache-Control', 'no-store').json(await agentDiscoveryService.scan(true));
+}));
+router.put('/discovery/:provider', requireSharedResourceAdministrator, asyncHandler(async (req, res) => {
+  if (typeof req.body?.enabled !== 'boolean') throw new AppError('enabled must be boolean', { statusCode: 400 });
+  agentDiscoveryService.setEnabled(String(req.params.provider), req.body.enabled);
+  res.json(await agentDiscoveryService.read());
+}));
 router.use((request, _response, next) => {
   try {
     const user = getCurrentUserContext();

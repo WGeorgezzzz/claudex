@@ -20,7 +20,7 @@
     "runClaudeCli": "Začněte spuštěním Claude CLI v adresáři projektu"
   },
   "app": {
-    "title": "AgentHub",
+    "title": "Nexagent",
     "subtitle": "Rozhraní AI asistenta pro programování"
   },
   "sessions": {

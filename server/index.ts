@@ -43,6 +43,8 @@ import { commandsRoutes } from './modules/commands/index.js';
 import { settingsRoutes } from './modules/settings/index.js';
 import { usageRoutes, initializeUsage, closeUsage } from './modules/usage/index.js';
 import { quotaRoutes, initializeQuota, closeQuota } from './modules/quota/index.js';
+import { remoteAccessRoutes, initializeRemoteAccess, closeRemoteAccess } from './modules/remote-access/index.js';
+import { initializeAgentDiscovery } from './modules/providers/index.js';
 import { createSystemModule } from './modules/system/index.js';
 import { createAgentModule } from './modules/agent/index.js';
 import projectModuleRoutes from './modules/projects/projects.routes.js';
@@ -178,6 +180,7 @@ app.use('/api', validateApiKey);
 app.use('/api/auth', authRoutes);
 app.use('/api/usage', authenticateToken, usageRoutes);
 app.use('/api/quota', authenticateToken, quotaRoutes);
+app.use('/api/remote-access', authenticateToken, remoteAccessRoutes);
 
 // File Tree API Routes (protected)
 app.use('/api/file-tree', authenticateToken, fileTreeRoutes);
@@ -367,6 +370,8 @@ async function startServer() {
         await initializeDatabase();
         initializeUsage();
         initializeQuota();
+        initializeAgentDiscovery();
+        initializeRemoteAccess();
         initializeLocalIdentity();
 
         // Configure Web Push (VAPID keys)
@@ -394,7 +399,7 @@ async function startServer() {
 
             console.log('');
             console.log(terminalTextStyles.dim('═'.repeat(63)));
-            console.log(`  ${terminalTextStyles.bright('AgentHub Server - Ready')}`);
+            console.log(`  ${terminalTextStyles.bright('Nexagent Server - Ready')}`);
             console.log(terminalTextStyles.dim('═'.repeat(63)));
             console.log('');
             console.log(`${terminalTextStyles.info('[INFO]')} Server URL:  ${terminalTextStyles.bright('http://' + DISPLAY_HOST + ':' + SERVER_PORT)}`);
@@ -432,6 +437,7 @@ async function startServer() {
         const shutdownRuntimeServices = async () => {
             closeUsage();
             closeQuota();
+            closeRemoteAccess();
             try {
                 await browserUseService.stopAllSessions();
             } catch (err) {

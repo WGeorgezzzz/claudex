@@ -302,7 +302,7 @@ export class LocalServerController {
   getPendingTarget() {
     return {
       kind: 'local',
-      name: this.workbenchProfile ? 'Local Workbench' : 'Local AgentHub',
+      name: this.workbenchProfile ? 'Local Workbench' : 'Local Nexagent',
       url: this.localServerUrl || `http://${DISPLAY_HOST}:${this.localServerPort || this.workbenchProfile?.defaultPort || DEFAULT_PORT}`,
     };
   }
@@ -482,7 +482,7 @@ export class LocalServerController {
     this.ownedServerProcess.once('exit', (code, signal) => {
       this.appendStartupLog(`process exited with code ${code ?? 'null'} and signal ${signal ?? 'null'}`);
       if (this.ownedServerProcess) {
-        console.error(`AgentHub desktop server exited with code ${code ?? 'null'} and signal ${signal ?? 'null'}`);
+        console.error(`Nexagent desktop server exited with code ${code ?? 'null'} and signal ${signal ?? 'null'}`);
       }
       this.ownedServerProcess = null;
     });
@@ -510,7 +510,7 @@ export class LocalServerController {
         if (await isCloudCliServer(candidateUrl)) {
           const displayUrl = getDisplayUrl(candidateUrl);
           this.localServerPort = getPortFromUrl(candidateUrl);
-          this.appendStartupLog(`Using existing Local AgentHub at ${displayUrl}`);
+          this.appendStartupLog(`Using existing Local Nexagent at ${displayUrl}`);
           return displayUrl;
         }
       }
@@ -535,7 +535,7 @@ export class LocalServerController {
       ].join('\n\n'));
     }
 
-    this.appendStartupLog(`Local AgentHub ready at ${displayUrl}`);
+    this.appendStartupLog(`Local Nexagent ready at ${displayUrl}`);
     this.localServerUrl = displayUrl;
     return displayUrl;
   }
@@ -602,7 +602,7 @@ export class LocalServerController {
     await this.ensureLocalServer();
     return {
       kind: 'local',
-      name: this.workbenchProfile ? 'Local Workbench' : 'Local AgentHub',
+      name: this.workbenchProfile ? 'Local Workbench' : 'Local Nexagent',
       url: this.workbenchProfile ? await localIdentityUrl(this.localServerUrl,process.env.CLAUDEX_LOCAL_IDENTITY_HOME || path.join(this.userDataPath,'server')) : this.localServerUrl,
     };
   }

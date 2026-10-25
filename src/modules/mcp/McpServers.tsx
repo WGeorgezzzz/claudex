@@ -56,7 +56,7 @@ const getServerKey = (server: ProviderMcpServer): string => (
 );
 
 // Servers prefixed with `cloudcli-` are written and removed automatically by a
-// AgentHub feature toggle (e.g. the Browser tab), not added by the user. They are
+// Nexagent feature toggle (e.g. the Browser tab), not added by the user. They are
 // shown read-only so users don't edit/delete them out of sync with the feature.
 const isManagedServer = (server: ProviderMcpServer): boolean => server.name.startsWith('cloudcli-');
 
@@ -212,7 +212,7 @@ export default function McpServers({ selectedProvider, currentProjects }: McpSer
                     {managed && (
                       <div className="text-xs text-muted-foreground">
                         {t('mcpServers.managed.hint', {
-                          defaultValue: 'Managed by AgentHub.',
+                          defaultValue: 'Managed by Nexagent.',
                         })}
                       </div>
                     )}

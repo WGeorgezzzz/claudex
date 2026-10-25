@@ -160,7 +160,7 @@ export type ReleaseInfo = {
   publishedAt: string;
 };
 
-/** How this AgentHub install was obtained; decides whether the UI offers a self-update action. */
+/** How this Nexagent install was obtained; decides whether the UI offers a self-update action. */
 export type InstallMode = 'git' | 'npm';
 
 // ---------------------------
@@ -1241,7 +1241,7 @@ type McpImportMode = 'form' | 'json';
 
 //----------------- PLUGINS ------------
 
-/** An installed AgentHub plugin's manifest and runtime status (entry point, slot, permissions, enabled and server-running flags); always import this type explicitly from `@/shared/types`, because `Plugin` is also a DOM global and an unimported reference silently resolves to that instead. */
+/** An installed Nexagent plugin's manifest and runtime status (entry point, slot, permissions, enabled and server-running flags); always import this type explicitly from `@/shared/types`, because `Plugin` is also a DOM global and an unimported reference silently resolves to that instead. */
 export type Plugin = {
   name: string;
   displayName: string;
@@ -1389,7 +1389,18 @@ export type AgentContext = {
 };
 
 /** Identifier of a top-level section in the settings dialog; use it whenever a tab is stored, compared or requested so deep links, the sidebar and the command palette all agree on the same set of names. */
-export type SettingsMainTab = 'account' | 'users' | 'usage' | 'agents' | 'appearance' | 'git' | 'api' | 'voice' | 'tasks' | 'browser' | 'notifications' | 'plugins' | 'about';
+export type SettingsMainTab = 'account' | 'users' | 'usage' | 'agents' | 'remote' | 'appearance' | 'git' | 'api' | 'voice' | 'tasks' | 'browser' | 'notifications' | 'plugins' | 'about';
+
+//----------------- LOCAL AGENT DISCOVERY ------------
+/** Server-projected discovery record; member responses omit machine paths and transcript counts. */
+export type DiscoveredAgent = {
+  id: string; name: string; installed: boolean; supported: boolean; authenticated: boolean;
+  enabled: boolean; disabled: boolean; version: string | null; installCommand: string;
+  executable?: string | null; configDirectory?: string; sessionCount?: number;
+};
+/** Discovery settings, onboarding and the new-conversation picker share this per-user snapshot. */
+export type AgentDiscoverySnapshot = { scannedAt: string; agents: DiscoveredAgent[] };
+// ---------------------------
 
 /** The coding-agent CLI a settings screen is configuring, aliasing LLMProvider so agent-scoped settings read as being about an agent rather than a chat model. */
 export type AgentProvider = LLMProvider;
@@ -1459,7 +1470,7 @@ export type CodeEditorSettingsState = {
 
 //----------------- SETTINGS CREDENTIALS ------------
 
-/** One stored AgentHub API key as the server returns it, in snake_case, including its masked key, creation and last-used timestamps and active flag; render it, do not rebuild it. */
+/** One stored Nexagent API key as the server returns it, in snake_case, including its masked key, creation and last-used timestamps and active flag; render it, do not rebuild it. */
 export type ApiKeyItem = {
   id: string;
   key_name: string;

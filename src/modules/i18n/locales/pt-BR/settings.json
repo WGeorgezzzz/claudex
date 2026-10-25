@@ -549,7 +549,7 @@
     },
     "managed": {
       "badge": "Gerenciado",
-      "hint": "Gerenciado pelo AgentHub."
+      "hint": "Gerenciado pelo Nexagent."
     },
     "help": {
       "title": "Sobre MCP do Codex",
@@ -581,7 +581,7 @@
     "docs": "Docs",
     "sections": {
       "officialTitle": "Plugins oficiais",
-      "officialDescription": "Mantidos pela equipe do AgentHub e prontos para instalação direta.",
+      "officialDescription": "Mantidos pela equipe do Nexagent e prontos para instalação direta.",
       "unofficialTitle": "Outros plugins",
       "unofficialDescription": "Plugins e integrações não oficiais de outros usuários. Revise o código-fonte antes de instalar."
     },
@@ -604,9 +604,9 @@
       "install": "Instalar"
     },
     "prismClaudex": {
-      "name": "PRISM AgentHub",
+      "name": "PRISM Nexagent",
       "badge": "não oficial",
-      "description": "Inteligência de sessão para o Claude Code, dentro do AgentHub. Veja por que suas sessões estão queimando tokens sem sair do navegador.",
+      "description": "Inteligência de sessão para o Claude Code, dentro do Nexagent. Veja por que suas sessões estão queimando tokens sem sair do navegador.",
       "install": "Instalar"
     },
     "sessionManagerPlugin": {
@@ -823,7 +823,7 @@
   "mcpTeamCard": {
     "title": "Configs MCP da equipe",
     "description": "Compartilhe configurações de servidores MCP com sua equipe. Todos ficam em sincronia automaticamente.",
-    "proLink": "Disponível com AgentHub Pro"
+    "proLink": "Disponível com Nexagent Pro"
   },
   "mcpServersAddErrors": {
     "loadFailedProvider": "Falha ao carregar servidores MCP do {{provider}}",
@@ -840,15 +840,15 @@
     "tagline": "Your agents, one workspace.",
     "starOnGitHub": "Dar estrela no GitHub",
     "docs": "Docs",
-    "hostedTitle": "Experimente o AgentHub hospedado",
+    "hostedTitle": "Experimente o Nexagent hospedado",
     "hostedDescription": "Colaboração em equipe, configs MCP compartilhados, sincronização de configurações entre ambientes e infraestrutura gerenciada.",
     "learnMore": "Saiba mais",
-    "proFeaturesTitle": "Recursos do AgentHub Pro",
+    "proFeaturesTitle": "Recursos do Nexagent Pro",
     "syncSettingsTitle": "Sincronizar configurações",
     "syncSettingsDescription": "Mantenha suas preferências, configs MCP e tema em sincronia em todos os seus ambientes.",
     "teamManagementTitle": "Gerenciamento de equipe",
     "teamManagementDescription": "Múltiplos usuários, acesso baseado em funções e projetos compartilhados para sua equipe.",
     "licensed": "Licenciado sob AGPL-3.0",
-    "proCta": "Disponível com AgentHub Pro"
+    "proCta": "Disponível com Nexagent Pro"
   }
 }

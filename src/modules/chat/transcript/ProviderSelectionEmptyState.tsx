@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { ChevronDown, Plus } from "lucide-react";
 import { Trans, useTranslation } from "react-i18next";
 
@@ -26,6 +26,7 @@ import ModelGroupList, { type ModelGroup } from "@/modules/chat/composer/ModelGr
 import ModelLibraryPanel from "@/modules/chat/modals/ModelLibraryPanel";
 import { ProviderQuotaPanel } from '@/modules/chat/modals/ProviderQuotaPanel';
 import { writeSelectedProvider } from '@/shared/selectedProvider';
+import { useDiscoveredAgents } from '@/modules/agent-discovery';
 
 const PROVIDER_META: { id: LLMProvider; name: string }[] = [
   { id: "claude", name: "Anthropic" },
@@ -105,6 +106,12 @@ export default function ProviderSelectionEmptyState({
   setInput,
 }: ProviderSelectionEmptyStateProps) {
   const { t } = useTranslation("chat");
+  const discovery = useDiscoveredAgents();
+  useEffect(() => {
+    if (selectedSession || currentSessionId || !discovery) return;
+    const enabled = discovery.agents.filter(a => a.enabled);
+    if (enabled.length && !enabled.some(a => a.id === provider)) setProvider(enabled[0].id as LLMProvider);
+  }, [discovery, provider, setProvider, selectedSession, currentSessionId]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [modelLibraryOpen, setModelLibraryOpen] = useState(false);
 
@@ -126,13 +133,13 @@ export default function ProviderSelectionEmptyState({
 
   /** One collapsible branch per provider, in the order the picker lists them. */
   const visibleProviderGroups = useMemo<ModelGroup[]>(
-    () => PROVIDER_META.map((meta) => ({
+    () => PROVIDER_META.filter(meta => !discovery || discovery.agents.some(a => a.id === meta.id && a.enabled)).map((meta) => ({
       key: meta.id,
       provider: meta.id,
       name: meta.name,
       models: providerModelCatalog[meta.id]?.OPTIONS ?? [],
     })),
-    [providerModelCatalog],
+    [providerModelCatalog, discovery],
   );
 
   /**

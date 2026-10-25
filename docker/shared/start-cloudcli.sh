@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Auto-start AgentHub server in background if not already running.
+# Auto-start Nexagent server in background if not already running.
 # This script is sourced from ~/.bashrc on sandbox shell open.
 
 if ! pgrep -f "server/index.js" > /dev/null 2>&1; then
@@ -8,7 +8,7 @@ if ! pgrep -f "server/index.js" > /dev/null 2>&1; then
   disown
 
   echo ""
-  echo "  AgentHub is starting on port 3001..."
+  echo "  Nexagent is starting on port 3001..."
   echo ""
   echo "  Forward the port from another terminal:"
   echo "    sbx ports <sandbox-name> --publish 3001:3001"

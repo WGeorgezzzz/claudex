@@ -17,7 +17,7 @@ import {
   readOptionalString,
 } from '@/shared/utils.js';
 
-/** Curated Codex catalog shipped as immutable AgentHub defaults. */
+/** Curated Codex catalog shipped as immutable Nexagent defaults. */
 export const CODEX_PREDEFINED_MODELS: ProviderModelsDefinition = {
   OPTIONS: [
     {

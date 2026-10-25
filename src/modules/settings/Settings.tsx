@@ -17,6 +17,7 @@ import { PluginSettingsTab } from '@/modules/plugins';
 import { UsersSettingsTab } from '@/modules/settings/tabs/UsersSettingsTab';
 import { UserManagementTab } from '@/modules/settings/tabs/UserManagementTab';
 import { UsageDashboard } from '@/modules/usage';
+import { RemoteAccessTab } from '@/modules/remote-access';
 import { useAuth } from '@/modules/auth';
 import AboutTab from '@/modules/settings/tabs/AboutTab';
 import { useSettingsController } from '@/modules/settings/hooks/useSettingsController';
@@ -288,6 +289,7 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }: Set
               {(activeTab === 'account' || (activeTab === 'users' && !isAdmin)) && <UsersSettingsTab />}
               {activeTab === 'users' && isAdmin && <UserManagementTab onUsage={id => { setUsageUserId(id); setActiveTab('usage'); }} />}
               {activeTab === 'usage' && <UsageDashboard selectedUserId={usageUserId} onSelectUser={setUsageUserId} />}
+              {activeTab === 'remote' && isAdmin && <RemoteAccessTab />}
               {activeTab === 'about' && <AboutTab />}
             </div>
           </main>

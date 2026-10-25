@@ -42,7 +42,7 @@
     "sessionCountShort_one": "{{display}} session"
   },
   "app": {
-    "title": "AgentHub",
+    "title": "Nexagent",
     "subtitle": "AI coding assistant interface"
   },
   "sessions": {
@@ -250,7 +250,7 @@
     "searchChats": "Search chats",
     "chats": "Chats",
     "filterChats": "Filter chats",
-    "about": "About AgentHub",
+    "about": "About Nexagent",
     "view": {
       "projects": "Projects",
       "conversations": "Recent chats",

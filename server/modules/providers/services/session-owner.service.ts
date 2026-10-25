@@ -17,5 +17,5 @@ export function assertSessionOwnerAvailable(sessionId: string): void {
     protectedSessions=new Set(data.sessionIds);
     cachedPath=filename;
   }
-  if (protectedSessions.has(sessionId)) throw new AppError('This conversation is still owned by the original AgentHub service. Continue it in the original window, or fork a completed reply into a new conversation.',{code:'SESSION_OWNED_ELSEWHERE',statusCode:409});
+  if (protectedSessions.has(sessionId)) throw new AppError('This conversation is still owned by the original Nexagent service. Continue it in the original window, or fork a completed reply into a new conversation.',{code:'SESSION_OWNED_ELSEWHERE',statusCode:409});
 }

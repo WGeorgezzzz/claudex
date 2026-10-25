@@ -145,7 +145,7 @@ export class DesktopNotificationsController {
     if (!deviceId) {
       this.stop();
       this.lastEvent = 'missing-device';
-      this.lastError = 'Connect a AgentHub account before enabling desktop notifications.';
+      this.lastError = 'Connect a Nexagent account before enabling desktop notifications.';
       this.onChange?.();
       return;
     }

@@ -10,7 +10,7 @@ import { spawn, execFileSync } from 'node:child_process';
 if (process.platform!=='win32' || process.env.CI!=='true') throw new Error('Run installer acceptance only on a disposable Windows CI runner.');
 const installDirectory=path.resolve(process.argv[2]||'');
 const reportPath=path.resolve(process.argv[3]||'release/workbench/installer-smoke.json');
-const executable=path.join(installDirectory,'AgentHub.exe');
+const executable=path.join(installDirectory,'Nexagent.exe');
 await fs.access(executable);
 const profileDirectory=await fs.mkdtemp(path.join(os.tmpdir(),'workbench-acceptance-'));
 const sentinelDatabase=path.join(profileDirectory,'existing-service.db');

@@ -73,7 +73,7 @@ async function withProviderServer(
   }
 }
 
-test('session creation route names a AgentHub session from the initial message', async () => {
+test('session creation route names a Nexagent session from the initial message', async () => {
   await withProviderServer(async (baseUrl, workspacePath) => {
     const response = await fetch(`${baseUrl}/api/providers/sessions`, {
       method: 'POST',

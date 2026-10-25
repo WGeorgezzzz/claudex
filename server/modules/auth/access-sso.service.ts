@@ -2,12 +2,14 @@ import { createHash } from 'node:crypto';
 import type { IncomingMessage } from 'node:http';
 
 import { isLocalRequest, validateAccessBoundary } from '@/modules/auth/access-boundary.js';
+import { isManagedTunnelRequest } from './managed-tunnel-ingress.js';
 import { authSessionsDb, userDb } from '@/modules/database/index.js';
 import { AppError } from '@/shared/index.js';
 
 /** Auth routes advertise SSO only for the explicitly configured private remote entry. */
 export function isAccessSsoEnabled(req: IncomingMessage): boolean {
   return process.env.CLAUDEX_PRIVATE_GATE === '1'
+    && !isManagedTunnelRequest(req)
     && (Boolean(process.env.CLAUDEX_ACCESS_SSO_EMAIL?.trim()) || userDb.hasSsoUsers())
     && !isLocalRequest(req);
 }

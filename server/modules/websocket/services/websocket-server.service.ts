@@ -2,7 +2,7 @@ import type { Server as HttpServer } from 'node:http';
 
 import { WebSocket, WebSocketServer, type VerifyClientCallbackAsync } from 'ws';
 
-import { validateAccessBoundary, isLocalRequest, authSessionEvents } from '@/modules/auth/index.js';
+import { validateAccessBoundary, isLocalRequest, requiresRemoteLogin, authSessionEvents } from '@/modules/auth/index.js';
 import { handleChatConnection } from '@/modules/websocket/services/chat-websocket.service.js';
 import { verifyWebSocketClient } from '@/modules/websocket/services/websocket-auth.service.js';
 import { handlePluginWsProxy } from '@/modules/websocket/services/plugin-websocket-proxy.service.js';
@@ -91,7 +91,7 @@ export function createWebSocketServer(
       void validateAccessBoundary(info.req).then(ok=>{
         if(!ok||!verifyWebSocketClient(info,dependencies.verifyClient))return done(false,403,'Access denied');
         const request=info.req as AuthenticatedWebSocketRequest;
-        if(process.env.CLAUDEX_PRIVATE_GATE==='1'&&!isLocalRequest(request)&&request.user?.authKind!=='remote')return done(false,403,'Remote login required');
+        if(requiresRemoteLogin(request)&&request.user?.authKind!=='remote')return done(false,403,'Remote login required');
         done(true);
       }).catch(()=>done(false,403,'Access denied'));
     }) as VerifyClientCallbackAsync<AuthenticatedWebSocketRequest>,

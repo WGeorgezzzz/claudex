@@ -6,6 +6,7 @@ import type { LLMProvider } from '@/shared/types';
 import { api, readApiErrorMessage } from '@/shared/api';
 import { ProviderLoginModal, useProviderAuthStatus } from '@/modules/provider-auth';
 import AgentConnectionsStep from '@/modules/onboarding/AgentConnectionsStep';
+import { AgentDiscoveryPanel } from '@/modules/agent-discovery';
 import GitConfigurationStep from '@/modules/onboarding/GitConfigurationStep';
 import OnboardingStepProgress from '@/modules/onboarding/OnboardingStepProgress';
 
@@ -85,6 +86,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
   const handleLoginComplete = (exitCode: number) => {
     if (exitCode === 0 && activeLoginProvider) {
       void checkProviderAuthStatus(activeLoginProvider);
+      void api.providers.rescan().then(() => window.dispatchEvent(new Event('nexagent:discovery-updated')));
     }
   };
 
@@ -174,10 +176,10 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
                 onGitEmailChange={setGitEmail}
               />
             ) : (
-              <AgentConnectionsStep
+              <><AgentDiscoveryPanel onLogin={handleProviderLoginOpen} /><AgentConnectionsStep
                 providerStatuses={providerAuthStatus}
                 onOpenProviderLogin={handleProviderLoginOpen}
-              />
+              /></>
             )}
 
               {errorMessage && (

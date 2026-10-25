@@ -90,7 +90,7 @@ export const showCompletionTitleIndicator = (): void => {
     return;
   }
 
-  const baseTitle = stripIndicator(document.title || 'AgentHub');
+  const baseTitle = stripIndicator(document.title || 'Nexagent');
   document.title = `${getIndicatorPrefix()}${baseTitle}`;
 
   if (pageIsActive()) {

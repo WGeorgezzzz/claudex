@@ -1446,7 +1446,7 @@ export function requireAuthenticatedUserId(request: Request): number {
 }
 
 /** Assets, browser profiles, plugins and server discovery share this owned application-data root.
- * Workbench supplies an absolute directory; ordinary AgentHub keeps its existing home-directory default. */
+ * Workbench supplies an absolute directory; ordinary Nexagent keeps its existing home-directory default. */
 export function getCloudCliHomeDir(): string {
   const override=process.env.CLOUDCLI_HOME?.trim();
   return override && path.isAbsolute(override)?override:path.join(os.homedir(),'.cloudcli');

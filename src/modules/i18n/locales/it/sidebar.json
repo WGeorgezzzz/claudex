@@ -20,7 +20,7 @@
     "runClaudeCli": "Esegui Claude CLI in una directory di progetto per iniziare"
   },
   "app": {
-    "title": "AgentHub",
+    "title": "Nexagent",
     "subtitle": "Interfaccia assistente di programmazione AI"
   },
   "sessions": {

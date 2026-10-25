@@ -200,6 +200,14 @@ const pluginAssetPath = (pluginName: string, assetFile: string) =>
 // import a named method instead of assembling URLs of their own.
 
 export const api = {
+  remoteAccess: {
+    status: () => get('/api/remote-access'),
+    install: () => post('/api/remote-access/install'),
+    login: () => post('/api/remote-access/login'),
+    tailscale: () => get('/api/remote-access/tailscale'),
+    start: (provider: string, publicAccess: boolean) => post('/api/remote-access/start', { provider, public: publicAccess }),
+    stop: () => post('/api/remote-access/stop'),
+  },
   quota: { overview: () => get('/api/quota') },
   usage: {
     overview: (params: {range?: string; groupBy?: string; userId?: number}) => get('/api/usage/overview' + query(params)),
@@ -483,6 +491,9 @@ export const api = {
 
   // Provider (coding agent) endpoints — models, capabilities, sessions, MCP, skills.
   providers: {
+    discovery: () => get('/api/providers/discovery'),
+    rescan: () => post('/api/providers/discovery/rescan'),
+    setDiscoveredEnabled: (provider: string, enabled: boolean) => put(`/api/providers/discovery/${encodeURIComponent(provider)}`, { enabled }),
     usageSnapshot: () => get('/api/providers/usage-snapshot'),
     openUsageLogin: (provider: string) => post('/api/providers/usage-login', { provider }),
     capabilities: () => get('/api/providers/capabilities'),
@@ -690,7 +701,7 @@ export const api = {
 
 /**
  * Builds a URL against the user's own OpenAI-compatible voice endpoint. Private to the
- * voice helpers below, which bypass the AgentHub proxy when a base URL is configured.
+ * voice helpers below, which bypass the Nexagent proxy when a base URL is configured.
  */
 function voiceDirectUrl(baseUrl: string, path: string): string {
   return `${baseUrl.replace(/\/$/, '')}${path}`;
@@ -706,7 +717,7 @@ export function voiceConfigSignature(): string {
 
 /**
  * Transcribes recorded audio, posting directly to the user's configured OpenAI-compatible
- * endpoint when one is set and otherwise going through the AgentHub voice proxy.
+ * endpoint when one is set and otherwise going through the Nexagent voice proxy.
  */
 export function transcribeVoice(blob: Blob, filename: string): Promise<Response> {
   const config = readVoiceConfig();
@@ -728,7 +739,7 @@ export function transcribeVoice(blob: Blob, filename: string): Promise<Response>
 
 /**
  * Synthesizes speech for the given text, using the user's configured OpenAI-compatible
- * endpoint when one is set and otherwise the AgentHub voice proxy.
+ * endpoint when one is set and otherwise the Nexagent voice proxy.
  */
 export function synthesizeVoice(text: string, signal: AbortSignal): Promise<Response> {
   const config = readVoiceConfig();
