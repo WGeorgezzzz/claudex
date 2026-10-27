@@ -5,7 +5,7 @@ import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, FolderPlus, MoreHorizont
 
 import { useWorkspaceSections } from '@/modules/sidebar/context/WorkspaceSectionsContext';
 import { api, readApiErrorMessage } from '@/shared/api';
-import { ActionMenu, Dialog, DialogContent } from '@/shared/ui';
+import { ActionMenu, Dialog, DialogContent, DialogTitle } from '@/shared/ui';
 import { WorkspaceSessionRow } from '@/modules/sidebar/WorkspaceSessionRow';
 import type { BridgeSessionPage, SidebarProjectListProps } from '@/shared/types';
 import { ProjectOrganization } from '@/modules/sidebar/ProjectOrganization';
@@ -39,6 +39,7 @@ export function WorkspaceSections({ projectListProps, onSelect }: { projectListP
   const error = state?.error || searchError;
   // Serialize layout mutations while waiting for their authoritative result.
   const busy = state?.busy ?? false;
+  const [newSessionSection, setNewSessionSection] = useState<string | null>(null);
   // Search projects locally and sessions through a bounded server query.
   const [query, setQuery] = useState('');
   // Switching assignment kind leaves the active conversation alone.
@@ -82,6 +83,13 @@ export function WorkspaceSections({ projectListProps, onSelect }: { projectListP
   if (!layout) return <ProjectOrganization props={projectListProps}/>;
   const assignedProject = (id: string) => layout.assignments.find(item => item.kind === 'project' && item.targetId === id)?.sectionId;
   const listProps = projectListProps;
+  const startNewSession = (sectionId: string, project: (typeof projectListProps.projects)[number] | null) => {
+    if (!project || !state) return;
+    state.prepareNewSession(sectionId);
+    projectListProps.onProjectSelect(project);
+    projectListProps.onNewSession(project);
+    setNewSessionSection(null);
+  };
   const available = kind === 'project' ? projectListProps.projects.filter(project => `${project.displayName} ${project.fullPath}`.toLocaleLowerCase().includes(query.toLocaleLowerCase())).map(project => ({ id: project.projectId, title: project.displayName, path: project.fullPath }))
     : (page?.sessions ?? []).map(session => ({ id: session.sessionId, title: session.title, path: session.projectPath }));
   return <>
@@ -99,6 +107,7 @@ export function WorkspaceSections({ projectListProps, onSelect }: { projectListP
         {editing === section.id ? input : <button type="button" onDoubleClick={() => { clearTimeout(collapseTimer.current); setEditing(section.id); setDraft(section.name); }} disabled={busy} aria-expanded={!section.collapsed} onClick={event => { clearTimeout(collapseTimer.current); if (event.detail < 2) collapseTimer.current = setTimeout(() => void change({ action: 'collapse', id: section.id, collapsed: !section.collapsed }), event.detail === 0 ? 0 : 250); }} className="flex min-w-0 flex-1 items-center gap-1 rounded px-1 py-1.5 text-xs font-semibold hover:bg-muted">
           {section.collapsed ? <ChevronRight size={13}/> : <ChevronDown size={13}/>}<span className="min-w-0 flex-1 truncate text-left">{section.name}</span><span className="text-muted-foreground">{projects.length + sessions.length}</span>
         </button>}
+        <button type="button" aria-label={'分区中新建对话：' + section.name} disabled={busy || projectListProps.projects.length === 0} onClick={() => { const candidates = projectListProps.projects.filter(project => assignedProject(project.projectId) === section.id); if (candidates.length === 1) startNewSession(section.id, candidates[0]); else setNewSessionSection(section.id); }} className="shrink-0 rounded p-1 text-muted-foreground hover:bg-muted"><Plus size={15}/></button>
         <ActionMenu menuClassName="z-[100]" label="分区操作" ariaLabel={'分区操作：' + section.name} icon={MoreHorizontal} iconOnly variant="ghost" size="icon" triggerClassName="h-8 w-7" items={[
           { key: 'rename', label: '重命名', disabled: busy, onSelect: () => { setEditing(section.id); setDraft(section.name); } },
           { key: 'up', label: '上移', disabled: busy || layout.sections[0].id === section.id, onSelect: () => { void change({ action: 'move', id: section.id, direction: 'up' }); } },
@@ -133,5 +142,6 @@ export function WorkspaceSections({ projectListProps, onSelect }: { projectListP
         {kind === 'session' && page?.hasMore && <button className="p-2 text-xs text-muted-foreground" onClick={() => { const sequence = searchSequence.current; void api.sessionBridge.list(query, page.offset + page.sessions.length).then(unwrap<BridgeSessionPage>).then(next => { if (sequence === searchSequence.current) setPage(previous => previous ? { ...next, offset: 0, sessions: [...previous.sessions, ...next.sessions] } : next); }).catch(reason => setError(String(reason))); }}>{t('sections.more')}</button>}
       </div>
     </DialogContent></Dialog>
+    <Dialog open={!!newSessionSection} onOpenChange={value => { if (!value) setNewSessionSection(null); }}><DialogContent aria-label="选择新对话项目" className="w-[calc(100vw-2rem)] max-w-sm space-y-3 p-4"><DialogTitle className="not-sr-only font-semibold">选择新对话项目</DialogTitle><p className="text-xs text-muted-foreground">新对话会自动加入此分区。</p><div className="space-y-1">{newSessionSection && projectListProps.projects.filter(project => assignedProject(project.projectId) === newSessionSection).map(project => <button key={project.projectId} type="button" className="w-full rounded px-3 py-2 text-left text-sm hover:bg-muted" onClick={() => startNewSession(newSessionSection, project)}>{project.displayName}</button>)}{newSessionSection && projectListProps.projects.filter(project => assignedProject(project.projectId) === newSessionSection).length === 0 && <button type="button" className="w-full rounded px-3 py-2 text-left text-sm hover:bg-muted" onClick={() => startNewSession(newSessionSection, projectListProps.selectedProject ?? projectListProps.projects[0] ?? null)}>使用当前项目</button>}</div></DialogContent></Dialog>
   </>;
 }

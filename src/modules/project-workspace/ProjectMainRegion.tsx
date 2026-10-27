@@ -43,6 +43,7 @@ function ProjectMainRegion({
     context: SessionEstablishedContext,
   ) => {
     registerOptimisticSession({ sessionId: targetSessionId, ...context });
+    window.dispatchEvent(new CustomEvent('workspace:session-established', { detail: { sessionId: targetSessionId } }));
   }, [registerOptimisticSession]);
 
   const handleProjectsRefresh = useCallback(() => {

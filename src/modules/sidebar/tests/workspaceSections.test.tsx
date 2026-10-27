@@ -12,7 +12,8 @@ vi.mock('@/shared/api',()=>({api:{workspaceSections:{list:vi.fn(),update:vi.fn()
 vi.mock('@/modules/sidebar/ProjectOrganization',()=>({ProjectOrganization:()=> <div>Independent project groups</div>}));
 vi.mock('@/modules/sidebar/SidebarProjectList',()=>({default:({filteredProjects,getProjectSessions}:SidebarProjectListProps)=><div>{filteredProjects.map(project=><span key={project.projectId}>Project:{project.projectId} Chats:{getProjectSessions(project).map(row=>row.id).join(',')}</span>)}</div>}));
 const project={projectId:'p1',displayName:'Research project',fullPath:'/research'};
-const props={projects:[project],filteredProjects:[project],getProjectSessions:()=>[{id:'s1'},{id:'s2'}],activeSessions:new Set(),selectedSession:null} as unknown as SidebarProjectListProps;
+const onProjectSelect=vi.fn(), onNewSession=vi.fn();
+const props={projects:[project],filteredProjects:[project],getProjectSessions:()=>[{id:'s1'},{id:'s2'}],activeSessions:new Set(),selectedSession:null,selectedProject:null,onProjectSelect,onNewSession} as unknown as SidebarProjectListProps;
 let snapshot:WorkspaceSectionsSnapshot;
 const response=(data:unknown)=>new Response(JSON.stringify({data}));
 beforeEach(()=>{
@@ -36,4 +37,13 @@ test('assignment controls use stable IDs and refresh instead of overwriting revi
   await screen.findByRole('alert');
   assert.deepEqual(vi.mocked(api.workspaceSections.update).mock.calls[0][0],{action:'assign',kind:'project',targetId:'p1',sectionId:null,revision:1});
   await waitFor(()=>assert.ok(vi.mocked(api.workspaceSections.list).mock.calls.length>=2));
+});
+test('section new conversation selects its project and assigns the established session',async()=>{
+  render(<WorkspaceSectionsProvider><WorkspaceSections projectListProps={props} onSelect={vi.fn()}/></WorkspaceSectionsProvider>);
+  fireEvent.click(await screen.findByRole('button',{name:'分区中新建对话：Research'}));
+  assert.equal(onNewSession.mock.calls[0][0].projectId, 'p1');
+  window.dispatchEvent(new CustomEvent('workspace:session-established',{detail:{sessionId:'fresh'}}));
+  await waitFor(()=>assert.equal(vi.mocked(api.workspaceSections.update).mock.calls.at(-1)?.[0].action,'assign'));
+  const update = vi.mocked(api.workspaceSections.update).mock.calls.at(-1)?.[0] as Record<string, unknown>;
+  assert.equal(update.kind, 'session'); assert.equal(update.targetId, 'fresh'); assert.equal(update.sectionId, 'a');
 });
