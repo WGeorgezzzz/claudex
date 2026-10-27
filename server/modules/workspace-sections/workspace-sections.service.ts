@@ -24,9 +24,21 @@ export const workspaceSectionsService = {
     const action = input.action;
     const name = typeof input.name === 'string' ? input.name.trim() : '';
     workspaceSectionsDb.update(userId, Number(input.revision), layout => {
-      if (action === 'create') {
+      if (action === 'create' || action === 'create-assign') {
         if (!name || name.length > 80 || layout.sections.length >= 50) throw invalid('Use a name of 1–80 characters; at most 50 sections.');
-        layout.sections.push({ id: randomUUID(), name, collapsed: false }); return;
+        if (layout.sections.some(row => row.name.toLocaleLowerCase() === name.toLocaleLowerCase())) throw invalid('同名分区已存在，请换一个名称。');
+        const id = randomUUID();
+        // Creation and assignment share the preference transaction: rejection leaves neither behind.
+        if (action === 'create-assign') {
+          const kind = input.kind; const targetId = typeof input.targetId === 'string' ? input.targetId : '';
+          if (kind !== 'project' && kind !== 'session') throw invalid('Choose a project or session.');
+          if (kind === 'session' && getSessionOwnerId(targetId) !== userId) throw new AppError('Conversation belongs to another user or is unavailable.', { statusCode: 403 });
+          const target = withUserContext(userId, () => kind === 'project' ? projectsDb.getProjectById(targetId) : sessionsDb.getSessionById(targetId));
+          if (!target || target.isArchived) throw invalid('Choose an active project or session.');
+          layout.assignments = layout.assignments.filter(row => row.kind !== kind || row.targetId !== targetId);
+          layout.assignments.push({ kind, targetId, sectionId: id });
+        }
+        layout.sections.push({ id, name, collapsed: false }); return;
       }
       if (action === 'assign') {
         const kind = input.kind; const targetId = typeof input.targetId === 'string' ? input.targetId : '';
@@ -43,12 +55,18 @@ export const workspaceSectionsService = {
       if (index < 0) throw invalid('Section does not exist.');
       if (action === 'rename') {
         if (!name || name.length > 80) throw invalid('Use a name of 1–80 characters.');
+        if (layout.sections.some((row, other) => other !== index && row.name.toLocaleLowerCase() === name.toLocaleLowerCase())) throw invalid('同名分区已存在，请换一个名称。');
         layout.sections[index].name = name;
       } else if (action === 'collapse') {
         if (typeof input.collapsed !== 'boolean') throw invalid('Collapsed must be a boolean.');
         layout.sections[index].collapsed = input.collapsed;
       } else if (action === 'delete') {
         layout.sections.splice(index, 1); layout.assignments = layout.assignments.filter(row => row.sectionId !== input.id);
+      } else if (action === 'reorder') {
+        const next = layout.sections.findIndex(row => row.id === input.beforeId);
+        if (next < 0) throw invalid('Section does not exist.');
+        const [section] = layout.sections.splice(index, 1);
+        layout.sections.splice(next, 0, section);
       } else if (action === 'move') {
         if (!['up', 'down'].includes(String(input.direction))) throw invalid('Choose up or down.');
         const next = index + (input.direction === 'up' ? -1 : 1);

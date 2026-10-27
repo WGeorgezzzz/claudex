@@ -1988,3 +1988,7 @@ export type ProjectOrganizationSnapshot = {
   sessions:{id:string;title:string;provider:string;cwd:string;roots:string[];updatedAt:string;sourceProjectId:string|null;projectId:string|null}[];
   threadOrders:Record<string,string[]>;
 };
+
+//----------------- SIDEBAR SECTION INTERACTION ------------
+/** A stable project or conversation identity passed between row menus and section drop targets. */
+export type WorkspaceSectionTarget = { kind: 'project' | 'session'; targetId: string; title: string };

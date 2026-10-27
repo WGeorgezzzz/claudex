@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Inbox, Mail, MailOpen, Pin, RefreshCw, X } from 'lucide-react';
 
+import { SectionRow } from '@/modules/sidebar/SectionRow';
 import { Dialog, DialogContent, SessionMonitorBadge } from '@/shared/ui';
 import type { SessionWorkspaceChange, SessionWorkspaceEntry } from '@/shared/types';
 import { useSessionWorkspace } from '@/modules/sidebar/context/SessionWorkspaceContext';
@@ -59,7 +60,7 @@ export function SessionInbox({ onSelect }: { onSelect: (projectId: string | null
       <span className="flex items-center gap-2"><Inbox size={14}/>{t('inbox.title')}</span><span>{counts.unread + counts.attention > 0 ? entries.filter(row => row.unread || needsAttention(row)).length : ''}</span>
     </button>
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent initialFocusRef={searchRef} aria-label={t('inbox.title')} className="flex max-h-[85dvh] w-[calc(100vw-1.5rem)] max-w-3xl flex-col gap-0 overflow-hidden p-0">
+      <DialogContent wrapperClassName="z-[80]" initialFocusRef={searchRef} aria-label={t('inbox.title')} className="flex max-h-[85dvh] w-[calc(100vw-1.5rem)] max-w-3xl flex-col gap-0 overflow-hidden p-0">
         <header className="flex items-start justify-between gap-4 border-b border-border px-5 py-4">
           <div><h2 className="text-base font-semibold">{t('inbox.title')}</h2><p className="mt-1 text-xs text-muted-foreground">{t('inbox.description')}</p></div>
           <button type="button" aria-label={t('inbox.close')} onClick={() => setOpen(false)} className="rounded p-1 hover:bg-muted"><X size={18}/></button>
@@ -84,7 +85,7 @@ export function SessionInbox({ onSelect }: { onSelect: (projectId: string | null
           {rows.length === 0 && <p className="px-2 py-12 text-center text-sm text-muted-foreground">{t('inbox.empty')}</p>}
           {rows.map(row => {
             const timestamp = row.lastActivityAt ? Date.parse(row.lastActivityAt) : NaN;
-            return <article key={row.sessionId} aria-label={row.title} className="flex items-start gap-2 rounded-lg border-b border-border/50 px-2 py-3 hover:bg-muted/40">
+            return <SectionRow key={row.sessionId} target={{kind:'session',targetId:row.sessionId,title:row.title}}><article aria-label={row.title} className="flex items-start gap-2 rounded-lg border-b border-border/50 px-2 py-3 hover:bg-muted/40">
               <a href={`/session/${encodeURIComponent(row.sessionId)}`} className="min-w-0 flex-1 rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring" onClick={event => {
                 if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
                 event.preventDefault(); setOpen(false); onSelect(row.projectId, row.sessionId, row.provider);
@@ -106,7 +107,7 @@ export function SessionInbox({ onSelect }: { onSelect: (projectId: string | null
                 <button type="button" disabled={busy} aria-pressed={row.pinnedAt !== null} aria-label={t(row.pinnedAt !== null ? 'inbox.unpin' : 'inbox.pin', { title: row.title })}
                   onClick={() => void write([{ row, input: { pinned: row.pinnedAt === null } }])} className={`rounded p-2 hover:bg-muted disabled:opacity-40 ${row.pinnedAt !== null ? 'text-primary' : 'text-muted-foreground'}`}><Pin size={15}/></button>
               </div>
-            </article>;
+            </article></SectionRow>;
           })}
         </div>
       </DialogContent>

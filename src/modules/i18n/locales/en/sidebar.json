@@ -241,7 +241,7 @@
     "search": "Find a project or conversation",
     "moveItem": "Section for {{name}}",
     "unassigned": "Projects · unassigned",
-    "empty": "Add a project or conversation from Manage sections",
+    "empty": "Drop a conversation or project here, or use its row menu",
     "more": "Load more conversations"
   },
   "ui": {

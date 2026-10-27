@@ -2,6 +2,7 @@ import { type ReactNode } from 'react';
 import { Activity, Archive, Folder, MessageSquare, RotateCcw, Search, Trash2 } from 'lucide-react';
 import type { TFunction } from 'i18next';
 
+import { WorkspaceSectionsProvider } from '@/modules/sidebar/context/WorkspaceSectionsContext';
 import { LLMProviderLogo, ScrollArea } from '@/shared/ui';
 import type { ArchivedProjectListItem, ArchivedSessionListItem, ConversationSearchResults, Project, RecentConversationListItem, ReleaseInfo, SearchProgress, SidebarProjectListProps, SidebarSearchMode } from '@/shared/types';
 import { formatCompactAge, getAllSessions } from '@/modules/sidebar/utils/sidebarProjectFormatting';
@@ -189,7 +190,7 @@ export default function SidebarContent({
   const isRenamingOnMobile = isMobile && projectListProps.activeRename !== null;
 
   return (
-    <div
+    <WorkspaceSectionsProvider><div
       className="workspace-sidebar flex h-full flex-col md:w-full md:select-none"
       style={{}}
     >
@@ -703,6 +704,6 @@ export default function SidebarContent({
           t={t}
         />
       )}
-    </div>
+    </div></WorkspaceSectionsProvider>
   );
 }

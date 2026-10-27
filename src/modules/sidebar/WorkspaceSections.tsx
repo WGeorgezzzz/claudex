@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
+import type { DragEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, FolderPlus, Settings2, Trash2, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, FolderPlus, MoreHorizontal, Plus, Trash2, X } from 'lucide-react';
 
+import { useWorkspaceSections } from '@/modules/sidebar/context/WorkspaceSectionsContext';
+import { SectionRow } from '@/modules/sidebar/SectionRow';
 import { api, readApiErrorMessage } from '@/shared/api';
-import { Dialog, DialogContent, SessionMonitorBadge } from '@/shared/ui';
-import type { BridgeSessionPage, SidebarProjectListProps, WorkspaceSectionsSnapshot } from '@/shared/types';
+import { ActionMenu, Dialog, DialogContent, SessionMonitorBadge } from '@/shared/ui';
+import type { BridgeSessionPage, SidebarProjectListProps } from '@/shared/types';
 import { ProjectOrganization } from '@/modules/sidebar/ProjectOrganization';
 import SidebarProjectList from '@/modules/sidebar/SidebarProjectList';
 import { useSessionWorkspace } from '@/modules/sidebar/context/SessionWorkspaceContext';
@@ -18,27 +21,34 @@ async function unwrap<T>(response: Response): Promise<T> {
 export function WorkspaceSections({ projectListProps, onSelect }: { projectListProps: SidebarProjectListProps; onSelect: (projectId: string | null, sessionId: string, provider: string) => void }) {
   const { t } = useTranslation('sidebar'); const workspace = useSessionWorkspace();
   // A server snapshot lets sections survive reloads and synchronize between clients.
-  const [layout, setLayout] = useState<WorkspaceSectionsSnapshot | null>(null);
+  const state = useWorkspaceSections();
+  const layout = state?.layout;
+  // Inline creation and rename preserve the sidebar position without a modal.
+  const [editing, setEditing] = useState<string | null>(null);
+  // Section inputs are independent from the batch-manager draft.
+  const [draft, setDraft] = useState('');
+  // Drop targets advertise which section will receive a row or reordered header.
+  const [hover, setHover] = useState<string | null>(null);
+  // Deletion explains that only organization was removed.
+  const [notice, setNotice] = useState('');
   // Organization controls do not navigate or replace a chat draft.
   const [open, setOpen] = useState(false);
   // Preserve a new section name until its request succeeds.
   const [name, setName] = useState('');
   // Show rejected writes, including revision conflicts, without silently overwriting another client.
-  const [error, setError] = useState('');
+  const [searchError, setError] = useState('');
+  const error = state?.error || searchError;
   // Serialize layout mutations while waiting for their authoritative result.
-  const [busy, setBusy] = useState(false);
+  const busy = state?.busy ?? false;
   // Search projects locally and sessions through a bounded server query.
   const [query, setQuery] = useState('');
   // Switching assignment kind leaves the active conversation alone.
   const [kind, setKind] = useState<'project' | 'session'>('project');
   // Retain one paginated server search result for assigning conversations.
   const [page, setPage] = useState<BridgeSessionPage | null>(null);
-  const writing = useRef(false); const searchSequence = useRef(0);
-  useEffect(() => {
-    let live = true;
-    const load = async () => { try { const value = await unwrap<WorkspaceSectionsSnapshot>(await api.workspaceSections.list()); if (live) setLayout(value); } catch { /* Older/offline servers keep their ordinary project list. */ } };
-    load(); const timer = setInterval(load, 15000); return () => { live = false; clearInterval(timer); };
-  }, []);
+  const searchSequence = useRef(0);
+  const collapseTimer = useRef<ReturnType<typeof setTimeout>>();
+  useEffect(() => () => clearTimeout(collapseTimer.current), []);
   useEffect(() => {
     if (!open || kind !== 'session') return;
     const sequence = ++searchSequence.current;
@@ -48,11 +58,26 @@ export function WorkspaceSections({ projectListProps, onSelect }: { projectListP
     return () => { clearTimeout(timer); searchSequence.current++; };
   }, [open, kind, query]);
   const change = async (input: Record<string, unknown>) => {
-    if (!layout || writing.current) return;
-    writing.current = true; setBusy(true); setError('');
-    try { setLayout(await unwrap<WorkspaceSectionsSnapshot>(await api.workspaceSections.update({ ...input, revision: layout.revision }))); if (input.action === 'create') setName(''); }
-    catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)); try { setLayout(await unwrap<WorkspaceSectionsSnapshot>(await api.workspaceSections.list())); } catch { /* Keep the last usable snapshot. */ } }
-    finally { writing.current = false; setBusy(false); }
+    const ok = await state?.change(input);
+    if (ok && input.action === 'create') setName('');
+    return ok;
+  };
+  const saveInline = async () => {
+    if (!draft.trim() || busy) return;
+    if (await change(editing === 'new' ? { action: 'create', name: draft } : { action: 'rename', id: editing, name: draft })) setEditing(null);
+  };
+  const input = <input autoFocus aria-label={editing === 'new' ? '新分区名称' : '分区名称'} value={draft} maxLength={80} disabled={busy} onChange={event => setDraft(event.target.value)}
+    onBlur={() => { if (!draft.trim()) setEditing(null); }} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); void saveInline(); } if (event.key === 'Escape') { event.stopPropagation(); setEditing(null); } }} className="mx-3 mb-2 w-[calc(100%-1.5rem)] rounded border border-primary bg-background px-2 py-2 text-base"/>;
+  const drop = (event: DragEvent, sectionId: string | null) => {
+    event.preventDefault(); event.stopPropagation(); setHover(null);
+    const id = event.dataTransfer.getData('application/x-nexagent-section');
+    if (id && sectionId && id !== sectionId) { void change({ action: 'reorder', id, beforeId: sectionId }); return; }
+    const raw = event.dataTransfer.getData('application/x-nexagent-section-item');
+    try { const target = JSON.parse(raw); if ((target.kind === 'project' || target.kind === 'session') && typeof target.targetId === 'string') void change({ action: 'assign', kind: target.kind, targetId: target.targetId, sectionId }); } catch { /* Ignore native file/link drags. */ }
+  };
+  const dragOver = (event: DragEvent, id: string) => {
+    if (!Array.from(event.dataTransfer.types).some(type => type.startsWith('application/x-nexagent-section'))) return;
+    event.preventDefault(); event.stopPropagation(); event.dataTransfer.dropEffect = 'move'; setHover(id);
   };
   // Older backends still show their ordinary project list without unsupported controls.
   if (!layout) return <ProjectOrganization props={projectListProps}/>;
@@ -61,27 +86,37 @@ export function WorkspaceSections({ projectListProps, onSelect }: { projectListP
   const available = kind === 'project' ? projectListProps.projects.filter(project => `${project.displayName} ${project.fullPath}`.toLocaleLowerCase().includes(query.toLocaleLowerCase())).map(project => ({ id: project.projectId, title: project.displayName, path: project.fullPath }))
     : (page?.sessions ?? []).map(session => ({ id: session.sessionId, title: session.title, path: session.projectPath }));
   return <>
-    <div className="mx-3 mb-2 flex items-center justify-between"><span className="text-xs font-medium text-muted-foreground">{t(layout.sections.length?'sections.title':'sections.projects')}</span>
-      <button type="button" aria-label={t('sections.manage')} onClick={() => setOpen(true)} className="rounded p-1.5 text-muted-foreground hover:bg-muted"><Settings2 size={14}/></button></div>
+    <div className="mx-3 mb-2 flex items-center justify-between"><span className="text-xs font-medium text-muted-foreground">{t('sections.title')}</span>
+      <div className="flex items-center gap-1"><button type="button" disabled={busy} aria-label="新建分区" onClick={() => { setEditing('new'); setDraft(''); }} className="flex items-center gap-1 rounded px-2 py-1.5 text-xs hover:bg-muted"><Plus size={17}/>{!layout.sections.length && '新建分区'}</button>
+        <ActionMenu menuClassName="z-[100]" label="分区操作" ariaLabel="分区操作" icon={MoreHorizontal} iconOnly variant="ghost" size="icon" triggerClassName="h-8 w-7" items={[{ key: 'manage', label: t('sections.manage'), onSelect: () => setOpen(true) }]}/></div></div>
+    {editing === 'new' && input}
+    {notice && <p role="status" className="mx-3 py-1 text-xs text-muted-foreground">{notice}</p>}
     {error && !open && <p role="alert" className="mx-3 text-xs text-destructive">{error}</p>}
     {layout.sections.map(section => {
       const projects = projectListProps.filteredProjects.filter(project => assignedProject(project.projectId) === section.id);
       const sessions = layout.sessionItems.filter(session => layout.assignments.some(item => item.kind === 'session' && item.targetId === session.sessionId && item.sectionId === section.id));
       return <section key={section.id} aria-label={section.name} className="mb-3">
-        <button type="button" disabled={busy} aria-expanded={!section.collapsed} onClick={() => void change({ action: 'collapse', id: section.id, collapsed: !section.collapsed })} className="mx-2 flex w-[calc(100%-1rem)] items-center gap-1 rounded px-1 py-1.5 text-xs font-semibold hover:bg-muted">
+        <div data-section-header={section.id} className={`mx-2 flex items-center rounded ${hover === section.id ? 'bg-primary/15 ring-2 ring-primary' : ''}`} draggable={!busy} onDragStart={event => { event.stopPropagation(); event.dataTransfer.setData('application/x-nexagent-section', section.id); }} onDragOver={event => dragOver(event, section.id)} onDragLeave={() => setHover(null)} onDrop={event => drop(event, section.id)} onDragEnd={() => setHover(null)}>
+        {editing === section.id ? input : <button type="button" onDoubleClick={() => { clearTimeout(collapseTimer.current); setEditing(section.id); setDraft(section.name); }} disabled={busy} aria-expanded={!section.collapsed} onClick={event => { clearTimeout(collapseTimer.current); if (event.detail < 2) collapseTimer.current = setTimeout(() => void change({ action: 'collapse', id: section.id, collapsed: !section.collapsed }), event.detail === 0 ? 0 : 250); }} className="flex min-w-0 flex-1 items-center gap-1 rounded px-1 py-1.5 text-xs font-semibold hover:bg-muted">
           {section.collapsed ? <ChevronRight size={13}/> : <ChevronDown size={13}/>}<span className="min-w-0 flex-1 truncate text-left">{section.name}</span><span className="text-muted-foreground">{projects.length + sessions.length}</span>
-        </button>
+        </button>}
+        <ActionMenu menuClassName="z-[100]" label="分区操作" ariaLabel={'分区操作：' + section.name} icon={MoreHorizontal} iconOnly variant="ghost" size="icon" triggerClassName="h-8 w-7" items={[
+          { key: 'rename', label: '重命名', disabled: busy, onSelect: () => { setEditing(section.id); setDraft(section.name); } },
+          { key: 'up', label: '上移', disabled: busy || layout.sections[0].id === section.id, onSelect: () => { void change({ action: 'move', id: section.id, direction: 'up' }); } },
+          { key: 'down', label: '下移', disabled: busy || layout.sections.at(-1)?.id === section.id, onSelect: () => { void change({ action: 'move', id: section.id, direction: 'down' }); } },
+          { key: 'delete', label: '删除分区', description: '只取消归类，保留项目和会话。', isDanger: true, disabled: busy, onSelect: () => { void change({ action: 'delete', id: section.id }).then(ok => { if (ok) setNotice('已删除分区，只取消归类，项目和会话均已保留。'); }); } },
+        ]}/></div>
         {!section.collapsed && <>{projects.length > 0 && <SidebarProjectList {...listProps} projects={projects} filteredProjects={projects}/>}
-          {sessions.map(session => <a key={session.sessionId} title={session.projectPath||session.provider} href={`/session/${encodeURIComponent(session.sessionId)}`} className={`mx-3 block rounded px-2 py-2 text-[13px] hover:bg-muted ${projectListProps.selectedSession?.id === session.sessionId ? 'bg-muted' : ''}`} onClick={event => {
+          {sessions.map(session => <SectionRow key={session.sessionId} target={{kind:'session',targetId:session.sessionId,title:session.title}}><a title={session.projectPath||session.provider} href={`/session/${encodeURIComponent(session.sessionId)}`} className={`mx-3 block rounded px-2 py-2 text-[13px] hover:bg-muted ${projectListProps.selectedSession?.id === session.sessionId ? 'bg-muted' : ''}`} onClick={event => {
             if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
             event.preventDefault(); onSelect(session.projectId, session.sessionId, session.provider);
-          }}><span className="block truncate">{projectListProps.activeSessions.has(session.sessionId) ? '◌ ' : workspace?.byId.get(session.sessionId)?.unread ? '● ' : ''}<SessionMonitorBadge sessionId={session.sessionId}/>{session.title}</span></a>)}
+          }}><span className="block truncate">{projectListProps.activeSessions.has(session.sessionId) ? '◌ ' : workspace?.byId.get(session.sessionId)?.unread ? '● ' : ''}<SessionMonitorBadge sessionId={session.sessionId}/>{session.title}</span></a></SectionRow>)}
           {projects.length + sessions.length === 0 && <p className="mx-5 py-2 text-[11px] text-muted-foreground">{t('sections.empty')}</p>}
         </>}
       </section>;
     })}
-    <ProjectOrganization props={projectListProps}/>
-    <Dialog open={open} onOpenChange={setOpen}><DialogContent aria-label={t('sections.manage')} className="flex max-h-[85dvh] max-w-2xl flex-col overflow-hidden">
+    <div data-section-unassign className={`rounded py-2 ${hover === 'unassigned' ? 'bg-primary/15 ring-2 ring-primary' : ''}`} onDragOver={event => dragOver(event, 'unassigned')} onDragLeave={() => setHover(null)} onDrop={event => drop(event, null)}><ProjectOrganization props={projectListProps}/></div>
+    <Dialog open={open} onOpenChange={setOpen}><DialogContent wrapperClassName="z-[80]" aria-label={t('sections.manage')} className="flex max-h-[85dvh] max-w-2xl flex-col overflow-hidden">
       <header className="flex items-center justify-between"><h2 className="font-semibold">{t('sections.manage')}</h2><button aria-label={t('sections.close')} onClick={() => setOpen(false)}><X size={18}/></button></header>
       <p className="text-xs text-muted-foreground">{t('sections.description')}</p>
       {error && <p role="alert" className="text-xs text-destructive">{error}</p>}

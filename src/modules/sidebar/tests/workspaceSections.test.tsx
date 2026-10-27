@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
-
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, test, vi } from 'vitest';
 
+import { WorkspaceSectionsProvider } from '@/modules/sidebar/context/WorkspaceSectionsContext';
 import '@/modules/i18n';
 import { api } from '@/shared/api';
 import type { SidebarProjectListProps, WorkspaceSectionsSnapshot } from '@/shared/types';
@@ -21,7 +21,7 @@ beforeEach(()=>{
   vi.mocked(api.workspaceSections.update).mockImplementation(async input=>{snapshot={...snapshot,revision:snapshot.revision+1,sections:input.action==='collapse'?snapshot.sections.map(row=>({...row,collapsed:Boolean(input.collapsed)})):snapshot.sections};return response(snapshot);});
 });
 test('sections coexist with project groups and preserve their session rows',async()=>{
-  const select=vi.fn();render(<WorkspaceSections projectListProps={props} onSelect={select}/>);
+  const select=vi.fn();render(<WorkspaceSectionsProvider><WorkspaceSections projectListProps={props} onSelect={select}/></WorkspaceSectionsProvider>);
   const link=await screen.findByRole('link',{name:/Independent chat/});
   assert.ok(screen.getByText('Project:p1 Chats:s1,s2'));assert.ok(screen.getByText('Independent project groups'));fireEvent.click(link);assert.deepEqual(select.mock.calls,[['p1','s1','claude']]);
   fireEvent.click(screen.getByRole('button',{name:/Research 2/}));await waitFor(()=>assert.equal(screen.queryAllByRole('link').length,0));
@@ -29,8 +29,9 @@ test('sections coexist with project groups and preserve their session rows',asyn
 });
 test('assignment controls use stable IDs and refresh instead of overwriting revision conflicts',async()=>{
   vi.mocked(api.workspaceSections.update).mockImplementation(async()=>{snapshot={...snapshot,revision:2};return new Response('{}',{status:409});});
-  render(<WorkspaceSections projectListProps={props} onSelect={vi.fn()}/>);
-  fireEvent.click(await screen.findByRole('button',{name:/Manage sections|管理分区/}));
+  render(<WorkspaceSectionsProvider><WorkspaceSections projectListProps={props} onSelect={vi.fn()}/></WorkspaceSectionsProvider>);
+  fireEvent.click(await screen.findByRole('button',{name:'分区操作'}));
+  fireEvent.click(await screen.findByRole('menuitem',{name:/Manage sections|管理分区/}));
   fireEvent.change(screen.getByRole('combobox',{name:/Section for Research project|Research project 所在分区/}),{target:{value:''}});
   await screen.findByRole('alert');
   assert.deepEqual(vi.mocked(api.workspaceSections.update).mock.calls[0][0],{action:'assign',kind:'project',targetId:'p1',sectionId:null,revision:1});

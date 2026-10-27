@@ -3,6 +3,8 @@ import type { KeyboardEvent } from 'react';
 import { Check, CheckSquare, Edit2, Loader2, MoreHorizontal, Sparkles, Square, Trash2, X } from 'lucide-react';
 import type { TFunction } from 'i18next';
 
+import { SectionRow } from '@/modules/sidebar/SectionRow';
+import { useWorkspaceSections } from '@/modules/sidebar/context/WorkspaceSectionsContext';
 import { useSessionTitleGeneration } from '@/modules/sidebar/hooks/useSessionTitleGeneration';
 import { Badge, Dialog, DialogContent, DialogTitle, LLMProviderLogo, Tooltip, buttonVariants } from '@/shared/ui';
 import { cn } from '@/shared/utils';
@@ -68,6 +70,7 @@ function SidebarSessionItem({
 }: SidebarSessionItemProps) {
   const { generatingTitle, regenerateTitle, titleActionLabel } = useSessionTitleGeneration(session.id);
   const isCompact = useCompactSidebar();
+  const sections = useWorkspaceSections();
   const sessionView = createSessionViewModel(session, currentTime, t);
   const isSelected = selectedSession?.id === session.id;
   const compactSessionAge = formatCompactAge(sessionView.sessionTime, currentTime);
@@ -151,7 +154,7 @@ function SidebarSessionItem({
   };
 
   return (
-    <div className="group relative">
+    <SectionRow target={{kind:'session',targetId:session.id,title:sessionView.sessionName}} showButton={false}><div className="group relative">
       {(showAttentionIndicator || showBackgroundIndicator || showRecentIndicator) && (
         <div className="absolute left-0 top-1/2 -translate-x-1 -translate-y-1/2 transform">
           <Tooltip content={indicatorLabel} position="right">
@@ -251,6 +254,7 @@ function SidebarSessionItem({
 
         <Dialog open={isMobileOptionsOpen} onOpenChange={setMobileOptionsOpen}>
           <DialogContent
+            wrapperClassName="z-[80]"
             aria-describedby="mobile-session-options-description"
             animationClassName="animate-bottom-sheet-content-show motion-reduce:animate-none"
             className="bottom-[var(--keyboard-height,0px)] left-0 top-auto max-w-none translate-x-0 translate-y-0 rounded-b-none rounded-t-2xl border-x-0 border-b-0 px-4 pb-safe-area-inset-bottom pt-3"
@@ -315,6 +319,7 @@ function SidebarSessionItem({
               </div>
             ) : (
               <div className="space-y-2">
+                {sections?.layout && <button type="button" className="min-h-12 w-full rounded-xl border border-border px-4 py-3 text-left text-sm" onClick={() => { setMobileOptionsOpen(false); sections.openMove({ kind: 'session', targetId: session.id, title: sessionView.sessionName }); }}>移到分区 ▸</button>}
                 <button
                   type="button"
                   onClick={startMobileRename}
@@ -485,7 +490,7 @@ function SidebarSessionItem({
         )}
       </div>
       )}
-    </div>
+    </div></SectionRow>
   );
 }
 
