@@ -179,7 +179,7 @@ test('only authenticated Claude sessions receive the monitor query factory', asy
   assert.deepEqual(seen,[true,false,false]);
 });
 
-test('forceStop starts the abort before killing the Claude CLI tree and reports killed pids', async () => {
+test('forceStop captures ancestry before abort and kills the captured tree after marking cancellation', async () => {
   const events: string[] = [];
   const claude = createProvider('claude', createRuntime({
     abort(sessionId) {
@@ -195,7 +195,12 @@ test('forceStop starts the abort before killing the Claude CLI tree and reports 
       events.push(`find:${providerSessionId}`);
       return [101, 202];
     },
-    async killProcessTree(pid) {
+    async listDescendants(pid) {
+      events.push(`capture:${pid}`);
+      return [pid + 1];
+    },
+    async killProcessTree(pid, captured) {
+      assert.deepEqual(captured, [pid + 1]);
       events.push(`kill:${pid}`);
       return pid === 101;
     },
@@ -204,8 +209,7 @@ test('forceStop starts the abort before killing the Claude CLI tree and reports 
   const result = await service.forceStop('claude', 'app-1');
 
   assert.deepEqual(result, { killedPids: [101] });
-  assert.equal(events[0], 'abort:app-1');
-  assert.deepEqual(events.slice(1), ['find:native-app-1', 'kill:101', 'kill:202']);
+  assert.deepEqual(events, ['find:native-app-1', 'capture:101', 'capture:202', 'abort:app-1', 'kill:101', 'kill:202']);
 });
 
 test('forceStop survives a throwing abort and kills nothing for non-Claude providers', async () => {

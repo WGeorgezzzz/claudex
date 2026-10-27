@@ -2,7 +2,13 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import test from 'node:test';
 
-import { isAlive, killProcessTree } from '@/shared/process-tree.js';
+import { descendantsFromTables, isAlive, killProcessTree } from '@/shared/process-tree.js';
+
+test('MSYS WINPID ancestry includes exec-reparented sleeps without touching another shell', () => {
+  const native = '100 10\n200 100\n300 200\n400 999\n500 998\n600 10';
+  const msys = 'PID PPID PGID WINPID TTY UID STIME COMMAND\n182 1 182 300 ? 1 00:00 bash\n183 182 182 400 ? 1 00:00 sleep\n184 182 182 500 ? 1 00:00 sleep\n185 1 185 600 ? 1 00:00 bash';
+  assert.deepEqual(descendantsFromTables(100, native, msys), [200, 300, 400, 500]);
+});
 
 // A parent that starts a long-running grandchild (the shape of a CLI running
 // `sleep 600` in a shell) and reports the grandchild's pid.

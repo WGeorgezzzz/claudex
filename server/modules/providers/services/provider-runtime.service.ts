@@ -6,7 +6,7 @@ import { AppError, userContextStorage } from '@/shared/utils.js';
 import { withUserContext, assertUserPath, getCurrentUserContext } from '@/modules/auth/index.js';
 import { providerRegistry } from '@/modules/providers/provider.registry.js';
 import { findClaudeCliProcessIds } from '@/modules/providers/services/claude-cli-liveness.service.js';
-import { killProcessTree } from '@/shared/process-tree.js';
+import { killProcessTree, listDescendants } from '@/shared/process-tree.js';
 import { providerModelsService } from '@/modules/providers/services/provider-models.service.js';
 import { sessionsService } from '@/modules/providers/services/sessions.service.js';
 import { createMonitorQuery } from '@/modules/monitors/index.js';
@@ -28,7 +28,8 @@ type ProviderRuntimeServiceDependencies = {
   resolveProvider(provider: string): IProvider;
   resolveProviderSessionId(sessionId: string | null | undefined): string | null;
   findClaudeCliProcessIds(providerSessionId: string): Promise<number[]>;
-  killProcessTree(pid: number): Promise<boolean>;
+  killProcessTree(pid: number, capturedDescendants?: number[]): Promise<boolean>;
+  listDescendants(pid: number): Promise<number[]>;
   resolveResumeModel(
     provider: LLMProvider,
     sessionId: string | undefined,
@@ -43,6 +44,7 @@ const defaultDependencies: ProviderRuntimeServiceDependencies = {
   resolveProviderSessionId: (sessionId) => sessionsService.resolveProviderSessionId(sessionId),
   findClaudeCliProcessIds,
   killProcessTree,
+  listDescendants,
   resolveResumeModel: (provider, sessionId, requestedModel) =>
     providerModelsService.resolveResumeModel(provider, sessionId, requestedModel),
   getProviderModels: (provider) => providerModelsService.getProviderModels(provider),
@@ -164,17 +166,22 @@ export function createProviderRuntimeService(
 
     /**
      * Stops a session no matter what state its process is in: the normal abort
-     * is started first (so the run loop knows the end is a cancel, not a
-     * crash), then every live CLI process tied to the session is killed with
+     * is started after capturing ancestry (so the run loop knows the end is a
+     * cancel), then every live CLI process tied to the session is killed with
      * its whole tree — shells, sub-agents, MCP servers. Also reaches a Claude
      * CLI Nexagent did not start, which a normal stop cannot interrupt.
      */
     async forceStop(providerName: LLMProvider, sessionId: string): Promise<{ killedPids: number[] }> {
       const { runtime } = dependencies.resolveProvider(providerName);
+      // Snapshot before interrupt: a fast abort can remove the shell and its
+      // MSYS ancestry before the forced kill gets a chance to enumerate it.
+      const providerSessionId = providerName === 'claude' ? dependencies.resolveProviderSessionId(sessionId) : null;
+      const pids = providerSessionId ? await dependencies.findClaudeCliProcessIds(providerSessionId) : [];
+      const trees = await Promise.all(pids.map(pid => dependencies.listDescendants(pid)));
       let abortPromise: Promise<unknown>;
       try {
         // Call synchronously so the runtime records the cancellation before
-        // process discovery starts. This prevents a late run callback from
+        // the captured process tree is killed. This prevents a late callback from
         // recreating state while its CLI tree is being killed.
         abortPromise = Promise.resolve(runtime.abort(sessionId));
       } catch (error) {
@@ -187,10 +194,8 @@ export function createProviderRuntimeService(
 
       const killedPids: number[] = [];
       if (providerName === 'claude') {
-        const providerSessionId = dependencies.resolveProviderSessionId(sessionId);
-        const pids = providerSessionId ? await dependencies.findClaudeCliProcessIds(providerSessionId) : [];
-        for (const pid of pids) {
-          if (await dependencies.killProcessTree(pid)) {
+        for (const [index, pid] of pids.entries()) {
+          if (await dependencies.killProcessTree(pid, trees[index])) {
             killedPids.push(pid);
           }
         }
