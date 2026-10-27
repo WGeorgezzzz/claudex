@@ -24,6 +24,7 @@
     "subtitle": "AI 程式開發助手"
   },
   "sessions": {
+    "forceStop": "強制停止",
     "title": "工作階段",
     "newSession": "新增工作階段",
     "deleteSession": "刪除工作階段",

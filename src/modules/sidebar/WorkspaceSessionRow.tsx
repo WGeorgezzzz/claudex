@@ -19,7 +19,7 @@ export function WorkspaceSessionRow({id,title,provider,projectId,onSelect,select
   return <SessionRow sessionId={id} title={title} provider={provider} selected={selected} processing={processing&&!background} background={background}
     attention={!!row&&(row.approvalCount>0||row.blockedCount>0||(row.queuePaused&&row.queuedCount>0))} subtitle={subtitle} t={t} onSelect={onSelect}
     options={actions?<SessionOptions sessionId={id} sessionName={title} provider={provider as LLMProvider} projectId={projectId}
-      isProcessing={processing&&!background} isEditing={editing} renameDraft={editing?rename.draft:''}
+      isProcessing={processing&&!background} hasBackgroundWork={background} isEditing={editing} renameDraft={editing?rename.draft:''}
       onRenameDraftChange={actions.onRenameDraftChange} onStartEditingSession={actions.onStartEditingSession} onCancelEditingSession={actions.onCancelEditingSession}
       onSaveEditingSession={actions.onSaveEditingSession} onDeleteSession={actions.onDeleteSession}
       onFork={actions.onForkSession?()=>actions.onForkSession?.({id,summary:title,__provider:provider as LLMProvider,__projectId:projectId??undefined}):undefined} t={t}/>

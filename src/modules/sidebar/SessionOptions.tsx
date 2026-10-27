@@ -12,6 +12,7 @@ import { useProviderSessionIdCopy } from '@/modules/sidebar/hooks/useProviderSes
 import { PROVIDER_LABELS } from '@/modules/sidebar/utils/sidebarProjectFormatting';
 import { useSessionWorkspace } from '@/modules/sidebar/context/SessionWorkspaceContext';
 import { useMonitorSummaries } from '@/shared/hooks/useMonitorSummaries';
+import { useWebSocket } from '@/shared/context/WebSocketContext';
 
 type SessionOptionsProps = {
   sessionId: string;
@@ -24,6 +25,7 @@ type SessionOptionsProps = {
   projectId: string | null;
   /** A running session cannot be deleted or forked, matching the Projects row. */
   isProcessing: boolean;
+  hasBackgroundWork?: boolean;
   isEditing: boolean;
   renameDraft: string;
   onRenameDraftChange: (draft: string) => void;
@@ -55,6 +57,7 @@ export default function SessionOptions({
   provider,
   projectId,
   isProcessing,
+  hasBackgroundWork = false,
   isEditing,
   renameDraft,
   onRenameDraftChange,
@@ -68,6 +71,7 @@ export default function SessionOptions({
   className,
   t,
 }: SessionOptionsProps) {
+  const { sendMessage } = useWebSocket();
   const { generatingTitle, regenerateTitle, titleActionLabel } = useSessionTitleGeneration(sessionId);
   const containerRef = useRef<HTMLDivElement>(null);
   const workspace=useSessionWorkspace();
@@ -171,6 +175,13 @@ export default function SessionOptions({
             </div>
           )}
           items={[
+            ...(isProcessing || hasBackgroundWork ? [{
+              key: 'session-force-stop',
+              label: t('sessions.forceStop', { defaultValue: 'Force stop' }),
+              icon: X,
+              isDanger: true,
+              onSelect: () => sendMessage({ type: 'chat.abort', sessionId, force: true }),
+            }] : []),
             ...(sections?.layout ? [{ key: 'section', label: '移到分区 ▸', disabled: sections.busy, onSelect: () => sections.openMove({kind:'session',targetId:sessionId,title:sessionName}) }] : []),
             {key:'organization',label:'会话归属与工作区',icon:FolderInput,onSelect:onEditOrganization??(()=>window.dispatchEvent(new CustomEvent('sidebar:session-organization',{detail:sessionId})))},
             ...(monitors.length ? [{key:'monitor',label:'会话监测',icon:Clock3,onSelect:()=>Array.from(document.querySelectorAll<HTMLButtonElement>('[data-monitor-session]')).find(button=>button.dataset.monitorSession===sessionId)?.click()}] : []),

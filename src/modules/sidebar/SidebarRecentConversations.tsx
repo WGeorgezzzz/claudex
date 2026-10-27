@@ -34,7 +34,7 @@ export default function SidebarRecentConversations(props:SidebarRecentConversati
           processing={processing} background={background} attention={actions.attentionSessionIds.has(row.sessionId)} t={t}
           onSelect={()=>props.onConversationSelect(row.projectId,row.sessionId,row.provider)}
           subtitle={<>{row.projectDisplayName}{!processing&&!background&&age&&<> · <time dateTime={row.lastActivity??undefined}>{age}</time></>}</>}
-          options={<SessionOptions sessionId={row.sessionId} sessionName={row.sessionTitle} provider={row.provider} projectId={row.projectId} isProcessing={processing}
+          options={<SessionOptions sessionId={row.sessionId} sessionName={row.sessionTitle} provider={row.provider} projectId={row.projectId} isProcessing={processing} hasBackgroundWork={background}
             isEditing={!!rename} renameDraft={rename?.draft??''} onRenameDraftChange={actions.onRenameDraftChange} onStartEditingSession={actions.onStartEditingSession}
             onCancelEditingSession={actions.onCancelEditingSession} onSaveEditingSession={actions.onSaveEditingSession} onDeleteSession={actions.onDeleteSession}
             onFork={actions.onForkSession?()=>actions.onForkSession?.({id:row.sessionId,summary:row.sessionTitle,__provider:row.provider,__projectId:row.projectId??undefined}):undefined} t={t}/>}/></div>

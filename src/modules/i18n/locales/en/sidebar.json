@@ -46,6 +46,7 @@
     "subtitle": "AI coding assistant interface"
   },
   "sessions": {
+    "forceStop": "Force stop",
     "title": "Sessions",
     "newSession": "New Session",
     "deleteSession": "Delete Session",

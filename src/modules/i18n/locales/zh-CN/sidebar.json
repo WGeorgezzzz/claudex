@@ -45,6 +45,7 @@
     "subtitle": "AI 编程助手"
   },
   "sessions": {
+    "forceStop": "强制停止",
     "title": "会话",
     "newSession": "新建会话",
     "deleteSession": "删除会话",
