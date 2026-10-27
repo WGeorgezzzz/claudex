@@ -34,6 +34,7 @@ const STATUS_OPTIONS = [
   { value: 'in-progress', label: 'In Progress' },
   { value: 'review', label: 'Review' },
   { value: 'done', label: 'Done' },
+  { value: 'blocked', label: 'Blocked' },
   { value: 'deferred', label: 'Deferred' },
   { value: 'cancelled', label: 'Cancelled' },
 ];
@@ -66,6 +67,8 @@ export default function TaskDetailModal({
 }: TaskDetailModalProps) {
   const { currentProject, refreshTasks } = useTaskMaster();
 
+  // Subtask generation feedback remains visible in the task details.
+  const [expandNotice, setExpandNotice] = useState('');
   const [isEditMode, setIsEditMode] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
@@ -212,6 +215,10 @@ export default function TaskDetailModal({
                 <Edit className="h-5 w-5" />
               </button>
             )}
+            <button disabled={isSaving} className="mx-2 text-xs text-blue-500" onClick={async () => {
+              if (!currentProject) return; setIsSaving(true); setExpandNotice('正在展开子任务…');
+              try { const r = await api.taskmaster.expandTask(currentProject.projectId, task.id); const data = await r.json(); if (!r.ok) throw new Error(data.message || data.error?.message || '展开失败'); await refreshTasks(); setEditableTask(data.task); setExpandNotice('子任务已更新'); } catch (error) { setExpandNotice(String(error)); } finally { setIsSaving(false); }
+            }}>展开子任务</button>{expandNotice && <span role="status" className="text-xs">{expandNotice}</span>}
             <button onClick={onClose} className="rounded-md p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800" title="Close">
               <X className="h-5 w-5" />
             </button>
@@ -279,6 +286,7 @@ export default function TaskDetailModal({
             )}
           </div>
 
+          {editableTask.subtasks?.length ? <section className="rounded-lg border p-3"><h3 className="mb-2 text-sm font-medium">子任务</h3>{editableTask.subtasks.map(sub => <p key={sub.id} className="my-1 text-sm">{sub.id} · {sub.title} · {sub.status}</p>)}</section> : null}
           {task.details && (
             <div className="rounded-lg border border-gray-200 dark:border-gray-700">
               <button

@@ -1824,6 +1824,10 @@ export type TaskMasterTask = {
   parentId?: TaskId;
   dependencies?: TaskId[];
   subtasks?: TaskMasterTask[];
+  /** Current-account provenance links supplied by the backend; never grants session access. */
+  sources?: { sessionId: string; messageId: string; evidence: string }[];
+  /** Latest source-backed automatic update, redacted for other accounts. */
+  autoUpdate?: { evidence: string };
   createdAt?: string;
   updatedAt?: string;
   [key: string]: unknown;
@@ -1988,3 +1992,9 @@ export type ProjectOrganizationSnapshot = {
   sessions:{id:string;title:string;provider:string;cwd:string;roots:string[];updatedAt:string;sourceProjectId:string|null;projectId:string|null}[];
   threadOrders:Record<string,string[]>;
 };
+
+//----------------- CONVERSATION TASK AUTOMATION ------------
+/** Account-scoped automation settings; project exclusions are canonical absolute roots. */
+export type TaskMasterAutoSettings = { enabled: boolean; suggestOnly: boolean; disabledProjects: string[] };
+/** Chat task snapshot includes only the current account's source links and reversible audit receipts. */
+export type TaskMasterConversationSnapshot = { tasks: (TaskMasterTask & { sources?: { sessionId: string; messageId: string; evidence: string }[]; autoUpdate?: { evidence: string } })[]; suggestions: { title: string; evidence: string }[]; audits: { id: string; at: string; changes: unknown[]; undone?: boolean }[]; root: string | null; error: string | null; skipped: string | null };

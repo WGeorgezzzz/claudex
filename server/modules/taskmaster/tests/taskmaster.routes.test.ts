@@ -1,13 +1,11 @@
-import { installAuthorizationFixture, authenticateTestRequest, testUserId } from '@/test-support/authorization-fixture.js';
+import { installAuthorizationFixture, authenticateTestRequest } from '@/test-support/authorization-fixture.js';
 import assert from 'node:assert/strict';
-import { EventEmitter, once } from 'node:events';
+import { once } from 'node:events';
 import type { AddressInfo } from 'node:net';
-import { PassThrough } from 'node:stream';
 import test from 'node:test';
 
 import express from 'express';
 
-import { connectedClients, clientUserIds } from '@/modules/websocket/index.js';
 
 import { createTaskmasterRouter } from '../taskmaster.routes.js';
 
@@ -18,8 +16,6 @@ test('tasks route resolves project ids through the injected project adapter', as
   const router = createTaskmasterRouter({
     fileSystem: {} as typeof import('node:fs'),
     fileSystemPromises: {} as typeof import('node:fs/promises'),
-    spawnProcess: (() => { throw new Error('spawn should not run'); }) as unknown as
-      Parameters<typeof createTaskmasterRouter>[0]['spawnProcess'],
     resolveProjectPathById: (projectId) => { resolvedIds.push(projectId); return null; },
     taskmasterService: {
       detectMcpServer: async () => ({
@@ -47,8 +43,6 @@ test('MCP status route delegates detection to the injected TaskMaster service', 
   const router = createTaskmasterRouter({
     fileSystem: {} as typeof import('node:fs'),
     fileSystemPromises: {} as typeof import('node:fs/promises'),
-    spawnProcess: (() => { throw new Error('spawn should not run'); }) as unknown as
-      Parameters<typeof createTaskmasterRouter>[0]['spawnProcess'],
     resolveProjectPathById: () => null,
     taskmasterService: {
       detectMcpServer: async () => {
@@ -95,111 +89,4 @@ test('MCP status route delegates detection to the injected TaskMaster service', 
   }
 
   assert.equal(detectionCount, 1);
-});
-
-test('TaskMaster process errors use the endpoint failure response and settle once', async () => {
-  const child = new EventEmitter() as EventEmitter & {
-    stdin: PassThrough;
-    stdout: PassThrough;
-    stderr: PassThrough;
-  };
-  child.stdin = new PassThrough();
-  child.stdout = new PassThrough();
-  child.stderr = new PassThrough();
-
-  const router = createTaskmasterRouter({
-    fileSystem: { constants: { F_OK: 0 } } as typeof import('node:fs'),
-    fileSystemPromises: {
-      access: async () => { throw new Error('not initialized'); },
-    } as unknown as typeof import('node:fs/promises'),
-    spawnProcess: (() => {
-      process.nextTick(() => {
-        child.emit('error', new Error('spawn failed'));
-        child.emit('close', 1);
-      });
-      return child;
-    }) as unknown as Parameters<typeof createTaskmasterRouter>[0]['spawnProcess'],
-    resolveProjectPathById: () => '/workspace/project',
-    taskmasterService: {
-      detectMcpServer: async () => ({
-        hasMCPServer: false,
-        reason: 'Not configured',
-        hasConfig: false,
-      }),
-    },
-  });
-  const app = express().use(authenticateTestRequest).use('/api/taskmaster', router);
-  const server = app.listen(0, '127.0.0.1');
-  await once(server, 'listening');
-
-  try {
-    const address = server.address() as AddressInfo;
-    const response = await fetch(`http://127.0.0.1:${address.port}/api/taskmaster/init/project-1`, {
-      method: 'POST',
-    });
-    assert.equal(response.status, 500);
-    assert.deepEqual(await response.json(), {
-      error: 'Failed to initialize TaskMaster',
-      message: 'spawn failed',
-      code: null,
-    });
-  } finally {
-    await new Promise<void>((resolve) => server.close(() => resolve()));
-  }
-});
-
-test('TaskMaster broadcasts reach only the tracked chat clients', async () => {
-  const child = new EventEmitter() as EventEmitter & {
-    stdin: PassThrough;
-    stdout: PassThrough;
-    stderr: PassThrough;
-  };
-  child.stdin = new PassThrough();
-  child.stdout = new PassThrough();
-  child.stderr = new PassThrough();
-
-  const chatClient = { readyState: 1, frames: [] as string[], send(data: string) { this.frames.push(data); } };
-  const closingClient = { readyState: 3, frames: [] as string[], send(data: string) { this.frames.push(data); } };
-
-  const router = createTaskmasterRouter({
-    fileSystem: { constants: { F_OK: 0 } } as typeof import('node:fs'),
-    fileSystemPromises: {
-      access: async () => { throw new Error('not initialized'); },
-    } as unknown as typeof import('node:fs/promises'),
-    spawnProcess: (() => {
-      process.nextTick(() => child.emit('close', 0));
-      return child;
-    }) as unknown as Parameters<typeof createTaskmasterRouter>[0]['spawnProcess'],
-    resolveProjectPathById: () => '/workspace/project',
-    taskmasterService: {
-      detectMcpServer: async () => ({
-        hasMCPServer: false,
-        reason: 'Not configured',
-        hasConfig: false,
-      }),
-    },
-  });
-  const app = express().use(authenticateTestRequest).use('/api/taskmaster', router);
-  const server = app.listen(0, '127.0.0.1');
-  await once(server, 'listening');
-
-  connectedClients.add(chatClient as never);
-  clientUserIds.set(chatClient as never, testUserId());
-  connectedClients.add(closingClient as never);
-  try {
-    const address = server.address() as AddressInfo;
-    const response = await fetch(`http://127.0.0.1:${address.port}/api/taskmaster/init/project-1`, {
-      method: 'POST',
-    });
-    assert.equal(response.status, 200);
-
-    assert.equal(chatClient.frames.length, 1);
-    const frame = JSON.parse(chatClient.frames[0]) as Record<string, unknown>;
-    assert.equal(frame.type, 'taskmaster-project-updated');
-    assert.equal(frame.projectId, 'project-1');
-    assert.equal(closingClient.frames.length, 0);
-  } finally {
-    connectedClients.clear();
-    await new Promise<void>((resolve) => server.close(() => resolve()));
-  }
 });

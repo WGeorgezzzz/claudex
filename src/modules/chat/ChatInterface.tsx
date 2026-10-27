@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next';
 import { ArrowDownIcon } from 'lucide-react';
 
-import { useTasksSettings } from '@/modules/task-master';
+import { useTasksSettings, ConversationTasksPanel } from '@/modules/task-master';
 import { usePaletteOpsRegister } from '@/modules/command-palette';
 import { useWebSocket } from '@/shared/context/WebSocketContext';
 import PermissionContext from '@/modules/chat/context/PermissionContext';
@@ -340,6 +340,17 @@ function ChatInterface({
   // Lets other modules (the quick settings Commands tab) hand text to the
   // composer: append it after a separating space, then focus the textarea with
   // the caret at the end once React has rendered the new value.
+  // A source outside the loaded tail must wait for full history before revealing its row.
+  const [taskSource, setTaskSource] = useState<{id: string; evidence: string} | null>(null);
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get('taskMessage');
+    if (id) { setTaskSource({ id, evidence: '' }); void loadFullTranscript(); }
+  }, [currentSessionId, loadFullTranscript]);
+  useEffect(() => {
+    if (!taskSource) return;
+    const source = chatMessages.find(m => m.id === taskSource.id || m.transcriptAnchorId === taskSource.id || (taskSource.evidence && typeof m.content === 'string' && m.content.includes(taskSource.evidence)));
+    if (source) { revealMessage(source); setTaskSource(null); }
+  }, [chatMessages, taskSource, revealMessage]);
   const insertComposerText = useCallback((text: string) => {
     setInput((previous) => {
       const separator = previous && !/\s$/.test(previous) ? ' ' : '';
@@ -509,6 +520,17 @@ function ChatInterface({
             {isSideChat && contextCutoff && <button type="button"
               className="mx-4 mt-2 self-start rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-muted"
               onClick={()=>setShowInherited(value=>!value)}>{t(showInherited?'sideChat.hideContext':'sideChat.showContext')}</button>}
+            <ConversationTasksPanel key={currentSessionId || selectedSession?.id} sessionId={currentSessionId || selectedSession?.id || null} busy={isProcessing}
+              onExecute={text => {
+                const id = currentSessionId || selectedSession?.id;
+                if (!id || isProcessing) return;
+                sendMessage({ type: 'chat.send', sessionId: id, content: text, options: { model: currentProviderModel, effort: currentProviderEffort, permissionMode } });
+                addMessage({ type: 'user', content: text, timestamp: new Date() });
+              }}
+              onSource={(id, evidence) => {
+                const message = chatMessages.find(m => m.id === id || m.transcriptAnchorId === id || (typeof m.content === 'string' && m.content.includes(evidence)));
+                if (message) revealMessage(message); else { setTaskSource({id, evidence}); void loadFullTranscript(); }
+              }}/>
             <ChatMessagesPane
               scrollContainerRef={scrollContainerRef}
               // Not redundant with the `scroll` listener. A first page is 20 rows,

@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 
-import { useTasksSettings } from '@/modules/task-master';
+import { useTasksSettings, TaskAutomationSettings } from '@/modules/task-master';
 import SettingsCard from '@/modules/settings/SettingsCard';
 import SettingsRow from '@/modules/settings/SettingsRow';
 import SettingsSection from '@/modules/settings/SettingsSection';
@@ -18,6 +18,7 @@ export default function TasksSettingsTab() {
 
   return (
     <div className="space-y-8">
+      <SettingsCard className="p-4"><TaskAutomationSettings/></SettingsCard>
       <SettingsSection title={t('mainTabs.tasks')}>
         {isCheckingInstallation ? (
           <SettingsCard className="p-4">

@@ -1,104 +1,33 @@
-import { useState } from 'react';
-import { Plus, Terminal } from 'lucide-react';
-import { useTranslation } from 'react-i18next';
-
-import { cn } from '@/shared/utils';
-import { Shell } from '@/modules/shell';
+import { useEffect, useState } from 'react';
+import { CheckCircle, ListChecks, X } from 'lucide-react';
+import { api } from '@/shared/api';
 import type { TaskMasterProject } from '@/shared/types';
 
-type TaskMasterSetupModalProps = {
-  isOpen: boolean;
-  project: TaskMasterProject | null;
-  onClose: () => void;
-  onAfterClose?: (() => void) | null;
-};
-
-/** Rendered by TaskBoard and NextTaskBanner to run TaskMaster initialisation for a project in an embedded shell. */
-export default function TaskMasterSetupModal({ isOpen, project, onClose, onAfterClose = null }: TaskMasterSetupModalProps) {
-  const { t } = useTranslation('tasks');
-  const [isTaskMasterComplete, setIsTaskMasterComplete] = useState(false);
-
-  if (!isOpen || !project) {
-    return null;
-  }
-
-  const closeModal = () => {
-    onClose();
-    setIsTaskMasterComplete(false);
-
-    // Delay refresh slightly so the CLI has time to flush writes to disk.
-    window.setTimeout(() => {
-      onAfterClose?.();
-    }, 800);
+type Props = { isOpen: boolean; project: TaskMasterProject | null; onClose: () => void; onAfterClose?: (() => void) | null };
+/** Task board and chat banner initialize projects through an ordinary authenticated request. */
+export default function TaskMasterSetupModal({ isOpen, project, onClose, onAfterClose }: Props) {
+  // Request outcome drives progress, readable failures and retry availability.
+  const [state, setState] = useState<'idle' | 'busy' | 'done'>('idle');
+  // Failure text stays visible until the user retries or closes the dialog.
+  const [error, setError] = useState('');
+  useEffect(() => { if (isOpen) { setState('idle'); setError(''); } }, [isOpen, project?.projectId]);
+  if (!isOpen || !project) return null;
+  const initialize = async () => {
+    setState('busy'); setError('');
+    try {
+      const response = await api.taskmaster.initialize(project.projectId), result = await response.json();
+      if (!response.ok) throw new Error(result.message || result.error?.message || '初始化失败，请检查项目写入权限。');
+      setState('done'); onAfterClose?.();
+    } catch (caught) { setError(caught instanceof Error ? caught.message : '初始化失败'); setState('idle'); }
   };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 p-4 pt-16 backdrop-blur-sm">
-      <div className="flex h-[600px] w-full max-w-4xl flex-col rounded-lg border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900">
-        <div className="flex items-center justify-between border-b border-gray-200 p-4 dark:border-gray-700">
-          <div className="flex items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-900/50">
-              <Terminal className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-            </div>
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{t('setupModal.title')}</h2>
-              <p className="text-sm text-gray-500 dark:text-gray-400">{t('setupModal.subtitle', { projectName: project.displayName })}</p>
-            </div>
-          </div>
-
-          <button
-            onClick={closeModal}
-            className="rounded-md p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
-            title="Close"
-          >
-            <Plus className="h-5 w-5 rotate-45" />
-          </button>
-        </div>
-
-        <div className="flex-1 p-4">
-          <div className="h-full overflow-hidden rounded-lg bg-black">
-            <Shell
-              selectedProject={project}
-              selectedSession={null}
-              initialCommand="npx task-master init"
-              isPlainShell
-              isActive
-              onProcessComplete={(exitCode) => {
-                if (exitCode === 0) {
-                  setIsTaskMasterComplete(true);
-                }
-              }}
-            />
-          </div>
-        </div>
-
-        <div className="border-t border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800/50">
-          <div className="flex items-center justify-between">
-            <div className="text-sm text-gray-600 dark:text-gray-400">
-              {isTaskMasterComplete ? (
-                <span className="flex items-center gap-2 text-green-600 dark:text-green-400">
-                  <span className="h-2 w-2 rounded-full bg-green-500" />
-                  {t('setupModal.completed')}
-                </span>
-              ) : (
-                t('setupModal.willStart')
-              )}
-            </div>
-
-            <button
-              onClick={closeModal}
-              className={cn(
-                'px-4 py-2 text-sm font-medium rounded-md transition-colors',
-                isTaskMasterComplete
-                  ? 'bg-green-600 hover:bg-green-700 text-white'
-                  : 'text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600',
-              )}
-            >
-              {isTaskMasterComplete ? t('setupModal.closeContinueButton') : t('setupModal.closeButton')}
-            </button>
-          </div>
-        </div>
-      </div>
+  return <div role="dialog" aria-label="初始化任务管理" className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+    <div className="w-full max-w-lg rounded-xl border bg-card p-6 shadow-xl">
+      <div className="flex items-center justify-between"><h2 className="flex gap-2 text-lg font-semibold"><ListChecks/>初始化任务管理</h2><button disabled={state === 'busy'} onClick={onClose} aria-label="关闭"><X/></button></div>
+      <p className="my-4 text-sm text-muted-foreground">为 {project.displayName} 创建空任务集和模型设置。无需填写密钥，随后即可从聊天整理任务。</p>
+      <ol className="my-4 space-y-2 text-sm"><li>1. 创建项目任务目录</li><li>2. 保留已有任务和配置</li><li>3. 准备对话任务管理</li></ol>
+      {state === 'busy' && <div role="status" className="my-4"><progress className="w-full"/>正在准备项目任务集…</div>}
+      {error && <p role="alert" className="my-4 text-sm text-red-500">{error}</p>}
+      {state === 'done' ? <div className="flex items-center justify-between text-green-600"><span className="flex gap-2"><CheckCircle/>已准备好</span><button onClick={onClose}>完成并继续</button></div> : <button disabled={state === 'busy'} onClick={() => void initialize()} className="rounded-lg bg-primary px-4 py-2 text-primary-foreground disabled:opacity-50">{state === 'busy' ? '正在初始化…' : error ? '重试初始化' : '一键初始化'}</button>}
     </div>
-  );
+  </div>;
 }

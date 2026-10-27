@@ -9,7 +9,7 @@ import {
   Play,
   Settings,
   Target,
-  Terminal,
+  ListChecks,
   Zap,
 } from 'lucide-react';
 
@@ -94,7 +94,7 @@ export default function NextTaskBanner({ onShowAllTasks = null, onStartTask = nu
               onClick={() => setShowSetupModal(true)}
               className="flex items-center gap-1 rounded bg-blue-600 px-2 py-1 text-xs text-white transition-colors hover:bg-blue-700"
             >
-              <Terminal className="h-3 w-3" />
+              <ListChecks className="h-3 w-3" />
               {t('tasks:banner.initialize')}
             </button>
           </div>

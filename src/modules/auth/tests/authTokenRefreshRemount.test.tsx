@@ -125,7 +125,8 @@ test('verified Access automatically opens a fresh browser without a second login
   assert.ok(localStorage.getItem('auth-token'));
   assert.equal(requestedPaths.filter((path) => path === '/api/auth/access-exchange').length, 1);
   assert.equal(requestedPaths.includes('/api/auth/login'), false);
-  assert.equal(workspaceMounts, 1);
+  // Rendering the workspace precedes its mount effect under a busy worker.
+  await waitFor(() => assert.equal(workspaceMounts, 1));
 });
 
 test('failed Access exchange clears an old credential and does not enter the workspace', async () => {

@@ -40,7 +40,7 @@ import {
     authRoutes,
     validateApiKey,
 } from './modules/auth/index.js';
-import { taskmasterRoutes } from './modules/taskmaster/index.js';
+import { taskmasterRoutes, taskmasterAutoService } from './modules/taskmaster/index.js';
 import { commandsRoutes } from './modules/commands/index.js';
 import { settingsRoutes } from './modules/settings/index.js';
 import { usageRoutes, initializeUsage, closeUsage } from './modules/usage/index.js';
@@ -122,6 +122,7 @@ const agentRoutes = createAgentModule({
 chatRunRegistry.setRetentionGuard((sessionId) => providerRuntimeService.hasBackgroundWork(sessionId));
 chatRunRegistry.setCompletionListener((sessionId, userId) => {
     if (userId === null) return;
+    taskmasterAutoService.schedule(sessionId, Number(userId));
     try { withUserContext(userId, () => sessionTitlesService.automatic(sessionId, 'completed')); }
     catch (error) { console.warn('[SessionTitles] Owner context unavailable:', String(error)); }
 });
@@ -393,7 +394,7 @@ async function startServer() {
         }
 
         console.log(`${terminalTextStyles.info('[INFO]')} To run in development mode with hot-module replacement, go to http://${DISPLAY_HOST}:${VITE_PORT}`);
-   
+
         server.listen(SERVER_PORT, HOST, async () => {
             const appInstallPath = APP_ROOT;
             await writeLocalServerMarker().catch((error) => {

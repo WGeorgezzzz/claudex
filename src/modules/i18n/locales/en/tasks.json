@@ -1,7 +1,7 @@
 {
   "notConfigured": {
     "title": "TaskMaster AI is not configured",
-    "description": "TaskMaster helps break down complex projects into manageable tasks with AI-powered assistance",
+    "description": "Prepare tasks with one click, then organize action items from everyday conversations.",
     "whatIsTitle": "🎯 What is TaskMaster?",
     "features": {
       "aiPowered": "AI-Powered Task Management: Break complex projects into manageable subtasks",
@@ -14,7 +14,7 @@
   },
   "gettingStarted": {
     "title": "Getting Started with TaskMaster",
-    "subtitle": "TaskMaster is initialized! Here's what to do next:",
+    "subtitle": "Organize tasks from chat, or optionally generate them from a saved requirements document.",
     "steps": {
       "createPRD": {
         "title": "Create a Product Requirements Document (PRD)",
@@ -28,14 +28,14 @@
       },
       "analyzeTasks": {
         "title": "Analyze & Expand Tasks",
-        "description": "Ask your AI assistant to analyze task complexity and expand them into detailed subtasks for easier implementation."
+        "description": "Expand subtasks and review dependencies in task details."
       },
       "startBuilding": {
         "title": "Start Building",
         "description": "Ask your AI assistant to begin working on tasks, update their status, and add new tasks as your project evolves."
       }
     },
-    "tip": "💡 Tip: Start with a PRD to get the most out of TaskMaster's AI-powered task generation"
+    "tip": "Open Conversation tasks above the chat to organize, confirm suggestions and undo automatic updates."
   },
   "setupModal": {
     "title": "TaskMaster Setup",

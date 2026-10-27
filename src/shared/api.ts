@@ -591,6 +591,14 @@ export const api = {
 
   // TaskMaster endpoints — all addressed by DB projectId post-migration.
   taskmaster: {
+    expandTask: (id: string, taskId: string | number) => post(`/api/taskmaster/expand-task/${encodeURIComponent(id)}/${encodeURIComponent(taskId)}`),
+    initialize: (id: string) => post(`/api/taskmaster/init/${encodeURIComponent(id)}`),
+    autoSettings: () => get('/api/taskmaster/auto/settings'),
+    saveAutoSettings: (settings: unknown) => put('/api/taskmaster/auto/settings', settings),
+    conversation: (id: string) => get(`/api/taskmaster/auto/sessions/${encodeURIComponent(id)}`),
+    conversationAction: (id: string, action: 'extract'|'confirm'|'undo', auditId?: string) => post(`/api/taskmaster/auto/sessions/${encodeURIComponent(id)}/${action}`, {auditId}),
+    generatePrd: (id: string, fileName: string) => post(`/api/taskmaster/parse-prd/${encodeURIComponent(id)}`, {fileName}),
+    addTask: (id: string, body: unknown) => post(`/api/taskmaster/add-task/${encodeURIComponent(id)}`, body),
     // Update a task
     updateTask: (projectId: string, taskId: string | number, updates: unknown) =>
       put(`/api/taskmaster/update-task/${projectId}/${taskId}`, updates),

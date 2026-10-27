@@ -1,80 +1,26 @@
-import { Sparkles, X } from 'lucide-react';
+import { useState } from 'react';
+import { X } from 'lucide-react';
+import { api } from '@/shared/api';
+import { useTaskMaster } from '@/modules/task-master';
 
-const PRD_DOCS_URL =
-  'https://github.com/eyaltoledano/claude-task-master/blob/main/docs/examples.md';
-
-type GenerateTasksModalProps = {
-  isOpen: boolean;
-  fileName: string;
-  onClose: () => void;
-};
-
-/** Opened by PrdEditorWorkspace inside the prd-editor module to explain how to turn the saved PRD into TaskMaster tasks. */
-export default function GenerateTasksModal({
-  isOpen,
-  fileName,
-  onClose,
-}: GenerateTasksModalProps) {
-  if (!isOpen) {
-    return null;
-  }
-
-  return (
-    <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-lg border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-800">
-        <div className="flex items-center justify-between border-b border-gray-200 p-6 dark:border-gray-700">
-          <div className="flex items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-100 dark:bg-purple-900/50">
-              <Sparkles className="h-4 w-4 text-purple-600 dark:text-purple-400" />
-            </div>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-              Generate Tasks from PRD
-            </h3>
-          </div>
-          <button
-            onClick={onClose}
-            className="rounded-md p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-
-        <div className="space-y-4 p-6">
-          <div className="rounded-lg border border-purple-200 bg-purple-50 p-4 dark:border-purple-800 dark:bg-purple-900/20">
-            <h4 className="mb-2 font-semibold text-purple-900 dark:text-purple-100">
-              Ask Claude Code directly
-            </h4>
-            <p className="mb-3 text-sm text-purple-800 dark:text-purple-200">
-              Save this PRD, then ask Claude Code in chat to parse the file and create your initial tasks.
-            </p>
-
-            <div className="rounded border border-purple-200 bg-white p-3 dark:border-purple-700 dark:bg-gray-800">
-              <p className="mb-1 text-xs font-medium text-gray-600 dark:text-gray-400">Example prompt</p>
-              <p className="font-mono text-xs text-gray-900 dark:text-white">
-                I have a PRD at .taskmaster/docs/{fileName}. Parse it and create the initial tasks.
-              </p>
-            </div>
-          </div>
-
-          <div className="border-t border-gray-200 pt-4 text-center dark:border-gray-700">
-            <a
-              href={PRD_DOCS_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-block text-sm font-medium text-purple-600 underline hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300"
-            >
-              View TaskMaster documentation
-            </a>
-          </div>
-
-          <button
-            onClick={onClose}
-            className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
-          >
-            Got it
-          </button>
-        </div>
-      </div>
-    </div>
-  );
+type Props = { isOpen: boolean; fileName: string; onClose: () => void };
+/** PRD editor requests task generation from the saved project document without opening a terminal. */
+export default function GenerateTasksModal({ isOpen, fileName, onClose }: Props) {
+  const { currentProject, refreshTasks } = useTaskMaster();
+  // Network state drives a bounded ordinary progress indicator.
+  const [busy, setBusy] = useState(false);
+  // The result remains reviewable before the dialog is closed.
+  const [result, setResult] = useState('');
+  if (!isOpen) return null;
+  return <div role="dialog" aria-label="生成任务" className="fixed inset-0 z-[300] flex items-center justify-center bg-black/50 p-4"><div className="w-full max-w-md space-y-4 rounded-xl border bg-card p-6">
+    <div className="flex justify-between"><h2 className="font-semibold">从需求生成任务</h2><button disabled={busy} onClick={onClose} aria-label="关闭"><X/></button></div>
+    <p className="text-sm text-muted-foreground">请先保存 {fileName}。系统将整理待办并合并已有任务。</p>
+    {busy && <div role="status"><progress className="w-full"/>正在分析需求和已有任务…</div>}
+    {result && <p role="status" className="text-sm">{result}</p>}
+    <button disabled={busy || !currentProject} className="rounded bg-primary px-4 py-2 text-primary-foreground disabled:opacity-50" onClick={async () => {
+      if (!currentProject) return; setBusy(true); setResult('');
+      try { const r = await api.taskmaster.generatePrd(currentProject.projectId, fileName), data = await r.json(); if (!r.ok) throw new Error(data.message || data.error?.message || '生成失败'); await refreshTasks(); setResult(`已新增 ${data.created ?? 0} 项，更新 ${data.updated ?? 0} 项。`); }
+      catch (e) { setResult(String(e)); } finally { setBusy(false); }
+    }}>{busy ? '生成中…' : '生成任务'}</button>
+  </div></div>;
 }

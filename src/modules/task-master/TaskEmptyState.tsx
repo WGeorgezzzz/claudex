@@ -1,4 +1,4 @@
-import { FileText, Settings, Terminal } from 'lucide-react';
+import { FileText, Settings, ListChecks } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { cn } from '@/shared/utils';
@@ -42,7 +42,7 @@ export default function TaskEmptyState({
               <p>- {t('notConfigured.features.prdTemplates')}</p>
               <p>- {t('notConfigured.features.dependencyTracking')}</p>
               <p>- {t('notConfigured.features.progressVisualization')}</p>
-              <p>- {t('notConfigured.features.cliIntegration')}</p>
+
             </div>
           </div>
 
@@ -50,7 +50,7 @@ export default function TaskEmptyState({
             onClick={onOpenSetupModal}
             className="mx-auto flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 font-medium text-white transition-colors hover:bg-blue-700"
           >
-            <Terminal className="h-4 w-4" />
+            <ListChecks className="h-4 w-4" />
             {t('notConfigured.initializeButton')}
           </button>
         </div>

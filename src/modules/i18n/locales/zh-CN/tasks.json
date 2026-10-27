@@ -1,7 +1,7 @@
 {
   "notConfigured": {
     "title": "TaskMaster AI 尚未配置",
-    "description": "TaskMaster 帮助将复杂的项目分解为可管理的任务，配合 AI 驱动的辅助功能",
+    "description": "一键准备任务集，之后可从日常对话自动整理待办。",
     "whatIsTitle": "🎯 什么是 TaskMaster？",
     "features": {
       "aiPowered": "AI 驱动的任务管理：将复杂项目分解为可管理的子任务",
@@ -14,7 +14,7 @@
   },
   "gettingStarted": {
     "title": "开始使用 TaskMaster",
-    "subtitle": "TaskMaster 已初始化！以下是接下来要做的事：",
+    "subtitle": "正常聊天即可整理任务，也可选择从需求文档生成。",
     "steps": {
       "createPRD": {
         "title": "创建产品需求文档（PRD）",
@@ -28,14 +28,14 @@
       },
       "analyzeTasks": {
         "title": "分析并展开任务",
-        "description": "请 AI 助手分析任务复杂度，并将其展开为详细的子任务以便于实现。"
+        "description": "在任务详情中展开子任务并查看依赖。"
       },
       "startBuilding": {
         "title": "开始构建",
         "description": "请 AI 助手开始处理任务、更新状态，并在项目演进时添加新任务。"
       }
     },
-    "tip": "💡 提示：从 PRD 开始可以充分利用 TaskMaster 的 AI 驱动任务生成功能"
+    "tip": "在对话上方打开“本对话的任务”，可手动整理、确认建议和撤销自动更新。"
   },
   "setupModal": {
     "title": "TaskMaster 设置",

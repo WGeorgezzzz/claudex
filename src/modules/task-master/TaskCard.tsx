@@ -189,6 +189,8 @@ function TaskCard({ task, onClick = null, showParent = false, className = '' }: 
         </Tooltip>
       </div>
 
+      {task.autoUpdate && <p className="text-xs text-green-600">自动更新：依据 {task.autoUpdate.evidence}</p>}
+      {task.sources?.slice(-1).map(source => <a key={source.messageId} href={`/session/${encodeURIComponent(source.sessionId)}?taskMessage=${encodeURIComponent(source.messageId)}`} onClick={event => event.stopPropagation()} className="text-xs text-blue-500 underline">查看原对话位置</a>)}
       {progress.total > 0 && (
         <div className="ml-3">
           <div className="mb-1 flex items-center gap-2">

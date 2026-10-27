@@ -27,11 +27,7 @@ type TasksSettingsContextValue = {
   isCheckingInstallation: boolean;
 };
 
-/**
- * Tasks are off unless the user turns them on. The feature depends on an
- * external TaskMaster install, so defaulting it on put a Tasks tab and a chat
- * banner in front of everyone who had never heard of it.
- */
+/** Native task management is available without installing an external CLI. */
 const TASKS_ENABLED_DEFAULT = false;
 
 const TasksSettingsContext = createContext<TasksSettingsContextValue>({
