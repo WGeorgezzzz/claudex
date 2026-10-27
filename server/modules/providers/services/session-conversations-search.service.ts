@@ -41,6 +41,7 @@ type ProjectConversationResult = {
 
 type SessionTitleSearchResult = {
   sessionId: string;
+  providerSessionId: string | null;
   provider: string;
   projectId: string | null;
   projectDisplayName: string;
@@ -187,8 +188,11 @@ function findSessionTitleResults(
       // A pasted session id is the fastest way to reach a conversation whose
       // title says nothing about it, so the id is searched alongside the title.
       const normalizedSessionId = session.session_id.toLocaleLowerCase();
+      const normalizedProviderSessionId = (session.provider_session_id || '').toLocaleLowerCase();
       const titleMatchIndex = normalizedTitle.indexOf(normalizedQuery);
-      const idMatchIndex = normalizedSessionId.indexOf(normalizedQuery);
+      const idMatchIndex = normalizedQuery.includes(' ')
+        ? -1
+        : Math.min(...[normalizedSessionId, normalizedProviderSessionId].filter(Boolean).map(id => id.indexOf(normalizedQuery)).filter(index => index !== -1), Number.POSITIVE_INFINITY);
       const matchIndex = titleMatchIndex !== -1 ? titleMatchIndex : idMatchIndex;
       if (matchIndex === -1) {
         return [];
@@ -212,6 +216,7 @@ function findSessionTitleResults(
 
       return [{
         sessionId: session.session_id,
+        providerSessionId: session.provider_session_id ?? null,
         provider: session.provider,
         projectId: project?.project_id ?? null,
         projectDisplayName: projectPath

@@ -3,7 +3,7 @@ import path from 'node:path';
 
 import type { WebSocket } from 'ws';
 
-import { sessionsDb } from '@/modules/database/index.js';
+import { getSessionOwnerId, sessionsDb, sessionWorkspaceDb } from '@/modules/database/index.js';
 import { providerModelsService, sessionsService } from '@/modules/providers/index.js';
 import { chatRunRegistry } from '@/modules/websocket/services/chat-run-registry.service.js';
 import { connectedClients, WS_OPEN_STATE, clientUserIds } from '@/modules/websocket/services/websocket-state.service.js';
@@ -460,6 +460,12 @@ async function handleChatAbort(
     const { killedPids } = await dependencies.runtime.forceStop(provider, sessionId);
     if (activeRun) {
       chatRunRegistry.completeRunIfCurrent(activeRun, { exitCode: 0, aborted: true });
+    }
+    const ownerId = getSessionOwnerId(sessionId);
+    if (ownerId !== null) {
+      // A forced kill is an explicit boundary: queued turns must wait for a
+      // deliberate resume instead of starting against a torn-down runtime.
+      withUserContext(ownerId, () => sessionWorkspaceDb.update(ownerId, sessionId, { queuePaused: true }));
     }
     sendJson(ws, {
       kind: 'force_stopped',
