@@ -171,9 +171,16 @@ export function createProviderRuntimeService(
      */
     async forceStop(providerName: LLMProvider, sessionId: string): Promise<{ killedPids: number[] }> {
       const { runtime } = dependencies.resolveProvider(providerName);
-      const abortPromise = Promise.resolve()
-        .then(() => runtime.abort(sessionId))
-        .catch((error) => {
+      let abortPromise: Promise<unknown>;
+      try {
+        // Call synchronously so the runtime records the cancellation before
+        // process discovery starts. This prevents a late run callback from
+        // recreating state while its CLI tree is being killed.
+        abortPromise = Promise.resolve(runtime.abort(sessionId));
+      } catch (error) {
+        abortPromise = Promise.reject(error);
+      }
+      abortPromise = abortPromise.catch((error) => {
           console.error(`[ForceStop] abort failed for ${sessionId}:`, error?.message || error);
           return false;
         });
