@@ -118,7 +118,13 @@ export function createProviderRuntimeService(
       if (providerName === 'codex' && user?.role === 'admin' && typeof runtimeOptions.sessionId === 'string'
         && userPreferencesDb.getPreferences(userId)[`taskmasterCodexSession:${runtimeOptions.sessionId}`] === true) {
         const codexHome = process.env.TASKMASTER_CODEX_HOME || path.join(os.homedir(), '.codex-qz');
-        return userContextStorage.run({ ...user, codexHome, env: { ...user.env, CODEX_HOME: codexHome } }, () => provider.runtime.run(command, runtimeOptions, writer, context));
+        return userContextStorage.run({ ...user, codexHome, env: { ...user.env, CODEX_HOME: codexHome } }, async () => {
+          const startedAt = new Date(Date.now() - 1000);
+          const result = await provider.runtime.run(command, runtimeOptions, writer, context);
+          // The ordinary watcher follows the account home; index this relay turn before completion extraction reads it.
+          await provider.sessionSynchronizer.synchronize(startedAt);
+          return result;
+        });
       }
       return provider.runtime.run(command, runtimeOptions, writer, context);
     };

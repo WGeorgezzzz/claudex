@@ -11,7 +11,8 @@ import { getConnection, projectsDb, userDb, sessionsDb } from '@/modules/databas
 import { AppError } from '@/shared/index.js';
 import { connectedClients, clientUserIds } from '@/modules/websocket/index.js';
 import { withUserContext } from '@/modules/auth/index.js';
-import { taskmasterAutoService } from '../taskmaster-auto.service.js';
+import { taskmasterAutoService, taskmasterWorkspace } from '../taskmaster-auto.service.js';
+import { sessionsService } from '@/modules/providers/index.js';
 import { createTaskmasterNativeRouter } from '../taskmaster-native.routes.js';
 
 installAuthorizationFixture();
@@ -72,4 +73,18 @@ test('temporary model congestion retries at one-minute intervals and stops after
   t.mock.timers.tick(1); await new Promise<void>(resolve => setImmediate(resolve)); assert.equal(attempts, 2);
   t.mock.timers.tick(60000); await new Promise<void>(resolve => setImmediate(resolve)); assert.equal(attempts, 3);
   t.mock.timers.tick(600000); await new Promise<void>(resolve => setImmediate(resolve)); assert.equal(attempts, 3);
+});
+
+test('completion extraction includes recorded tool results without treating plans as completed work', async t => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'taskmaster-tool-evidence-')), userId = testUserId();
+  withUserContext(userId, () => { projectsDb.createProjectPath(root, 'Evidence'); sessionsDb.createAppSession('tool-evidence-session', 'codex', root, 'Evidence'); });
+  t.mock.method(sessionsService, 'fetchHistory', async () => ({ messages: [
+    { id: 'user', kind: 'text', role: 'user', content: '写入并读回标记' },
+    { id: 'tool', kind: 'tool_use', toolName: 'Bash', toolInput: 'read marker', toolResult: { content: 'marker-ok', isError: false } },
+    { id: 'answer', kind: 'text', role: 'assistant', content: '已完成，读回 marker-ok' },
+  ], total: 3, hasMore: false, offset: 0, limit: null }));
+  let evidence: { role: string; content: string }[] = [];
+  t.mock.method(taskmasterWorkspace, 'extract', async (_root: string, _user: number, _session: string, messages: { id: string; role: string; content: string }[]) => { evidence = messages; return { status: 'unchanged', created: 0, updated: 0 }; });
+  await withUserContext(userId, () => taskmasterAutoService.extract('tool-evidence-session'));
+  assert.equal(evidence.length, 3); assert.equal(evidence[1].role, 'tool'); assert(evidence[1].content.includes('marker-ok'));
 });

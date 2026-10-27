@@ -49,8 +49,9 @@ export const taskmasterAutoService = {
     if (!settings.enabled || settings.disabledProjects.includes(root)) return { status: 'disabled' };
     if (chatRunRegistry.isProcessing(sessionId)) throw new AppError('请等本轮回复结束再整理。', { statusCode: 409 });
     const history = await sessionsService.fetchHistory(sessionId, { limit: null, offset: 0 });
-    const messages = history.messages.filter(m => m.kind === 'text' && ['user', 'assistant'].includes(m.role ?? '') && !m.parentToolUseId)
-      .map(m => ({ id: m.id, role: m.role!, content: m.content ?? '' }));
+    const messages = history.messages.filter(m => !m.parentToolUseId && ((m.kind === 'text' && ['user', 'assistant'].includes(m.role ?? '')) || (m.kind === 'tool_use' && m.toolResult)))
+      .map(m => ({ id: m.id, role: m.kind === 'tool_use' ? 'tool' : m.role!, content: m.kind === 'tool_use'
+        ? JSON.stringify({ tool: m.toolName, input: m.toolInput, result: m.toolResult }) : m.content ?? '' }));
     const result = await taskmasterWorkspace.extract(root, userId, sessionId, messages, settings.suggestOnly, confirm);
     if (result.created || result.updated) await taskmasterWorkspace.initialize(root);
     errors.delete(`${userId}:${sessionId}`); return result;

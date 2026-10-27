@@ -27,6 +27,7 @@ function createProvider(id: LLMProvider, runtime: IProviderRuntime): IProvider {
   return {
     id,
     runtime,
+    sessionSynchronizer: { async synchronize() { return 0; } },
     auth: {
       async getStatus() {
         return {
@@ -90,7 +91,9 @@ test('providerRegistry owns one runtime for every registered provider', () => {
 test('TaskMaster Codex sessions use their relay home while ordinary sessions keep the account home', async () => {
   const userId = testUserId(), seen: string[] = [];
   const runtime = createRuntime({ async run() { seen.push(getCurrentUserContext()!.env.CODEX_HOME!); } });
-  const service = createService([createProvider('codex', runtime)]), writer = { userId, send() {} };
+  const provider = createProvider('codex', runtime), indexed: string[] = [];
+  provider.sessionSynchronizer.synchronize = async () => { indexed.push(getCurrentUserContext()!.env.CODEX_HOME!); return 1; };
+  const service = createService([provider]), writer = { userId, send() {} };
   const original = process.env.TASKMASTER_CODEX_HOME;
   process.env.TASKMASTER_CODEX_HOME = 'D:/test-taskmaster-relay';
   try {
@@ -98,6 +101,7 @@ test('TaskMaster Codex sessions use their relay home while ordinary sessions kee
     await service.getRunner('codex')('task', { sessionId: 'relay-task-session' }, writer);
     await service.getRunner('codex')('ordinary', { sessionId: 'ordinary-session' }, writer);
     assert.equal(seen[0], 'D:/test-taskmaster-relay'); assert.notEqual(seen[1], seen[0]);
+    assert.deepEqual(indexed, ['D:/test-taskmaster-relay']);
   } finally { if (original === undefined) delete process.env.TASKMASTER_CODEX_HOME; else process.env.TASKMASTER_CODEX_HOME = original; }
 });
 
