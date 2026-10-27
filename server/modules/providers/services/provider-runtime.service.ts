@@ -1,7 +1,9 @@
-import { getSessionOwnerId } from '@/modules/database/index.js';
+import path from 'node:path';
+import os from 'node:os';
+import { getSessionOwnerId, userPreferencesDb } from '@/modules/database/index.js';
 import { agentDiscoveryService } from './agent-discovery.service.js';
-import { AppError } from '@/shared/utils.js';
-import { withUserContext, assertUserPath } from '@/modules/auth/index.js';
+import { AppError, userContextStorage } from '@/shared/utils.js';
+import { withUserContext, assertUserPath, getCurrentUserContext } from '@/modules/auth/index.js';
 import { providerRegistry } from '@/modules/providers/provider.registry.js';
 import { providerModelsService } from '@/modules/providers/services/provider-models.service.js';
 import { sessionsService } from '@/modules/providers/services/sessions.service.js';
@@ -110,6 +112,13 @@ export function createProviderRuntimeService(
           const owner = getSessionOwnerId(runtimeOptions.sessionId);
           if (owner != null && owner !== userId) throw new AppError('Session belongs to another user.', { statusCode: 403 });
         }
+      }
+      const user = getCurrentUserContext();
+      // TaskMaster stores this server-owned marker when creating a Codex session. Subsequent turns keep its relay profile.
+      if (providerName === 'codex' && user?.role === 'admin' && typeof runtimeOptions.sessionId === 'string'
+        && userPreferencesDb.getPreferences(userId)[`taskmasterCodexSession:${runtimeOptions.sessionId}`] === true) {
+        const codexHome = process.env.TASKMASTER_CODEX_HOME || path.join(os.homedir(), '.codex-qz');
+        return userContextStorage.run({ ...user, codexHome, env: { ...user.env, CODEX_HOME: codexHome } }, () => provider.runtime.run(command, runtimeOptions, writer, context));
       }
       return provider.runtime.run(command, runtimeOptions, writer, context);
     };

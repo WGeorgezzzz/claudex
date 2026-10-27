@@ -1,4 +1,6 @@
 import { memo, useCallback } from 'react';
+import { useLocation } from 'react-router-dom';
+import { GlobalTasksPage } from '@/modules/task-master';
 
 import { useProjectMainState } from '@/modules/project-workspace/context/ProjectsStateContext';
 import type { SessionEstablishedContext, SessionNavigationOptions,ProjectWorkspaceShellProps } from '@/shared/types';
@@ -11,6 +13,7 @@ function ProjectMainRegion({
   sendMessage,
   navigate,
 }: ProjectWorkspaceShellProps) {
+  const location = useLocation();
   const {
     selectedProject,
     selectedSession,
@@ -50,6 +53,7 @@ function ProjectMainRegion({
     void refreshProjectsSilently();
   }, [refreshProjectsSilently]);
 
+  if (location.pathname === '/tasks') return <GlobalTasksPage onMenuClick={handleOpenSidebar}/>;
   return (
     <WorkspaceMain
       selectedProject={selectedProject}

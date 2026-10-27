@@ -68,6 +68,67 @@ async function load(root: string) {
 /** TaskMaster module routes and completion hooks share atomic native writes; no subprocesses are created. */
 export function createTaskmasterWorkspaceService(generate: (input: unknown) => Promise<unknown>, changed: (root: string, kind: 'project' | 'tasks') => void = () => {}) {
   return {
+    async removeCompletedTest(root: string, userId: number, taskId: string, expectedTitle: string) {
+      return exclusive(root, async () => {
+        const data = await load(root), index = data.tasks.findIndex(t => String(t.id) === taskId), task = data.tasks[index];
+        if (!task || task.title !== expectedTitle || !task.title.startsWith('[测试]') || task.source !== '本地验收' || task.status !== 'done') throw new AppError('仅允许清理已完成且标题匹配的本地验收任务。', { statusCode: 409 });
+        data.state.audits.push({ id: randomUUID(), userId, sessionId: 'test-cleanup', at: new Date().toISOString(), changes: [{ id: task.id, before: structuredClone(task), after: { ...task, removed: true } }] });
+        data.tasks.splice(index, 1); await atomic(data.file, data.document); changed(root, 'tasks'); return { removed: task.id };
+      });
+    },
+    async importInbox(root: string, userId: number, batchId: string, items: {
+      id: number | string; title: string; detail: string; source: string; due: string; urgency: string;
+      options: { key: string; label: string; plan: string }[]; recommended: string;
+    }[]) {
+      return exclusive(root, async () => {
+        const data = await load(root);
+        const batches = (data.state as State & { inboxBatches?: Record<string, { hash: string; tasks: { inputId: string | number; taskId: string | number }[]; auditId: string | null }> }).inboxBatches ??= {};
+        const identity = `${userId}:${batchId}`, hash = createHash('sha256').update(JSON.stringify(items)).digest('hex');
+        if (batches[identity]) {
+          if (batches[identity].hash !== hash) throw new AppError('批次编号已用于其他内容。', { statusCode: 409 });
+          return batches[identity];
+        }
+        const audit: Audit = { id: randomUUID(), userId, sessionId: 'global', at: new Date().toISOString(), changes: [] };
+        const mappings: { inputId: string | number; taskId: string | number }[] = [];
+        for (const item of items) {
+          let task = data.tasks.find(t => !['done', 'cancelled'].includes(t.status) && similar(t.title, item.title));
+          const completed = !task && data.tasks.find(t => t.status === 'done' && similar(t.title, item.title));
+          if (completed) { mappings.push({ inputId: item.id, taskId: completed.id }); continue; }
+          const before = task ? structuredClone(task) : null;
+          if (!task) {
+            task = { id: Math.max(0, ...data.tasks.map(t => Number(t.id) || 0)) + 1, title: item.title, status: 'pending', dependencies: [], subtasks: [], createdAt: audit.at };
+            data.tasks.push(task);
+          }
+          Object.assign(task, { title: item.title, description: item.detail, details: item.detail,
+            priority: ({ '高': 'high', '中': 'medium', '低': 'low' } as Record<string, string>)[item.urgency] ?? 'medium',
+            due: item.due, source: item.source, options: item.options, recommended: item.recommended,
+            batchId, batchIds: [...new Set([...(task.batchIds as string[] ?? []), batchId])], updatedAt: audit.at });
+          audit.changes.push({ id: task.id, before, after: structuredClone(task) });
+          mappings.push({ inputId: item.id, taskId: task.id });
+        }
+        for (const change of audit.changes) change.after = structuredClone(data.tasks.find(t => t.id === change.id)!);
+        if (audit.changes.length) data.state.audits.push(audit);
+        const receipt = { hash, tasks: mappings, auditId: audit.changes.length ? audit.id : null };
+        batches[identity] = receipt;
+        await atomic(data.file, data.document); changed(root, 'tasks'); return receipt;
+      });
+    },
+    async globalSnapshot(root: string, userId: number) {
+      const data = await load(root);
+      return { audits: data.state.audits.filter(a => a.userId === userId && a.sessionId === 'global').slice(-30).map(a => ({ id: a.id, at: a.at, undone: a.undone, changes: a.changes.map(c => ({ id: c.id, title: c.after.title, status: c.after.status })) })) };
+    },
+    async changeInboxTask(root: string, userId: number, taskId: string, mutate: (task: Task) => Promise<Record<string, unknown>>) {
+      return exclusive(root, async () => {
+        const data = await load(root), task = data.tasks.find(t => String(t.id) === taskId);
+        if (!task) throw new AppError('任务不存在。', { statusCode: 404 });
+        const before = structuredClone(task), changes = await mutate(structuredClone(task));
+        Object.assign(task, changes, { updatedAt: new Date().toISOString() });
+        const execution = changes.executionSessionId !== undefined;
+        const audit: Audit = { id: randomUUID(), userId, sessionId: execution ? 'execution' : 'global', at: new Date().toISOString(), changes: [{ id: task.id, before, after: structuredClone(task) }] };
+        data.state.audits.push(audit); await atomic(data.file, data.document); changed(root, 'tasks');
+        return { task, auditId: execution ? null : audit.id };
+      });
+    },
     async initialize(root: string) {
       return exclusive(root, async () => {
         for (const directory of ['tasks', 'docs', 'reports']) await fs.mkdir(path.join(root, '.taskmaster', directory), { recursive: true });

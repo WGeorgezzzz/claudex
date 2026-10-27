@@ -67,6 +67,14 @@ export const authenticatedFetch = (
 
 type QueryValue = string | number | boolean | null | undefined;
 
+/** Global tasks and the sidebar share the authenticated TaskMaster transport. */
+export const inboxTasksApi = {
+  list: () => authenticatedFetch('/api/taskmaster/inbox/global'),
+  execute: (projectId: string, taskId: string, option: string) => authenticatedFetch('/api/taskmaster/inbox/execute', { method: 'POST', body: JSON.stringify({ projectId, taskId, option }) }),
+  action: (projectId: string, taskId: string, action: 'done' | 'cancelled') => authenticatedFetch('/api/taskmaster/inbox/action', { method: 'POST', body: JSON.stringify({ projectId, taskId, action }) }),
+  undo: (projectId: string, auditId: string) => authenticatedFetch('/api/taskmaster/inbox/undo', { method: 'POST', body: JSON.stringify({ projectId, auditId }) }),
+};
+
 // Serializes a query object into `?a=1&b=2` (or an empty string). Empty and
 // `false` values are dropped so optional flags can be passed unconditionally.
 const query = (params: Record<string, QueryValue>): string => {

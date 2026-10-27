@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { installAuthorizationFixture } from '@/test-support/authorization-fixture.js';
+import { installAuthorizationFixture, testUserId } from '@/test-support/authorization-fixture.js';
+import { userPreferencesDb } from '@/modules/database/index.js';
+import { getCurrentUserContext, withUserContext } from '@/modules/auth/index.js';
 
 installAuthorizationFixture();
 
@@ -83,6 +85,20 @@ test('providerRegistry owns one runtime for every registered provider', () => {
   ]);
   assert.equal(providers.every((provider) => typeof provider.runtime.run === 'function'), true);
   assert.equal(providers.every((provider) => typeof provider.runtime.abort === 'function'), true);
+});
+
+test('TaskMaster Codex sessions use their relay home while ordinary sessions keep the account home', async () => {
+  const userId = testUserId(), seen: string[] = [];
+  const runtime = createRuntime({ async run() { seen.push(getCurrentUserContext()!.env.CODEX_HOME!); } });
+  const service = createService([createProvider('codex', runtime)]), writer = { userId, send() {} };
+  const original = process.env.TASKMASTER_CODEX_HOME;
+  process.env.TASKMASTER_CODEX_HOME = 'D:/test-taskmaster-relay';
+  try {
+    withUserContext(userId, () => userPreferencesDb.savePreferences(userId, { 'taskmasterCodexSession:relay-task-session': true }));
+    await service.getRunner('codex')('task', { sessionId: 'relay-task-session' }, writer);
+    await service.getRunner('codex')('ordinary', { sessionId: 'ordinary-session' }, writer);
+    assert.equal(seen[0], 'D:/test-taskmaster-relay'); assert.notEqual(seen[1], seen[0]);
+  } finally { if (original === undefined) delete process.env.TASKMASTER_CODEX_HOME; else process.env.TASKMASTER_CODEX_HOME = original; }
 });
 
 test('dispatches runs and aborts through the runtime owned by providerRegistry', async () => {

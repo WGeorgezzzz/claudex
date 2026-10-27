@@ -3,6 +3,8 @@ import path from 'node:path';
 import { z } from 'zod';
 import { userContextMiddleware, requireContextUserId, authorizeProjectParameter, authorizePaths } from '@/modules/access-control/index.js';
 import { projectsDb } from '@/modules/database/index.js';
+import { requireSharedResourceAdministrator } from '@/modules/auth/index.js';
+import { inboxBatchSchema, taskmasterInboxService } from './taskmaster-inbox.service.js';
 import { taskmasterAutoService, taskmasterWorkspace } from './taskmaster-auto.service.js';
 
 /** TaskMaster composition mounts these native endpoints ahead of legacy document routes. */
@@ -25,6 +27,15 @@ export function createTaskmasterNativeRouter() {
   router.post('/auto/sessions/:sessionId/confirm', action(req => taskmasterAutoService.extract(String(req.params.sessionId), true)));
   router.post('/auto/sessions/:sessionId/undo', action(req => taskmasterAutoService.undo(String(req.params.sessionId), z.string().uuid().parse(req.body.auditId))));
   const root = (req: express.Request) => projectsDb.getProjectPathById(String(req.params.projectId))!;
+  router.use('/inbox', requireSharedResourceAdministrator);
+  const execution = z.object({ projectId: z.string().min(1), taskId: z.string().min(1), option: z.enum(['A', 'B', 'C']).optional() });
+  router.post('/inbox/import', action(req => taskmasterInboxService.import(inboxBatchSchema.parse(req.body))));
+  router.get('/inbox/global', action(() => taskmasterInboxService.global()));
+  router.get('/inbox/status', action(req => taskmasterInboxService.status(z.string().min(1).parse(req.query.projectId))));
+  router.post('/inbox/execute', action(req => { const p = execution.parse(req.body); return taskmasterInboxService.execute(p.projectId, p.taskId, p.option); }));
+  router.post('/inbox/action', action(req => { const p = execution.extend({ action: z.enum(['done', 'cancelled']) }).parse(req.body); return taskmasterInboxService.action(p.projectId, p.taskId, p.action); }));
+  router.post('/inbox/undo', action(req => { const p = z.object({ projectId: z.string().min(1), auditId: z.string().uuid() }).parse(req.body); return taskmasterInboxService.undo(p.projectId, p.auditId); }));
+  router.post('/inbox/test-cleanup', action(req => { const p = execution.extend({ title: z.string().min(1) }).parse(req.body); return taskmasterInboxService.cleanup(p.projectId, p.taskId, p.title); }));
   router.get('/installation-status', action(() => ({ success: true, installation: { isInstalled: true, version: 'native' }, mcpServer: { hasMCPServer: false }, isReady: true })));
   router.get('/tasks/:projectId', action(req => taskmasterWorkspace.list(root(req), requireContextUserId())));
   router.post('/init/:projectId', action(async req => ({ projectId: req.params.projectId, ...await taskmasterWorkspace.initialize(root(req)) })));
