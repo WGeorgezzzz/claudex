@@ -2,6 +2,7 @@ import { memo, useEffect, useRef } from 'react';
 import { Check, ChevronDown, ChevronRight, Edit3, Star, Trash2, X, Folder } from 'lucide-react';
 import type { TFunction } from 'i18next';
 
+import { SectionRow } from '@/modules/sidebar/SectionRow';
 import { Button } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 import type { LLMProvider, MCPServerStatus, Project, ProjectSession, SessionWithProvider, SidebarSessionSelection } from '@/shared/types';
@@ -160,7 +161,7 @@ function SidebarProjectItem({
 
   return (
     <div className={cn('sidebar-project-item md:space-y-0.5', isDeleting && 'opacity-50 pointer-events-none')}>
-      <div className="md:group group sticky top-0 z-10">
+      <SectionRow target={{kind:'project',targetId:project.projectId,title:project.displayName}}><div className="md:group group sticky top-0 z-10">
         {isCompact && (
         <div className="bg-[var(--workspace-sidebar)]">
           <div
@@ -306,6 +307,7 @@ function SidebarProjectItem({
 
         {!isCompact && (
         <Button
+          aria-expanded={isExpanded}
           variant="ghost"
           className={cn(
             'sticky top-0 z-10 flex w-full justify-between p-2 h-auto font-normal hover:bg-accent/50',
@@ -442,7 +444,7 @@ function SidebarProjectItem({
           </div>
         </Button>
         )}
-      </div>
+      </div></SectionRow>
 
       <SidebarProjectSessions
         project={project}

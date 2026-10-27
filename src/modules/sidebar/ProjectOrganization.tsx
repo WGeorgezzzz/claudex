@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Folder, MoreHorizontal, Plus, Settings2, X } from 'lucide-react';
 
+import { SectionRow } from '@/modules/sidebar/SectionRow';
 import { api, readApiErrorMessage } from '@/shared/api';
 import { Dialog, DialogContent, DialogTitle } from '@/shared/ui';
 import type { LLMProvider, Project, ProjectOrganizationSnapshot, SidebarProjectListProps } from '@/shared/types';
@@ -55,7 +56,7 @@ export function ProjectOrganization({props}:{props:SidebarProjectListProps}) {
   const renderRows=(rows:ProjectOrganizationSnapshot['sessions'],manual:boolean)=>rows.filter(row=>props.projects.length===props.filteredProjects.length||props.filteredProjects.some(p=>p.projectId===row.sourceProjectId)).map((row,index)=>{
     const project=row.sourceProjectId&&snapshot.projects.some(p=>p.id===row.sourceProjectId)?projectFor(row.sourceProjectId):{projectId:'projectless',displayName:'无项目对话',fullPath:row.cwd};
     const rename=props.activeRename?.target==='session'&&props.activeRename.id===row.id?props.activeRename:null;
-    return <div key={row.id} data-organization-session={row.id} className="group/organization flex min-w-0 items-center" draggable={manual&&!busy} onDragStart={event=>{dragged.current=row.id;event.dataTransfer.setData('text/plain',row.id);}} onDragOver={event=>{if(manual)event.preventDefault();}} onDrop={event=>{event.preventDefault();if(manual&&dragged.current&&rows.some(s=>s.id===dragged.current))move(row.projectId,dragged.current,index);dragged.current=null;}}>
+    return <div key={row.id} data-organization-session={row.id} className="group/organization flex min-w-0 items-center" draggable={manual&&!busy} onDragStartCapture={()=>{dragged.current=row.id;}} onDragOver={event=>{if(manual)event.preventDefault();}} onDrop={event=>{event.preventDefault();event.stopPropagation();if(manual&&dragged.current&&rows.some(s=>s.id===dragged.current))move(row.projectId,dragged.current,index);dragged.current=null;}}>
       <div className="min-w-0 flex-1"><SidebarSessionItem project={project} session={{id:row.id,summary:row.title,updated_at:row.updatedAt,__provider:row.provider as LLMProvider}} selectedSession={props.selectedSession}
         isProcessing={props.activeSessions.has(row.id)} hasBackgroundWork={props.backgroundSessionIds.has(row.id)} needsAttention={props.attentionSessionIds.has(row.id)} currentTime={props.currentTime}
         isEditing={!!rename} renameDraft={rename?.draft??''} onRenameDraftChange={props.onRenameDraftChange} onStartEditingSession={props.onStartEditingSession} onCancelEditingSession={props.onCancelEditingSession} onSaveEditingSession={props.onSaveEditingSession}
@@ -71,12 +72,12 @@ export function ProjectOrganization({props}:{props:SidebarProjectListProps}) {
     {error&&<p role="alert" className="mx-3 py-1 text-xs text-destructive">{error}</p>}
     {snapshot.mode==='flat'?renderRows([...snapshot.sessions].sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt)),false):<>
       {snapshot.projects.filter(project=>needle!==null||props.filteredProjects.some(p=>p.projectId===project.id)).map((project,index)=><section key={project.id} aria-label={project.name} className="mb-2">
-        <div className="mx-2 flex items-center gap-1 rounded px-1 hover:bg-muted"><button aria-label={'展开项目：'+project.name} aria-expanded={!project.collapsed} disabled={busy} onClick={()=>{if(props.selectedProject?.projectId!==project.id)props.onProjectSelect(projectFor(project.id));void change({action:'collapse',projectId:project.id,collapsed:!project.collapsed});}} className="flex min-w-0 flex-1 items-center gap-1 py-2 text-left text-xs">{project.collapsed?<ChevronRight size={13}/>:<ChevronDown size={13}/>}<Folder size={13}/><span className="min-w-0 flex-1 truncate" title={project.rootPaths.join('\n')}>{project.name}</span><span className="text-muted-foreground">{sorted(project.id).length}</span></button>
+        <SectionRow target={{kind:'project',targetId:project.id,title:project.name}}><div className="mx-2 flex items-center gap-1 rounded px-1 hover:bg-muted"><button aria-label={'展开项目：'+project.name} aria-expanded={!project.collapsed} disabled={busy} onClick={()=>{if(props.selectedProject?.projectId!==project.id)props.onProjectSelect(projectFor(project.id));void change({action:'collapse',projectId:project.id,collapsed:!project.collapsed});}} className="flex min-w-0 flex-1 items-center gap-1 py-2 text-left text-xs">{project.collapsed?<ChevronRight size={13}/>:<ChevronDown size={13}/>}<Folder size={13}/><span className="min-w-0 flex-1 truncate" title={project.rootPaths.join('\n')}>{project.name}</span><span className="text-muted-foreground">{sorted(project.id).length}</span></button>
           <button aria-label={'新建项目对话：'+project.name} className="p-1 text-muted-foreground" onClick={()=>{const selected=projectFor(project.id);props.onProjectSelect(selected);props.onNewSession(selected);}}><Plus size={13}/></button>
           <button aria-label={'项目设置：'+project.name} className="p-1 text-muted-foreground" onClick={()=>{setEditor({kind:'project',id:project.id});setName(project.name);setRoots(project.rootPaths.join('\n'));}}><Settings2 size={13}/></button>
           <button aria-label={'上移项目：'+project.name} disabled={busy||index===0} onClick={()=>void change({action:'move',projectId:project.id,direction:'up'})} className="p-1 text-muted-foreground disabled:opacity-20"><ArrowUp size={11}/></button>
           <button aria-label={'下移项目：'+project.name} disabled={busy||index===snapshot.projects.length-1} onClick={()=>void change({action:'move',projectId:project.id,direction:'down'})} className="p-1 text-muted-foreground disabled:opacity-20"><ArrowDown size={11}/></button>
-        </div>{!project.collapsed&&renderRows(sorted(project.id),true)}
+        </div></SectionRow>{!project.collapsed&&renderRows(sorted(project.id),true)}
       </section>)}
       <section aria-label="无项目对话"><h3 className="mx-3 py-2 text-xs text-muted-foreground">无项目对话</h3>{renderRows(sorted(null),true)}</section>
     </>}

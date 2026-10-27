@@ -1998,3 +1998,7 @@ export type ProjectOrganizationSnapshot = {
 export type TaskMasterAutoSettings = { enabled: boolean; suggestOnly: boolean; disabledProjects: string[] };
 /** Chat task snapshot includes only the current account's source links and reversible audit receipts. */
 export type TaskMasterConversationSnapshot = { tasks: (TaskMasterTask & { sources?: { sessionId: string; messageId: string; evidence: string }[]; autoUpdate?: { evidence: string } })[]; suggestions: { title: string; evidence: string }[]; audits: { id: string; at: string; changes: unknown[]; undone?: boolean }[]; root: string | null; error: string | null; skipped: string | null };
+// ---------------------------
+//----------------- SIDEBAR SECTION INTERACTION ------------
+/** A stable project or conversation identity passed between row menus and section drop targets. */
+export type WorkspaceSectionTarget = { kind: 'project' | 'session'; targetId: string; title: string };

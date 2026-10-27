@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { Check, Edit2, GitBranch, Mail, MailOpen, MoreHorizontal, Sparkles, Pin, PinOff, Trash2, X } from 'lucide-react';
 import type { TFunction } from 'i18next';
 
+import { useWorkspaceSections } from '@/modules/sidebar/context/WorkspaceSectionsContext';
 import { useSessionTitleGeneration } from '@/modules/sidebar/hooks/useSessionTitleGeneration';
 import { ActionMenu } from '@/shared/ui';
 import { cn } from '@/shared/utils';
@@ -67,6 +68,7 @@ export default function SessionOptions({
   const { generatingTitle, regenerateTitle, titleActionLabel } = useSessionTitleGeneration(sessionId);
   const containerRef = useRef<HTMLDivElement>(null);
   const workspace=useSessionWorkspace();
+  const sections = useWorkspaceSections();
   const organization=workspace?.byId.get(sessionId);
   const providerLabel = PROVIDER_LABELS[provider];
   const { copyState, copyLabel, setOptionsOpen, handleCopyAction, isCopyPending, CopyStateIcon } =
@@ -155,7 +157,7 @@ export default function SessionOptions({
           size="icon"
           onOpenChange={setOptionsOpen}
           triggerClassName="h-7 w-7 text-muted-foreground opacity-70 hover:bg-muted hover:opacity-100"
-          menuClassName="w-[260px] rounded-xl p-1.5 shadow-xl"
+          menuClassName="z-[100] w-[260px] rounded-xl p-1.5 shadow-xl"
           header={(
             <div className="mb-1 border-b border-border px-3 py-2">
               <p className="truncate text-xs font-medium text-foreground" title={sessionName}>
@@ -165,6 +167,7 @@ export default function SessionOptions({
             </div>
           )}
           items={[
+            ...(sections?.layout ? [{ key: 'section', label: '移到分区 ▸', disabled: sections.busy, onSelect: () => sections.openMove({kind:'session',targetId:sessionId,title:sessionName}) }] : []),
             ...(workspace?.ready?[
               {key:'pin',label:t(organization?.pinnedAt?'workspace.unpin':'workspace.pin'),icon:organization?.pinnedAt?PinOff:Pin,
                 onSelect:()=>{void workspace.change(sessionId,{pinned:!organization?.pinnedAt}).catch(()=>{});}},

@@ -3,6 +3,7 @@ import { Fragment } from 'react';
 import type { MouseEvent } from 'react';
 import type { TFunction } from 'i18next';
 
+import { SectionRow } from '@/modules/sidebar/SectionRow';
 import { Button, LLMProviderLogo, Tooltip } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 import type { ProjectSession, RecentConversationListItem, SessionRowActions } from '@/shared/types';
@@ -141,7 +142,7 @@ export default function SidebarRecentConversations({
                 {conversation.provider === 'claude' ? 'Claude' : t('sessions.otherProviders', 'Other chats')}
               </h3>
             )}
-            <div key={conversation.sessionId} className="group relative">
+            <SectionRow target={{kind:'session',targetId:conversation.sessionId,title:conversation.sessionTitle}} showButton={false}><div className="group relative">
               {/*
                 * Only the amber "needs attention" dot, and the spinner below. The
                 * Projects row also has a green dot for a session touched recently,
@@ -244,7 +245,7 @@ export default function SidebarRecentConversations({
                   : undefined}
                 t={t}
               />
-            </div>
+            </div></SectionRow>
             </Fragment>
           );
         })}

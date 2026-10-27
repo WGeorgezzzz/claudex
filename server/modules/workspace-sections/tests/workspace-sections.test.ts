@@ -40,3 +40,36 @@ test('section assignments reject foreign session IDs and omit stale saved refere
     layout=workspaceSectionsService.list(user+1);assert.deepEqual(layout.assignments,[]);assert.deepEqual(layout.sessionItems,[]);
   }finally{closeConnection();if(old===undefined)delete process.env.DATABASE_PATH;else process.env.DATABASE_PATH=old;await rm(root,{recursive:true,force:true});}
 });
+
+test('atomic section creation assigns owned items, rejects duplicates and rolls back invalid/foreign targets', async () => {
+  const root=await mkdtemp(path.join(os.tmpdir(),'nexagent-section-create-')); const old=process.env.DATABASE_PATH;
+  closeConnection(); process.env.DATABASE_PATH=path.join(root,'test.db'); await initializeDatabase();
+  try {
+    const user=Number(userDb.createUser('section-atomic','hash').id);
+    sessionsDb.createAppSession('atomic-chat','claude',root,'Atomic chat');
+    const project=projectsDb.getProjectPath(root)!;
+    let view=workspaceSectionsService.update(user,{revision:0,action:'create-assign',name:' Research ',kind:'session',targetId:'atomic-chat'});
+    const first=view.sections[0].id; assert.equal(view.sections[0].name,'Research'); assert.deepEqual(view.assignments,[{kind:'session',targetId:'atomic-chat',sectionId:first}]);
+    const unchanged=structuredClone(view);
+    for (const input of [
+      {action:'create',name:'research'},
+      {action:'create-assign',name:'Research',kind:'project',targetId:project.project_id},
+      {action:'create-assign',name:'Invalid project',kind:'project',targetId:'missing'},
+      {action:'create-assign',name:'Invalid kind',kind:'anything',targetId:'atomic-chat'},
+    ]) {
+      assert.throws(()=>workspaceSectionsService.update(user,{revision:view.revision,...input}));
+      assert.deepEqual(workspaceSectionsService.list(user),unchanged);
+    }
+    const other=Number(userDb.createUser('section-atomic-other','hash').id);
+    assert.throws(()=>workspaceSectionsService.update(other,{revision:0,action:'create-assign',name:'Foreign',kind:'session',targetId:'atomic-chat'}),/another user/);
+    assert.equal(workspaceSectionsService.list(other).sections.length,0);
+    view=workspaceSectionsService.update(user,{revision:view.revision,action:'create-assign',name:'Delivery',kind:'project',targetId:project.project_id});
+    const second=view.sections[1].id;
+    assert.throws(()=>workspaceSectionsService.update(user,{revision:view.revision,action:'rename',id:second,name:'RESEARCH'}),/同名/);
+    view=workspaceSectionsService.update(user,{revision:view.revision,action:'reorder',id:second,beforeId:first}); assert.equal(view.sections[0].id,second);
+    view=workspaceSectionsService.update(user,{revision:view.revision,action:'reorder',id:second,beforeId:first}); assert.equal(view.sections[1].id,second);
+    view=workspaceSectionsService.update(user,{revision:view.revision,action:'assign',kind:'session',targetId:'atomic-chat',sectionId:null}); assert.equal(view.assignments.some(row=>row.kind==='session'),false);
+    view=workspaceSectionsService.update(user,{revision:view.revision,action:'delete',id:second}); assert.equal(view.assignments.length,0);
+    assert.ok(sessionsDb.getSessionById('atomic-chat')); assert.ok(projectsDb.getProjectById(project.project_id));
+  } finally { closeConnection(); if(old===undefined)delete process.env.DATABASE_PATH;else process.env.DATABASE_PATH=old; await rm(root,{recursive:true,force:true}); }
+});
