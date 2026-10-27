@@ -3,8 +3,9 @@ import { useTranslation } from 'react-i18next';
 import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, FolderPlus, Settings2, Trash2, X } from 'lucide-react';
 
 import { api, readApiErrorMessage } from '@/shared/api';
-import { Dialog, DialogContent } from '@/shared/ui';
+import { Dialog, DialogContent, SessionMonitorBadge } from '@/shared/ui';
 import type { BridgeSessionPage, SidebarProjectListProps, WorkspaceSectionsSnapshot } from '@/shared/types';
+import { ProjectOrganization } from '@/modules/sidebar/ProjectOrganization';
 import SidebarProjectList from '@/modules/sidebar/SidebarProjectList';
 import { useSessionWorkspace } from '@/modules/sidebar/context/SessionWorkspaceContext';
 
@@ -54,13 +55,11 @@ export function WorkspaceSections({ projectListProps, onSelect }: { projectListP
     finally { writing.current = false; setBusy(false); }
   };
   // Older backends still show their ordinary project list without unsupported controls.
-  if (!layout) return <SidebarProjectList {...projectListProps}/>;
-  const assignedSessions = new Set(layout.assignments.filter(item => item.kind === 'session').map(item => item.targetId));
+  if (!layout) return <ProjectOrganization props={projectListProps}/>;
   const assignedProject = (id: string) => layout.assignments.find(item => item.kind === 'project' && item.targetId === id)?.sectionId;
-  const listProps = { ...projectListProps, getProjectSessions: (project: Parameters<SidebarProjectListProps['getProjectSessions']>[0]) => projectListProps.getProjectSessions(project).filter(row => !assignedSessions.has(row.id)) };
+  const listProps = projectListProps;
   const available = kind === 'project' ? projectListProps.projects.filter(project => `${project.displayName} ${project.fullPath}`.toLocaleLowerCase().includes(query.toLocaleLowerCase())).map(project => ({ id: project.projectId, title: project.displayName, path: project.fullPath }))
     : (page?.sessions ?? []).map(session => ({ id: session.sessionId, title: session.title, path: session.projectPath }));
-  const unassigned = projectListProps.filteredProjects.filter(project => !assignedProject(project.projectId));
   return <>
     <div className="mx-3 mb-2 flex items-center justify-between"><span className="text-xs font-medium text-muted-foreground">{t(layout.sections.length?'sections.title':'sections.projects')}</span>
       <button type="button" aria-label={t('sections.manage')} onClick={() => setOpen(true)} className="rounded p-1.5 text-muted-foreground hover:bg-muted"><Settings2 size={14}/></button></div>
@@ -76,13 +75,12 @@ export function WorkspaceSections({ projectListProps, onSelect }: { projectListP
           {sessions.map(session => <a key={session.sessionId} title={session.projectPath||session.provider} href={`/session/${encodeURIComponent(session.sessionId)}`} className={`mx-3 block rounded px-2 py-2 text-[13px] hover:bg-muted ${projectListProps.selectedSession?.id === session.sessionId ? 'bg-muted' : ''}`} onClick={event => {
             if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
             event.preventDefault(); onSelect(session.projectId, session.sessionId, session.provider);
-          }}><span className="block truncate">{projectListProps.activeSessions.has(session.sessionId) ? '◌ ' : workspace?.byId.get(session.sessionId)?.unread ? '● ' : ''}{session.title}</span></a>)}
+          }}><span className="block truncate">{projectListProps.activeSessions.has(session.sessionId) ? '◌ ' : workspace?.byId.get(session.sessionId)?.unread ? '● ' : ''}<SessionMonitorBadge sessionId={session.sessionId}/>{session.title}</span></a>)}
           {projects.length + sessions.length === 0 && <p className="mx-5 py-2 text-[11px] text-muted-foreground">{t('sections.empty')}</p>}
         </>}
       </section>;
     })}
-    {layout.sections.length>0&&<h3 className="mx-3 mb-1 text-xs font-medium text-muted-foreground">{t('sections.unassigned')}</h3>}
-    {(unassigned.length > 0 || projectListProps.projects.length === 0 || projectListProps.isLoading) && <SidebarProjectList {...listProps} filteredProjects={unassigned}/>}
+    <ProjectOrganization props={projectListProps}/>
     <Dialog open={open} onOpenChange={setOpen}><DialogContent aria-label={t('sections.manage')} className="flex max-h-[85dvh] max-w-2xl flex-col overflow-hidden">
       <header className="flex items-center justify-between"><h2 className="font-semibold">{t('sections.manage')}</h2><button aria-label={t('sections.close')} onClick={() => setOpen(false)}><X size={18}/></button></header>
       <p className="text-xs text-muted-foreground">{t('sections.description')}</p>

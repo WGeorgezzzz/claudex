@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Inbox, Mail, MailOpen, Pin, RefreshCw, X } from 'lucide-react';
 
-import { Dialog, DialogContent } from '@/shared/ui';
+import { Dialog, DialogContent, SessionMonitorBadge } from '@/shared/ui';
 import type { SessionWorkspaceChange, SessionWorkspaceEntry } from '@/shared/types';
 import { useSessionWorkspace } from '@/modules/sidebar/context/SessionWorkspaceContext';
 
@@ -89,7 +89,7 @@ export function SessionInbox({ onSelect }: { onSelect: (projectId: string | null
                 if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
                 event.preventDefault(); setOpen(false); onSelect(row.projectId, row.sessionId, row.provider);
               }}>
-                <div className={`break-words text-sm ${row.unread ? 'font-semibold' : ''}`}>{row.unread && <span className="mr-1 text-primary" aria-label={t('workspace.unread')}>●</span>}{row.title}</div>
+                <div className={`break-words text-sm ${row.unread ? 'font-semibold' : ''}`}>{row.unread && <span className="mr-1 text-primary" aria-label={t('workspace.unread')}>●</span>}<SessionMonitorBadge sessionId={row.sessionId}/>{row.title}</div>
                 <p className="mt-1 break-all text-xs text-muted-foreground">{row.projectPath || t('inbox.noProject')} · {row.provider}</p>
                 <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
                   {row.approvalCount > 0 && <span className="text-amber-600 dark:text-amber-400">{t('workspace.waitingApproval', { count: row.approvalCount })}</span>}

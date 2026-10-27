@@ -32,3 +32,5 @@ export { ScrollArea } from '@/shared/ui/ScrollArea';
 export { Shimmer } from '@/shared/ui/Shimmer';
 export { Tooltip } from '@/shared/ui/Tooltip';
 export { MonitorScheduleFields } from '@/shared/ui/MonitorScheduleFields';
+
+export { SessionMonitorBadge } from '@/shared/ui/SessionMonitorBadge';

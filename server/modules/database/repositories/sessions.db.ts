@@ -1,7 +1,8 @@
+import { projectOrganizationDb } from '@/modules/database/repositories/project-organization.db.js';
 import { getConnection } from '@/modules/database/connection.js';
 import { projectsDb } from '@/modules/database/repositories/projects.db.js';
 import { normalizeProjectPath } from '@/shared/utils.js';
-import { ownerPredicate } from '@/modules/database/ownership.js';
+import { getOwnerUserId, ownerPredicate } from '@/modules/database/ownership.js';
 
 type SessionRow = {
   owner_id: number | null;
@@ -196,6 +197,8 @@ export const sessionsDb = {
        VALUES (?, ?, NULL, ?, 'auto', ?, NULL, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
     ).run(sessionId, provider, customName ?? null, normalizedProjectPath);
 
+    const project=projectsDb.getProjectPath(normalizedProjectPath);
+    if(project)projectOrganizationDb.recordNewSession(getOwnerUserId(),sessionId,project.project_id,normalizedProjectPath);
     return sessionId;
   },
 

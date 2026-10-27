@@ -5,6 +5,11 @@ import { parseMonitorCalendarSchedule } from '@/shared/index.js';
 
 /** Used by monitor HTTP routes for validation and lifecycle changes. */
 export const monitorsService = {
+  summaries(userId:number) {
+    const sessions:Record<string,ReturnType<typeof monitorsDb.summaries>>=Object.create(null);
+    for(const row of monitorsDb.summaries(userId))(sessions[row.session_id]??=[]).push(row);
+    return {...sessions};
+  },
   create(userId: number, input: Record<string, unknown>) {
     const sessionId=typeof input.sessionId==='string'?input.sessionId:'';
     const content=typeof input.content==='string'?input.content.trim():'';

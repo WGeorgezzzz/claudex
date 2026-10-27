@@ -2,6 +2,7 @@
 // Load environment variables before other imports execute.
 import './load-env.js';
 
+
 import fs, { promises as fsPromises } from 'fs';
 import path from 'path';
 import os from 'os';
@@ -9,6 +10,7 @@ import http from 'http';
 
 import express, { type NextFunction, type Request, type Response } from 'express';
 import cors from 'cors';
+import { projectOrganizationRoutes } from '@/modules/project-organization/index.js';
 
 import { monitorsRoutes, initializeMonitors, closeMonitors } from '@/modules/monitors/index.js';
 import { dotRoutes, initializeDot, closeDot } from '@/modules/dot/index.js';
@@ -231,6 +233,7 @@ app.use('/api/side-chats', authenticateToken, sideChatsRoutes);
 app.use('/api/message-queue', authenticateToken, messageQueueRoutes);
 app.use('/api/session-workspace', authenticateToken, sessionWorkspaceRoutes);
 app.use('/api/workspace-sections', authenticateToken, workspaceSectionsRoutes);
+app.use('/api/project-organization', authenticateToken, projectOrganizationRoutes);
 app.use('/api/session-bridge', authenticateToken, sessionBridgeRoutes);
 
 // Agent API Routes (uses API key authentication)

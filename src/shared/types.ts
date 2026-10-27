@@ -1977,3 +1977,14 @@ export type QuotaOverview = {
   pool?: QuotaCache<{ thresholds: { fiveHour: number | null; sevenDay: number | null }; warnings: string[]; accounts: { id: number; name: string; status: string; schedulable: boolean; autoPause: { fiveHour: { disabled: boolean; threshold: number | null }; sevenDay: { disabled: boolean; threshold: number | null } }; windows: QuotaWindow[]; balance: string | null; balanceChange: string | null; consumed: string | null; warnings: string[]; creditUpdatedAt: string | null; usageUpdatedAt: string | null; creditStale: boolean; usageStale: boolean }[] }>;
 };
 // ---------------------------
+
+//----------------- MONITOR NAVIGATION ------------
+/** Safe monitor summary for session badges; contains no prompt or execution options. */
+export type SessionMonitorSummary = {id:string;session_id:string;name:string;status:string;interval_minutes:number;schedule_json:string|null;next_run_at:string;running_id:string|null;last_error:string|null;consecutive_failures:number;last_result:string|null};
+/** Account-scoped navigation snapshot; physical cwd remains independent of explicit project membership. */
+export type ProjectOrganizationSnapshot = {
+  revision:number;mode:'project'|'flat';
+  projects:{id:string;name:string;path:string;rootPaths:string[];collapsed:boolean}[];
+  sessions:{id:string;title:string;provider:string;cwd:string;roots:string[];updatedAt:string;sourceProjectId:string|null;projectId:string|null}[];
+  threadOrders:Record<string,string[]>;
+};

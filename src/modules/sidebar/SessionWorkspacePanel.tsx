@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { Pin, RefreshCw } from 'lucide-react';
 
+import { SessionMonitorBadge } from '@/shared/ui';
 import { useSessionWorkspace } from '@/modules/sidebar/context/SessionWorkspaceContext';
 import { SessionInbox } from '@/modules/sidebar/modals/SessionInbox';
 
@@ -19,7 +20,7 @@ export function SessionWorkspacePanel({onSelect}:{onSelect:(projectId:string|nul
         if(event.button!==0||event.ctrlKey||event.metaKey||event.shiftKey||event.altKey)return;
         event.preventDefault();onSelect(row.projectId,row.sessionId,row.provider);
       }}>
-      <span className={`block truncate ${row.unread?'font-semibold':'font-normal'}`}>{row.unread?'● ':''}{row.title}</span>
+      <span className={`block truncate ${row.unread?'font-semibold':'font-normal'}`}>{row.unread?'● ':''}<SessionMonitorBadge sessionId={row.sessionId}/>{row.title}</span>
       <span className="block truncate text-[10px] text-muted-foreground">{row.approvalCount>0?t('workspace.waitingApproval',{count:row.approvalCount}):row.blockedCount>0?t('workspace.blocked',{count:row.blockedCount}):row.queuePaused&&row.queuedCount>0?t('workspace.paused',{count:row.queuedCount}):row.projectPath||row.provider}</span>
     </a>)}</div>
   </section>;

@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 
+import { SessionMonitorBadge } from '@/shared/ui';
 import type { AppTab, Project, ProjectSession } from '@/shared/types';
 import { usePlugins } from '@/modules/plugins';
 import { getSessionTitle } from '@/shared/utils';
@@ -79,7 +80,7 @@ export default function WorkspaceTitle({
     <div className="scrollbar-hide flex min-w-0 flex-1 items-center gap-2 overflow-x-auto">
       <div className="min-w-0 flex-1">
         {activeTab === 'chat' && selectedSession ? (
-          <div className="workspace-title-row flex min-w-0 items-baseline gap-2">
+          <div className="workspace-title-row flex min-w-0 items-baseline gap-2"><SessionMonitorBadge sessionId={selectedSession.id}/>
             {isRenaming ? (
               <input
                 ref={renameInputRef}

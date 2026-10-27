@@ -52,6 +52,14 @@ export const monitorsDb = {
     return getConnection().prepare(`SELECT * FROM monitors WHERE user_id=?${sessionId ? ' AND session_id=?' : ''} ORDER BY created_at DESC`)
       .all(...(sessionId ? [userId,sessionId] : [userId])) as MonitorRecord[];
   },
+  summaries(userId: number) {
+    return getConnection().prepare(`SELECT m.id,m.session_id,m.name,m.status,m.interval_minutes,m.schedule_json,m.next_run_at,m.running_id,m.last_error,m.consecutive_failures,
+      (SELECT r.status FROM monitor_runs r WHERE r.monitor_id=m.id ORDER BY r.started_at DESC,r.rowid DESC LIMIT 1) AS last_result
+      FROM monitors m JOIN sessions s ON s.session_id=m.session_id
+      WHERE m.user_id=? AND s.owner_id=? AND s.isArchived=0 AND m.status<>'stopped' ORDER BY m.created_at DESC`).all(userId,userId) as {
+        id:string;session_id:string;name:string;status:string;interval_minutes:number;schedule_json:string|null;next_run_at:string;running_id:string|null;last_error:string|null;consecutive_failures:number;last_result:string|null;
+      }[];
+  },
   due(now: Date): MonitorRecord[] {
     return getConnection().prepare("SELECT * FROM monitors WHERE status='active' AND running_id IS NULL AND next_run_at<=? ORDER BY next_run_at LIMIT 20")
       .all(now.toISOString()) as MonitorRecord[];

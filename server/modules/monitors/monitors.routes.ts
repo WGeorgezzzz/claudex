@@ -15,6 +15,7 @@ export const monitorsRoutes=express.Router();
 monitorsRoutes.get('/capabilities',asyncHandler(async(req,res)=>{
   userId(req);res.json(createApiSuccessResponse({calendar:true,scheduleVersion:1}));
 }));
+monitorsRoutes.get('/summaries',asyncHandler(async(req,res)=>{res.json(createApiSuccessResponse(monitorsService.summaries(userId(req))));}));
 monitorsRoutes.get('/',asyncHandler(async(req,res)=>{
   res.json(createApiSuccessResponse(monitorsService.list(userId(req),typeof req.query.sessionId==='string'?req.query.sessionId:undefined)));
 }));

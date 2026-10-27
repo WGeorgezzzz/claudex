@@ -1706,3 +1706,12 @@ export type UserRuntimeContext = {
   codexHome: string;
   env: NodeJS.ProcessEnv;
 };
+
+//----------------- ACCOUNT PROJECT ORGANIZATION ------------
+/** Account-local navigation metadata; never changes transcript locations or execution paths implicitly. */
+export type ProjectOrganizationLayout = {
+  version: 1; revision: number; mode: 'project' | 'flat'; order: string[];
+  projects: Record<string, { name: string; rootPaths: string[]; collapsed: boolean }>;
+  threads: Record<string, { projectId: string | null; cwd: string; roots: string[] }>;
+  threadOrders: Record<string, string[]>;
+};

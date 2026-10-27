@@ -44,3 +44,6 @@ export { authSessionsDb } from '@/modules/database/repositories/auth-sessions.db
 
 // Projects, Providers and WebSocket share indexed resource ownership.
 export { getOwnerUserId, getSessionOwnerId } from './ownership.js';
+
+// Project Organization stores account-local navigation separately from discovered disk paths.
+export { projectOrganizationDb } from './repositories/project-organization.db.js';

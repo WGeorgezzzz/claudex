@@ -9,6 +9,7 @@ import type { SidebarProjectListProps, WorkspaceSectionsSnapshot } from '@/share
 import { WorkspaceSections } from '@/modules/sidebar/WorkspaceSections';
 
 vi.mock('@/shared/api',()=>({api:{workspaceSections:{list:vi.fn(),update:vi.fn()},sessionBridge:{list:vi.fn()}},readApiErrorMessage:()=> 'Layout changed'}));
+vi.mock('@/modules/sidebar/ProjectOrganization',()=>({ProjectOrganization:()=> <div>Independent project groups</div>}));
 vi.mock('@/modules/sidebar/SidebarProjectList',()=>({default:({filteredProjects,getProjectSessions}:SidebarProjectListProps)=><div>{filteredProjects.map(project=><span key={project.projectId}>Project:{project.projectId} Chats:{getProjectSessions(project).map(row=>row.id).join(',')}</span>)}</div>}));
 const project={projectId:'p1',displayName:'Research project',fullPath:'/research'};
 const props={projects:[project],filteredProjects:[project],getProjectSessions:()=>[{id:'s1'},{id:'s2'}],activeSessions:new Set(),selectedSession:null} as unknown as SidebarProjectListProps;
@@ -19,10 +20,10 @@ beforeEach(()=>{
   vi.mocked(api.workspaceSections.list).mockImplementation(async()=>response(snapshot));
   vi.mocked(api.workspaceSections.update).mockImplementation(async input=>{snapshot={...snapshot,revision:snapshot.revision+1,sections:input.action==='collapse'?snapshot.sections.map(row=>({...row,collapsed:Boolean(input.collapsed)})):snapshot.sections};return response(snapshot);});
 });
-test('sections place projects and standalone chats without duplicating assigned chats inside project lists',async()=>{
+test('sections coexist with project groups and preserve their session rows',async()=>{
   const select=vi.fn();render(<WorkspaceSections projectListProps={props} onSelect={select}/>);
   const link=await screen.findByRole('link',{name:/Independent chat/});
-  assert.ok(screen.getByText('Project:p1 Chats:s2'));fireEvent.click(link);assert.deepEqual(select.mock.calls,[['p1','s1','claude']]);
+  assert.ok(screen.getByText('Project:p1 Chats:s1,s2'));assert.ok(screen.getByText('Independent project groups'));fireEvent.click(link);assert.deepEqual(select.mock.calls,[['p1','s1','claude']]);
   fireEvent.click(screen.getByRole('button',{name:/Research 2/}));await waitFor(()=>assert.equal(screen.queryAllByRole('link').length,0));
   assert.deepEqual(vi.mocked(api.workspaceSections.update).mock.calls[0][0],{action:'collapse',id:'a',collapsed:true,revision:1});
 });

@@ -347,6 +347,10 @@ export const api = {
     get: (id:string) => get(`/api/session-workspace/${encodeURIComponent(id)}`),
     update: (id:string,body:SessionWorkspaceChange) => patch(`/api/session-workspace/${encodeURIComponent(id)}`,body),
   },
+  projectOrganization: {
+    list: () => get('/api/project-organization'),
+    update: (body: Record<string, unknown>) => patch('/api/project-organization', body),
+  },
   workspaceSections: {
     list: () => get('/api/workspace-sections'),
     update: (body: Record<string, unknown>) => patch('/api/workspace-sections', body),
@@ -365,6 +369,7 @@ export const api = {
     cancelTask: (id:string) => post('/api/dot/tasks/'+encodeURIComponent(id)+'/cancel',{}),
   },
   monitors: {
+    summaries: () => get('/api/monitors/summaries'),
     capabilities: (options: ApiRequestOptions = {}) => get('/api/monitors/capabilities',options),
     update: (id: string, input: {name:string;content:string;intervalMinutes:number;schedule?:MonitorCalendarSchedule|null}) => patch('/api/monitors/' + encodeURIComponent(id), input),
     list: (sessionId?: string) => get('/api/monitors' + (sessionId ? '?sessionId=' + encodeURIComponent(sessionId) : '')),
