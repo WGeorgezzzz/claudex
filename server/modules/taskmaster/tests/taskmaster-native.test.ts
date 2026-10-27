@@ -32,6 +32,8 @@ test('native HTTP initialization, validation, account/project isolation and junc
   const server = app.listen(0, '127.0.0.1'); await once(server, 'listening'); const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api/taskmaster`;
   const request = (url: string, method = 'GET', data?: unknown) => fetch(base + url, { method, headers: { 'content-type': 'application/json' }, ...(data ? { body: JSON.stringify(data) } : {}) });
   try {
+    assert.equal((await request('/inbox/global')).status, 403);
+    assert.equal((await request('/inbox/import', 'POST', { batchId: 'member', items: [] })).status, 403);
     assert.equal((await request(`/init/${ownId}`, 'POST')).status, 200);
     assert.equal((await request(`/init/${ownId}`, 'POST')).status, 200);
     assert.equal((await request(`/add-task/${ownId}`, 'POST', { title: '成员任务', description: '保留' })).status, 200);

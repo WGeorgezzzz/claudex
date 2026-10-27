@@ -6,3 +6,4 @@ export { useTaskMasterProjectSync } from '@/modules/task-master/hooks/useTaskMas
 
 export { ConversationTasksPanel } from '@/modules/task-master/ConversationTasksPanel';
 export { TaskAutomationSettings } from '@/modules/task-master/TaskAutomationSettings';
+export { GlobalTasksPage, TasksNavigation } from '@/modules/task-master/GlobalTasksPage';

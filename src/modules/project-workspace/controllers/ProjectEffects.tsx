@@ -25,7 +25,7 @@ export default function ProjectEffects({
     if (isMobile) {
       // A browser edge-swipe back to the list should land on the drawer, not
       // leave the previous conversation visible underneath a closed sidebar.
-      setSidebarOpen(navigationType === 'POP' && !sessionId);
+      setSidebarOpen(navigationType === 'POP' && !sessionId && location.pathname !== '/tasks');
     }
   }, [isMobile, location.key, navigationType, sessionId, setSidebarOpen]);
 
