@@ -55,9 +55,11 @@ const PROVIDER_NAMES: Record<SkillsProvider, string> = {
   cursor: 'Cursor',
   opencode: 'OpenCode',
   workbuddy: 'WorkBuddy',
+  'deepseek-harness': 'DeepSeek Harness',
 };
 
 const PROVIDER_SKILL_PATHS: Record<Exclude<SkillsProvider, 'opencode'>, string> = {
+  'deepseek-harness': 'Manage skills in the local Harness configuration',
   workbuddy: 'Manage skills in the WorkBuddy desktop client',
   claude: '~/.claude/skills/<skill-name>/SKILL.md',
   codex: '~/.agents/skills/<skill-name>/SKILL.md',

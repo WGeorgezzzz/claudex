@@ -1,0 +1,4 @@
+Lobe Icons MIT licensed static assets
+https://github.com/lobehub/lobe-icons
+Commit: 8b7bbc433d38437fa2b0cca58ae896917162b812
+Logos belong to their respective owners.

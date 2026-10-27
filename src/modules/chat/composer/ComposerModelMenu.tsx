@@ -3,9 +3,10 @@ import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 
-import type { ProviderModelOption } from '@/shared/types';
+import type { LLMProvider, ProviderModelOption } from '@/shared/types';
 import { DEFAULT_EFFORT_VALUE } from '@/shared/constants';
 import { useViewportMenuAnchor } from '@/shared/hooks/useViewportMenuAnchor';
+import { LLMProviderLogo } from '@/shared/ui';
 import {
   ComposerMenuHeading,
   ComposerMenuItem,
@@ -16,6 +17,7 @@ import {
 type EffortOption = NonNullable<ProviderModelOption['effort']>['values'][number];
 
 type ComposerModelMenuProps = {
+  provider?: LLMProvider;
   providerLabel?: string;
   effort: string;
   /** Effort values the active provider/model actually accepts; empty hides the section. */
@@ -33,6 +35,7 @@ type ComposerModelMenuProps = {
  * provider's model and reasoning effort for the next turn.
  */
 function ComposerModelMenu({
+  provider,
   providerLabel,
   effort,
   effortOptions,
@@ -43,6 +46,11 @@ function ComposerModelMenu({
   modelsLoading,
 }: ComposerModelMenuProps) {
   const { t } = useTranslation('chat');
+  const harness = provider || (/deepseek/i.test(providerLabel || '') ? 'deepseek-harness'
+    : /workbuddy/i.test(providerLabel || '') ? 'workbuddy'
+    : /codex|openai/i.test(providerLabel || '') ? 'codex'
+    : /cursor/i.test(providerLabel || '') ? 'cursor'
+    : /opencode/i.test(providerLabel || '') ? 'opencode' : 'claude');
   const [isOpen, setIsOpen] = useState(false);
   // The catalog is visible on opening for every provider, including models without an effort selector.
   const [isModelSectionOpen, setIsModelSectionOpen] = useState(true);
@@ -96,6 +104,7 @@ function ComposerModelMenu({
         aria-label={ariaLabel}
         title={ariaLabel}
       >
+        <LLMProviderLogo provider={harness} className="h-4 w-4 shrink-0" />
         <span className="truncate">{triggerLabel}</span>
         {hasModelSection && hasEffortSection && effort !== DEFAULT_EFFORT_VALUE && (
           <span className="hidden shrink-0 capitalize text-muted-foreground sm:inline">· {effortLabel}</span>
@@ -131,6 +140,7 @@ function ComposerModelMenu({
               <ComposerMenuItem
                 role="menuitem"
                 label={modelLabel}
+                icon={<LLMProviderLogo provider={harness} />}
                 isSelected={false}
                 onSelect={() => setIsModelSectionOpen((current) => !current)}
                 trailing={
@@ -155,6 +165,7 @@ function ComposerModelMenu({
                     <ComposerMenuItem
                       key={option.value}
                       label={option.label || option.value}
+                      icon={<LLMProviderLogo provider={harness} />}
                       isSelected={option.value === model}
                       onSelect={() => {
                         onSelectModel(option.value);

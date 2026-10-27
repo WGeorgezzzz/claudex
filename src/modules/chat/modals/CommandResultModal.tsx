@@ -59,6 +59,7 @@ const PROVIDER_LABELS: Record<string, string> = {
   codex: 'Codex',
   opencode: 'OpenCode',
   workbuddy: 'WorkBuddy',
+  'deepseek-harness': 'DeepSeek Harness',
 };
 
 const FALLBACK_COMMANDS: CommandEntry[] = [

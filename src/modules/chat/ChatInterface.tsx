@@ -305,9 +305,8 @@ function ChatInterface({
   // while Chat is hidden), then re-subscribe — the
   // `chat_subscribed` ack restores or clears the activity indicator, replays
   // missed live events, and re-attaches a still-running stream to this socket.
-  const handleWebSocketReconnect = useCallback(async () => {
+  const handleWebSocketReconnect = useCallback(() => {
     if (!selectedProject || !selectedSession) return;
-    await requestLatestMessages(selectedSession.id, isActive);
     statusCheckSentAtRef.current.set(selectedSession.id, Date.now());
     sendMessage({
       type: 'chat.subscribe',
@@ -316,6 +315,8 @@ function ChatInterface({
         lastSeq: lastSeqRef.current.get(selectedSession.id) ?? 0,
       }],
     });
+    // Reattach live output immediately; a slow history fetch must not hold the stream hostage.
+    void requestLatestMessages(selectedSession.id, isActive).catch(error => console.warn('Reconnect history refresh failed:', error));
   }, [isActive, requestLatestMessages, selectedProject, selectedSession, sendMessage]);
 
   useChatRealtimeHandlers({
@@ -491,7 +492,7 @@ function ChatInterface({
   const hasActivityIndicator = Boolean(sessionActivity && pendingPermissionRequests.length === 0);
 
   const selectedProviderLabel =
-    provider === 'workbuddy' ? 'WorkBuddy' : provider === 'cursor'
+    provider === 'deepseek-harness' ? 'DeepSeek Harness' : provider === 'workbuddy' ? 'WorkBuddy' : provider === 'cursor'
       ? t('messageTypes.cursor')
       : provider === 'codex'
         ? t('messageTypes.codex')
@@ -619,6 +620,7 @@ function ChatInterface({
           <NextPromptSuggestions messages={displayMessages} busy={isProcessing} onInsert={insertComposerText}
             sessionId={currentSessionId || selectedSession?.id} provider={provider}/>
           <ChatComposer
+          provider={provider}
           extraActions={provider === 'claude' && (currentSessionId || selectedSession?.id) ? <CrossSessionDialog key={`bridge-${currentSessionId || selectedSession?.id}`} sourceSessionId={(currentSessionId || selectedSession?.id)!} draft={input} onInsert={insertComposerText}/> : undefined}
           busySendMode={busySendMode}
           onBusySendModeChange={setBusySendMode}

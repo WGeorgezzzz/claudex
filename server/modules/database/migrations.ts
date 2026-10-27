@@ -543,7 +543,7 @@ export const runMigrations = (db: Database) => {
     `);
     addProviderModelEffortColumns(db);
     const modelSchema = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='provider_models'").get() as { sql?: string };
-    if (modelSchema.sql && !modelSchema.sql.includes("'workbuddy'")) {
+    if (modelSchema.sql && !modelSchema.sql.includes("'deepseek-harness'")) {
       db.transaction(() => {
         db.exec('ALTER TABLE provider_models RENAME TO provider_models_before_workbuddy');
         db.exec(PROVIDER_MODELS_TABLE_SCHEMA_SQL);

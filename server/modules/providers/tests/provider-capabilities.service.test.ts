@@ -14,6 +14,7 @@ import type { LLMProvider, ProviderModelsDefinition } from '@/shared/types.js';
  * providers a machine has connected.
  */
 const CURATED_CATALOGS: Record<LLMProvider, ProviderModelsDefinition> = {
+  'deepseek-harness': { OPTIONS: [{ value: 'configured', label: 'Harness default' }], DEFAULT: 'configured' },
   workbuddy: buildWorkBuddyFreeModels({ models: [{ id: 'free-model', credits: 'x0.00', supportsToolCall: true }] }),
   claude: CLAUDE_PREDEFINED_MODELS,
   codex: CODEX_PREDEFINED_MODELS,

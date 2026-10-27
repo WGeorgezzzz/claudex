@@ -16,6 +16,7 @@ const PROVIDER_LABELS: Record<string, string> = {
   cursor: 'Cursor',
   opencode: 'OpenCode',
   workbuddy: 'WorkBuddy',
+  'deepseek-harness': 'DeepSeek Harness',
 };
 
 /** Fenced blocks need a longer fence than anything they contain. */

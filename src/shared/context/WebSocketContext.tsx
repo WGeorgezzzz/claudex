@@ -18,7 +18,8 @@ type ConnectionStatus = 'connecting' | 'connected' | 'disconnected';
 
 type WebSocketContextType = {
   ws: WebSocket | null;
-  sendMessage: (message: unknown) => void;
+  /** False means the frame was not sent; callers must preserve the draft instead of showing a delivered message. */
+  sendMessage: (message: unknown) => boolean;
   /**
    * Subscribes to every websocket frame. Returns an unsubscribe function.
    *
@@ -75,6 +76,8 @@ const useWebSocketProviderState = (): WebSocketContextType => {
   // not read as a lost connection, or every page load would flash the indicator.
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('connecting');
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // A failed handshake may never emit close, so bound the wait before opening a fresh connection.
+  const handshakeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const { isLoading: isAuthLoading, token, user } = useAuth();
 
   const dispatch = useCallback((event: ServerEvent) => {
@@ -92,6 +95,15 @@ const useWebSocketProviderState = (): WebSocketContextType => {
   const connect = useCallback(function connect() {
     if (unmountedRef.current) return; // Prevent connection if unmounted
     if (!IS_PLATFORM && (isAuthLoading || !user)) return;
+    if (wsRef.current && (wsRef.current.readyState === WebSocket.OPEN || wsRef.current.readyState === WebSocket.CONNECTING)) return;
+    if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
+    reconnectTimeoutRef.current = null;
+    const scheduleRetry = () => {
+      if (unmountedRef.current) return;
+      setConnectionStatus('disconnected');
+      if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = setTimeout(() => { reconnectTimeoutRef.current = null; connect(); }, 3000);
+    };
     try {
       // Construct WebSocket URL
       const wsUrl = buildWebSocketUrl(token);
@@ -103,7 +115,26 @@ const useWebSocketProviderState = (): WebSocketContextType => {
       // their handshake completes with stale credentials.
       wsRef.current = websocket;
 
+      const disconnect = () => {
+        if (wsRef.current !== websocket || unmountedRef.current) return;
+        if (handshakeTimeoutRef.current) clearTimeout(handshakeTimeoutRef.current);
+        handshakeTimeoutRef.current = null;
+        websocket.onopen = null;
+        websocket.onmessage = null;
+        websocket.onclose = null;
+        websocket.onerror = null;
+        wsRef.current = null;
+        try { websocket.close(); } catch { /* A failed handshake may already be closed. */ }
+        scheduleRetry();
+      };
+      handshakeTimeoutRef.current = setTimeout(() => {
+        if (websocket.readyState === WebSocket.CONNECTING) disconnect();
+      }, 10000);
+
       websocket.onopen = () => {
+        if (wsRef.current !== websocket || unmountedRef.current) return;
+        if (handshakeTimeoutRef.current) clearTimeout(handshakeTimeoutRef.current);
+        handshakeTimeoutRef.current = null;
         setConnectionStatus('connected');
         if (hasConnectedRef.current) {
           // This is a reconnect — signal so components can catch up on missed messages
@@ -113,6 +144,7 @@ const useWebSocketProviderState = (): WebSocketContextType => {
       };
 
       websocket.onmessage = (event) => {
+        if (wsRef.current !== websocket || unmountedRef.current) return;
         try {
           const data = JSON.parse(event.data) as ServerEvent;
           dispatch(data);
@@ -121,29 +153,16 @@ const useWebSocketProviderState = (): WebSocketContextType => {
         }
       };
 
-      websocket.onclose = () => {
-        if (wsRef.current !== websocket) {
-          return;
-        }
-        // Also reached when the very first attempt fails, which is a lost
-        // connection too. The effect cleanup detaches this handler before
-        // closing a socket on purpose, so a token refresh never gets here.
-        setConnectionStatus('disconnected');
-        wsRef.current = null;
-
-        // Attempt to reconnect after 3 seconds
-        reconnectTimeoutRef.current = setTimeout(() => {
-          if (unmountedRef.current) return; // Prevent reconnection if unmounted
-          connect();
-        }, 3000);
-      };
+      websocket.onclose = disconnect;
 
       websocket.onerror = (error) => {
         console.error('WebSocket error:', error);
+        disconnect();
       };
 
     } catch (error) {
       console.error('Error creating WebSocket connection:', error);
+      scheduleRetry();
     }
   }, [dispatch, isAuthLoading, token, user]); // reconnect with current authentication state
 
@@ -160,9 +179,16 @@ const useWebSocketProviderState = (): WebSocketContextType => {
       return undefined;
     }
     connect();
+    const resumeOnline = () => {
+      if (!wsRef.current || wsRef.current.readyState === WebSocket.CLOSED) connect();
+    };
+    window.addEventListener('online', resumeOnline);
 
     return () => {
       unmountedRef.current = true;
+      window.removeEventListener('online', resumeOnline);
+      if (handshakeTimeoutRef.current) clearTimeout(handshakeTimeoutRef.current);
+      handshakeTimeoutRef.current = null;
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);
       }
@@ -188,9 +214,11 @@ const useWebSocketProviderState = (): WebSocketContextType => {
   const sendMessage = useCallback((message: unknown) => {
     const socket = wsRef.current;
     if (socket && socket.readyState === WebSocket.OPEN) {
-      socket.send(JSON.stringify(message));
+      try { socket.send(JSON.stringify(message)); return true; }
+      catch (error) { console.error('WebSocket send failed:', error); socket.close(); return false; }
     } else {
       console.warn('WebSocket not connected');
+      return false;
     }
   }, []);
 

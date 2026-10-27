@@ -1,4 +1,12 @@
 {
+  "harnessModes": {
+    "modes": { "default": "Workspace", "plan": "Read only", "bypassPermissions": "Full access" },
+    "descriptions": {
+      "default": "Read and write workspace files. Commands use the local sandbox; requests for extra permissions are refused.",
+      "plan": "Read files without modifying them.",
+      "bypassPermissions": "Allow local commands and file operations without per-action approval."
+    }
+  },
   "workbuddyModes": {
     "modes": {
       "default": "Ask for approval",
@@ -222,6 +230,7 @@
     "effortDefault": "Default",
     "loadingModels": "Loading models…",
     "modelMenu": "Select model and reasoning effort",
+    "connectionLostDraftKept": "Connection lost. Your message was not sent and the draft is saved. Send it again after reconnecting.",
     "permissionHeading": "How should {{provider}} actions be approved?",
     "editing": {
       "title": "Replacing an earlier message",

@@ -45,6 +45,11 @@ const agentConfig: Record<AgentProvider, AgentVisualConfig> = {
     subtextClass: 'text-gray-700 dark:text-gray-300',
     buttonClass: 'bg-gray-800 hover:bg-gray-900 active:bg-gray-950 dark:bg-gray-700 dark:hover:bg-gray-600 dark:active:bg-gray-500',
   },
+  'deepseek-harness': {
+    name: 'DeepSeek Harness', description: '使用本机 Harness 配置运行任务',
+    bgClass: 'bg-blue-50 dark:bg-blue-900/20', borderClass: 'border-blue-200 dark:border-blue-700',
+    textClass: 'text-blue-900 dark:text-blue-100', subtextClass: 'text-blue-700 dark:text-blue-300', buttonClass: 'bg-blue-600 hover:bg-blue-700',
+  },
   workbuddy: {
     name: 'WorkBuddy', description: 'Use the WorkBuddy account signed in on this Windows computer. Conversations only.',
     bgClass: 'bg-blue-50 dark:bg-blue-900/20', borderClass: 'border-blue-200 dark:border-blue-800',

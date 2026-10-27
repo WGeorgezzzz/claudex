@@ -38,15 +38,16 @@ export default function AgentsSettingsTab({
   const [selectedAgent, setSelectedAgent] = useState<AgentProvider>('claude');
   const [selectedCategory, setSelectedCategory] = useState<AgentCategory>('account');
   const visibleCategories = useMemo<AgentCategory[]>(() => (
-    selectedAgent === 'workbuddy' ? ['account'] : selectedAgent === 'opencode'
+    ['workbuddy', 'deepseek-harness'].includes(selectedAgent) ? ['account'] : selectedAgent === 'opencode'
       ? ['account', 'permissions', 'mcp']
       : ['account', 'permissions', 'mcp', 'skills']
   ), [selectedAgent]);
 
   const visibleAgents = useMemo<AgentProvider[]>(() => {
-    return isMember ? ['claude', 'codex'] : ['claude', 'cursor', 'codex', 'opencode', 'workbuddy'];
+    return isMember ? ['claude', 'codex'] : ['claude', 'cursor', 'codex', 'opencode', 'workbuddy', 'deepseek-harness'];
   }, [isMember]);
 
+  const harnessAuthStatus = providerAuthStatus['deepseek-harness'];
   const agentContextById = useMemo<AgentContextByProvider>(() => ({
     claude: {
       authStatus: providerAuthStatus.claude,
@@ -60,6 +61,7 @@ export default function AgentsSettingsTab({
       authStatus: providerAuthStatus.codex,
       onLogin: () => onProviderLogin('codex'),
     },
+    'deepseek-harness': { authStatus: harnessAuthStatus, onLogin: () => onProviderLogin('deepseek-harness') },
     workbuddy: { authStatus: providerAuthStatus.workbuddy, onLogin: () => onProviderLogin('workbuddy') },
     opencode: {
       authStatus: providerAuthStatus.opencode,
@@ -72,6 +74,7 @@ export default function AgentsSettingsTab({
     providerAuthStatus.cursor,
     providerAuthStatus.opencode,
     providerAuthStatus.workbuddy,
+    harnessAuthStatus,
   ]);
 
   useEffect(() => {

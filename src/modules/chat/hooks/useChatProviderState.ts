@@ -30,7 +30,7 @@ const toProviderEffortOptions = (
   values: readonly string[],
 ): NonNullable<ProviderModelOption['effort']>['values'] => values.map((value) => ({ value }));
 
-const PROVIDERS: LLMProvider[] = ['claude', 'cursor', 'codex', 'opencode', 'workbuddy'];
+const PROVIDERS: LLMProvider[] = ['claude', 'cursor', 'codex', 'opencode', 'workbuddy', 'deepseek-harness'];
 
 /** localStorage key holding the user's default model for one provider. */
 const providerModelStorageKey = (provider: LLMProvider): string => `${provider}-model`;
@@ -46,6 +46,7 @@ const FALLBACK_PERMISSION_MODES: Record<LLMProvider, PermissionMode[]> = {
   cursor: ['default', 'acceptEdits', 'bypassPermissions', 'plan'],
   codex: ['default', 'acceptEdits', 'bypassPermissions', 'plan'],
   opencode: ['default', 'acceptEdits', 'bypassPermissions', 'plan'],
+  'deepseek-harness': ['default', 'plan', 'bypassPermissions'],
   workbuddy: ['default', 'auto', 'acceptEdits', 'bypassPermissions', 'dontAsk', 'plan'],
 };
 

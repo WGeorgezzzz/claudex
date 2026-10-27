@@ -1,3 +1,4 @@
+import { DeepSeekHarnessProvider } from '@/modules/providers/list/deepseek-harness/deepseek-harness.provider.js';
 import { WorkBuddyProvider } from '@/modules/providers/list/workbuddy/workbuddy.provider.js';
 import { ClaudeProvider } from '@/modules/providers/list/claude/claude.provider.js';
 import { CodexProvider } from '@/modules/providers/list/codex/codex.provider.js';
@@ -13,6 +14,7 @@ const providers: Record<LLMProvider, IProvider> = {
   cursor: new CursorProvider(),
   opencode: new OpenCodeProvider(),
   workbuddy: new WorkBuddyProvider(),
+  'deepseek-harness': new DeepSeekHarnessProvider(),
 };
 
 /**

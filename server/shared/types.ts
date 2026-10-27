@@ -99,7 +99,7 @@ export type AuthenticatedWebSocketRequest = IncomingMessage & {
  * Use this as the source of truth whenever a function or payload needs to identify
  * a specific LLM integration.
  */
-export type LLMProvider = 'claude' | 'codex' | 'cursor' | 'opencode' | 'workbuddy';
+export type LLMProvider = 'claude' | 'codex' | 'cursor' | 'opencode' | 'workbuddy' | 'deepseek-harness';
 
 /**
  * One selectable model row in a provider model catalog.
@@ -127,6 +127,8 @@ export type ProviderModelOption = {
  * Provider model catalog returned by `GET /api/providers/:provider/models`.
  */
 export type ProviderModelsDefinition = {
+  /** False for native-managed catalogs: UI and service must reject custom model rows and custom-only overrides. */
+  CUSTOM_MODELS_SUPPORTED?: boolean;
   OPTIONS: ProviderModelOption[];
   DEFAULT: string;
   /**

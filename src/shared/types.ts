@@ -5,7 +5,7 @@ import type { NavigateFunction } from 'react-router-dom';
 //----------------- LLM PROVIDER MODEL CATALOG ------------
 
 /** Identifies which coding-agent CLI backs a session, project selection or model list. */
-export type LLMProvider = 'claude' | 'cursor' | 'codex' | 'opencode' | 'workbuddy';
+export type LLMProvider = 'claude' | 'cursor' | 'codex' | 'opencode' | 'workbuddy' | 'deepseek-harness';
 
 /** One selectable model in a provider's model menu, including its optional reasoning-effort choices. */
 export type ProviderModelOption = {
@@ -33,6 +33,8 @@ export type ProviderModelOption = {
  * server lists only custom models and the first is `DEFAULT`. Older servers omit it, which means off.
  */
 export type ProviderModelsDefinition = {
+  /** False when the native launcher owns model selection and the model-library editor must stay hidden. */
+  CUSTOM_MODELS_SUPPORTED?: boolean;
   OPTIONS: ProviderModelOption[];
   DEFAULT: string;
   EFFORT_LEVELS?: string[];

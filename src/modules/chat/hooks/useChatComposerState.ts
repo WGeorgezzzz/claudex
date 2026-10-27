@@ -56,7 +56,7 @@ type UseChatComposerStateArgs = {
   processingSessions?: SessionActivityMap;
   canAbortSession: boolean;
   tokenBudget: Record<string, unknown> | null;
-  sendMessage: (message: unknown) => void;
+  sendMessage: (message: unknown) => boolean | void;
   sendByCtrlEnter?: boolean;
   onSessionProcessing?: MarkSessionProcessing;
   /**
@@ -1029,22 +1029,10 @@ export function useChatComposerState({
         ...(editingAnchorId ? { replacesAnchorId: editingAnchorId } : {}),
       };
 
-      addMessage(userMessage);
-      // Mark this request as processing in the per-session activity map (the
-      // single source of truth the indicator derives from). The id is always
-      // concrete at this point — no pending placeholder exists anymore.
-      onSessionProcessing?.(targetSessionId, {
-        statusText: null,
-        canInterrupt: true,
-      });
-
-      setIsUserScrolledUp(false);
-      setTimeout(() => scrollToBottom(), 100);
-
       // One message shape for every provider. The backend resolves the
       // provider, project path, and provider-native resume id from the
       // session row; `options` only carries composer-level preferences.
-      sendMessage({
+      const sent = sendMessage({
         // Replacing an already-sent message is its own frame: it changes the
         // shape of the conversation, so it gets validated separately and can
         // report why it was refused.
@@ -1057,6 +1045,17 @@ export function useChatComposerState({
           attachments: uploadedAttachments,
         },
       });
+      if (sent === false) {
+        // Session allocation or uploads may outlive a connection. Keep the text
+        // under its new stable session id too, so route changes cannot lose it.
+        writeDraftText(targetSessionId, currentInput);
+        addMessage({ type: 'error', content: t('composer.connectionLostDraftKept', { defaultValue: '连接已断开，消息尚未发送。草稿已保留，重连后可重新发送。' }), timestamp: new Date() });
+        return;
+      }
+      addMessage(userMessage);
+      onSessionProcessing?.(targetSessionId, { statusText: null, canInterrupt: true });
+      setIsUserScrolledUp(false);
+      setTimeout(() => scrollToBottom(), 100);
       setEditingAnchorId(null);
 
       // Recorded under the (possibly just-allocated) session id, so the first

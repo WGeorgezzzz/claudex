@@ -18,6 +18,7 @@ import type { SessionStore } from '@/modules/chat/hooks/useSessionStore';
 const renderHandlers = () => {
   let listener: ((event: ServerEvent) => void) | null = null;
   let pending: PendingPermissionRequest[] = [];
+  const lastSeq = new Map<string, number>();
 
   renderHook(() => useChatRealtimeHandlers({
     isActive: true,
@@ -35,14 +36,14 @@ const renderHandlers = () => {
     },
     streamTimerRef: { current: null },
     accumulatedStreamRef: { current: '' },
-    lastSeqRef: { current: new Map() },
+    lastSeqRef: { current: lastSeq },
     statusCheckSentAtRef: { current: new Map() },
     requestLatestMessages: async () => {},
     sessionStore: { appendRealtime: () => {} } as unknown as SessionStore,
   }));
 
   const dispatch = (event: ServerEvent) => listener?.(event);
-  return { dispatch, getPending: () => pending };
+  return { dispatch, getPending: () => pending, lastSeq };
 };
 
 const requestEvent = (requestId: string, seq: number): ServerEvent => ({
@@ -87,4 +88,14 @@ test('an unanswered request stays pending through a resolution for another id', 
   const pending = getPending();
   assert.equal(pending.length, 1);
   assert.equal(pending[0].requestId, 'req-open');
+});
+
+test('a reconnect ack resets replay progress after a server restart or a new run', () => {
+  const {dispatch,lastSeq}=renderHandlers();
+  dispatch(requestEvent('old-run',80));
+  assert.equal(lastSeq.get('viewed-session'),80);
+  dispatch({kind:'chat_subscribed',sessionId:'viewed-session',isProcessing:true,lastSeq:0,pendingPermissions:[]});
+  assert.equal(lastSeq.get('viewed-session'),0);
+  dispatch(requestEvent('new-run',1));
+  assert.equal(lastSeq.get('viewed-session'),1);
 });

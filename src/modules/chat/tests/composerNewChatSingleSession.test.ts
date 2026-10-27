@@ -47,7 +47,7 @@ const releaseCreates = async (status = 201) => {
 const createRequests = (fetchMock: ReturnType<typeof vi.fn>) => fetchMock.mock.calls
   .filter(([url, init]) => String(url) === '/api/providers/sessions' && (init as RequestInit | undefined)?.method === 'POST');
 
-const renderComposer = (initialSession: ProjectSession | null) => {
+const renderComposer = (initialSession: ProjectSession | null, sendAllowed = true) => {
   const sent: Array<{ type: string; sessionId?: string; content?: string }> = [];
   const established: string[] = [];
   const view = renderHook(({ session }: { session: ProjectSession | null }) =>
@@ -64,7 +64,7 @@ const renderComposer = (initialSession: ProjectSession | null) => {
       isLoading: false,
       canAbortSession: false,
       tokenBudget: null,
-      sendMessage: (message) => { sent.push(message as { type: string }); },
+      sendMessage: (message) => { if (!sendAllowed) return false; sent.push(message as { type: string }); return true; },
       onSessionEstablished: (sessionId) => { established.push(sessionId); },
       scrollToBottom: () => undefined,
       addMessage: () => undefined,
@@ -76,6 +76,14 @@ const renderComposer = (initialSession: ProjectSession | null) => {
 };
 
 const renderNewChat = () => renderComposer(null);
+
+test('a disconnected send preserves the draft and does not record a delivered message', async () => {
+  const { view, chatSends } = renderComposer({id:'session-existing'}, false);
+  await act(async () => { view.result.current.setInput('keep this instruction'); });
+  await act(async () => { await view.result.current.handleSubmit({preventDefault:()=>undefined} as never); });
+  assert.equal(view.result.current.input,'keep this instruction');
+  assert.equal(chatSends().length,0);
+});
 
 let fetchMock: ReturnType<typeof vi.fn>;
 let pendingUploads: PendingCreate[] = [];

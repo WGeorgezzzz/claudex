@@ -224,7 +224,7 @@ const MessageComponent = memo(({ message, prevMessage, createDiff, onFileOpen, s
                   ? t('messageTypes.error')
                   : message.type === 'tool'
                     ? t('messageTypes.tool')
-                    : (provider === 'workbuddy' ? 'WorkBuddy' : provider === 'cursor'
+                    : (provider === 'deepseek-harness' ? 'DeepSeek Harness' : provider === 'workbuddy' ? 'WorkBuddy' : provider === 'cursor'
                         ? t('messageTypes.cursor')
                         : provider === 'codex'
                           ? t('messageTypes.codex')

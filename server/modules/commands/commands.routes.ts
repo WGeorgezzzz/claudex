@@ -49,7 +49,7 @@ const router = express.Router();
   router.use(userContextMiddleware);
   router.use(authorizePaths(req => [req.body?.projectPath, req.body?.context?.projectPath].filter(value => typeof value === 'string')));
 
-const MODEL_PROVIDERS = ["claude", "cursor", "codex", "opencode", "workbuddy"];
+const MODEL_PROVIDERS = ["claude", "cursor", "codex", "opencode", "workbuddy", "deepseek-harness"];
 
 const MODEL_PROVIDER_LABELS = {
   claude: "Claude",
@@ -57,6 +57,7 @@ const MODEL_PROVIDER_LABELS = {
   codex: "Codex",
   opencode: "OpenCode",
   workbuddy: "WorkBuddy",
+  "deepseek-harness": "DeepSeek Harness",
 };
 
 const readModelProvider = (value) => {

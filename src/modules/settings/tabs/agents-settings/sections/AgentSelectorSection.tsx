@@ -14,6 +14,7 @@ const AGENT_NAMES: Record<AgentProvider, string> = {
   codex: 'Codex',
   opencode: 'OpenCode',
   workbuddy: 'WorkBuddy',
+  'deepseek-harness': 'DeepSeek Harness',
 };
 
 /** Rendered by AgentsSettingsTab to pick which agent provider the tab is configuring. */

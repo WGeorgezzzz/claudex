@@ -106,7 +106,7 @@ const mergeProviderModels = (
 ): ProviderModelsDefinition => {
   // WorkBuddy is free-only. Custom rows cannot reintroduce a paid model or
   // override the verified catalog default, even with custom-only enabled.
-  if (provider === 'workbuddy') return {
+  if (provider === 'workbuddy' || predefined.CUSTOM_MODELS_SUPPORTED === false) return {
     ...predefined,
     OPTIONS: predefined.OPTIONS.map(option => ({ ...option, isCustom: false })),
     EFFORT_LEVELS: [],
@@ -216,6 +216,7 @@ export const createProviderModelsService = (dependencies: ProviderModelsServiceD
     enabled: boolean,
   ): Promise<ProviderModelsDefinition> => {
     const predefined = await resolveProvider(provider).models.getSupportedModels();
+    if (predefined.CUSTOM_MODELS_SUPPORTED === false) throw new AppError('This provider manages models in its native configuration.', { statusCode: 409 });
     settings.set(customModelsOnlyConfigKey(provider), enabled ? 'true' : 'false');
     return readMergedCatalog(provider, predefined);
   };
@@ -267,6 +268,7 @@ export const createProviderModelsService = (dependencies: ProviderModelsServiceD
     input: CustomProviderModelInput,
   ): Promise<{ model: ProviderModelOption; models: ProviderModelsDefinition }> => {
     const predefined = await resolveProvider(provider).models.getSupportedModels();
+    if (predefined.CUSTOM_MODELS_SUPPORTED === false) throw new AppError('This provider manages models in its native configuration.', { statusCode: 409 });
     const normalized = normalizeCustomModelInput(input);
     assertModelIdAvailable(provider, predefined, normalized.id);
     assertEffortLevelsSupported(provider, normalized);
@@ -294,6 +296,7 @@ export const createProviderModelsService = (dependencies: ProviderModelsServiceD
     input: CustomProviderModelInput,
   ): Promise<{ model: ProviderModelOption; models: ProviderModelsDefinition }> => {
     const predefined = await resolveProvider(provider).models.getSupportedModels();
+    if (predefined.CUSTOM_MODELS_SUPPORTED === false) throw new AppError('This provider manages models in its native configuration.', { statusCode: 409 });
     readCustomModel(provider, recordId);
     const normalized = normalizeCustomModelInput(input);
     assertModelIdAvailable(provider, predefined, normalized.id, recordId);

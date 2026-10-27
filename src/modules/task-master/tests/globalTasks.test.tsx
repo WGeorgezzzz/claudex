@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { MemoryRouter } from 'react-router-dom';
 import assert from 'node:assert/strict';
 import { GlobalTasksPage, TasksNavigation } from '@/modules/task-master/GlobalTasksPage';
+import { taskWorkstream } from '@/modules/task-master/utils/taskWorkstreams';
 
 const mocks = vi.hoisted(() => ({ list: vi.fn(), execute: vi.fn(), action: vi.fn(), undo: vi.fn() }));
 vi.mock('@/shared/api', () => ({ inboxTasksApi: mocks }));
@@ -34,4 +35,35 @@ test('completion returns an undo receipt, and status filter includes completed t
 test('sidebar entry counts unfinished and high priority tasks', async () => {
   render(<MemoryRouter><TasksNavigation/></MemoryRouter>);
   await screen.findByRole('button', { name: '任务，1 项未完成' }); assert(screen.getByLabelText('1 项高优先级'));
+});
+
+test('task loading is not reported as an empty collection', () => {
+  mocks.list.mockReturnValue(new Promise(() => {}));
+  render(<MemoryRouter><GlobalTasksPage onMenuClick={() => {}}/></MemoryRouter>);
+  assert(screen.getByRole('status').textContent?.includes('正在加载'));
+  assert(!screen.queryByText('暂无任务'));
+});
+
+test('workstreams keep robot operations together and distinguish research from its execution tools', () => {
+  assert.equal(taskWorkstream('每15分钟巡检 RPW 真机 RAX 抓取'), 'robotics');
+  assert.equal(taskWorkstream('使用 Codex 复现 RAX 并统计开销'), 'research');
+  assert.equal(taskWorkstream('补齐 CATL 技术规格书与 BOM'), 'delivery');
+  assert.equal(taskWorkstream('为 Nexagent 接入 DeepSeek Harness'), 'platform');
+  assert.equal(taskWorkstream('核对其他事项'), 'followup');
+});
+
+test('category previews reveal remaining tasks on expansion and search never drops a hidden task', async () => {
+  const tasks = Array.from({length:5}, (_,i) => ({id:i+1,title:`Nexagent 任务 ${i+1}`,status:'pending',priority:'medium'}));
+  mocks.list.mockResolvedValue(reply({projects:[{...project,tasks}]}));
+  render(<MemoryRouter><GlobalTasksPage onMenuClick={() => {}}/></MemoryRouter>);
+  await screen.findByText('Nexagent 任务 1');
+  assert.equal(screen.getAllByTestId('global-task-row').length,3);
+  fireEvent.click(screen.getByRole('button',{name:'展开其余 2 项'}));
+  assert.equal(screen.getAllByTestId('global-task-row').length,5);
+  fireEvent.click(screen.getByRole('button',{name:'收起为重点概览'}));
+  fireEvent.change(screen.getByRole('textbox',{name:'搜索任务'}),{target:{value:'任务 5'}});
+  await screen.findByText('Nexagent 任务 5');
+  assert.equal(screen.getAllByTestId('global-task-row').length,1);
+  assert.equal(mocks.action.mock.calls.length,0);
+  assert.equal(mocks.execute.mock.calls.length,0);
 });

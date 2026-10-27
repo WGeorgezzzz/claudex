@@ -84,6 +84,19 @@ export default function ProviderLoginModal({
     return null;
   }
 
+  if (provider === 'deepseek-harness') return (
+    <div data-escape-layer className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50">
+      <div role="dialog" aria-label="DeepSeek Harness" className="m-4 w-full max-w-md rounded-lg bg-background p-6 shadow-xl">
+        <h2 className="mb-3 text-lg font-semibold">DeepSeek Harness</h2>
+        <p className="text-sm text-muted-foreground">使用本机已配置的 Harness 模型和凭证。完成本地配置后，刷新连接状态。</p>
+        <div className="mt-5 flex justify-end gap-3">
+          <button onClick={onClose}>关闭</button>
+          <button className="rounded bg-primary px-3 py-2 text-primary-foreground" onClick={() => { onComplete?.(0); onClose(); }}>刷新</button>
+        </div>
+      </div>
+    </div>
+  );
+
   if (provider === 'workbuddy') {
     return (
       <div data-escape-layer className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50">

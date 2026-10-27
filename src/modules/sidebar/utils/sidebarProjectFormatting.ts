@@ -218,4 +218,5 @@ export const PROVIDER_LABELS: Record<LLMProvider, string> = {
   cursor: 'Cursor',
   opencode: 'OpenCode',
   workbuddy: 'WorkBuddy',
+  'deepseek-harness': 'DeepSeek Harness',
 };

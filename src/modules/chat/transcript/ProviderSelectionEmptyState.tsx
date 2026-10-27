@@ -29,11 +29,12 @@ import { writeSelectedProvider } from '@/shared/selectedProvider';
 import { useDiscoveredAgents } from '@/modules/agent-discovery';
 
 const PROVIDER_META: { id: LLMProvider; name: string }[] = [
-  { id: "claude", name: "Anthropic" },
-  { id: "codex", name: "OpenAI" },
+  { id: "claude", name: "Claude Code" },
+  { id: "codex", name: "Codex" },
   { id: "cursor", name: "Cursor" },
   { id: "opencode", name: "OpenCode" },
   { id: "workbuddy", name: "WorkBuddy" },
+  { id: "deepseek-harness", name: "DeepSeek Harness" },
 ];
 
 const MOD_KEY =
@@ -81,6 +82,7 @@ function getProviderDisplayName(p: LLMProvider) {
   if (p === "cursor") return "Cursor";
   if (p === "codex") return "Codex";
   if (p === "opencode") return "OpenCode";
+  if (p === "deepseek-harness") return "DeepSeek Harness";
   if (p === "workbuddy") return "WorkBuddy";
   return "Claude";
 }
@@ -330,6 +332,7 @@ export default function ProviderSelectionEmptyState({
           <p className="mt-4 text-center text-sm text-muted-foreground/70">
             {
               {
+                'deepseek-harness': 'DeepSeek Harness · 本机执行',
                 workbuddy: t('providerSelection.readyPrompt.workbuddy', { defaultValue: 'WorkBuddy local login · conversations', model: providerModels.workbuddy }),
                 claude: t("providerSelection.readyPrompt.claude", {
                   model: providerModels.claude,

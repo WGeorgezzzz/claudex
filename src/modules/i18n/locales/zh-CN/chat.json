@@ -1,4 +1,12 @@
 {
+  "harnessModes": {
+    "modes": { "default": "工作区", "plan": "只读", "bypassPermissions": "完全访问" },
+    "descriptions": {
+      "default": "读写工作区文件；命令遵循本机沙箱权限，需要额外权限时停止。",
+      "plan": "只读文件，不允许修改。",
+      "bypassPermissions": "允许本机命令和文件操作，不再等待逐项授权。"
+    }
+  },
   "workbuddyModes": {
     "modes": {
       "default": "默认审批",
@@ -333,6 +341,7 @@
     "effortDefault": "默认",
     "loadingModels": "正在加载模型…",
     "modelMenu": "选择模型和推理强度",
+    "connectionLostDraftKept": "连接已断开，消息尚未发送。草稿已保留，重连后可重新发送。",
     "permissionHeading": "{{provider}} 的操作如何审批？"
   },
   "export": {

@@ -121,6 +121,7 @@ export const MCP_PROVIDER_NAMES: Record<McpProvider, string> = {
   codex: 'Codex',
   opencode: 'OpenCode',
   workbuddy: 'WorkBuddy',
+  'deepseek-harness': 'DeepSeek Harness',
 };
 
 /** Scopes each provider can install an MCP server into; drives the scope selector and validation. */
@@ -130,6 +131,7 @@ export const MCP_SUPPORTED_SCOPES: Record<McpProvider, McpScope[]> = {
   codex: ['user', 'project'],
   opencode: ['user', 'project'],
   workbuddy: [],
+  'deepseek-harness': [],
 };
 
 /** Transports each provider can talk to an MCP server over; drives the transport selector and validation. */
@@ -139,6 +141,7 @@ export const MCP_SUPPORTED_TRANSPORTS: Record<McpProvider, McpTransport[]> = {
   codex: ['stdio', 'http'],
   opencode: ['stdio', 'http'],
   workbuddy: [],
+  'deepseek-harness': [],
 };
 
 /** Transports offered when configuring a global (provider-agnostic) MCP server. */
@@ -151,6 +154,7 @@ export const MCP_SUPPORTS_WORKING_DIRECTORY: Record<McpProvider, boolean> = {
   codex: true,
   opencode: false,
   workbuddy: false,
+  'deepseek-harness': false,
 };
 
 // ---------------------------
@@ -222,4 +226,5 @@ export const PROVIDER_PERMISSION_PREFERENCE_KEYS: Record<LLMProvider, UserPrefer
   codex: 'codexPermissions',
   opencode: 'opencodePermissions',
   workbuddy: 'workbuddyPermissions',
+  'deepseek-harness': 'harnessPermissions',
 };

@@ -130,7 +130,7 @@ test('the model library toggles "use only my models" for the selected provider',
 
   const toggle = screen.getByRole('checkbox', { name: /Use only my models/ });
   assert.equal((toggle as HTMLInputElement).checked, false);
-  screen.getByText(/Hide the built-in Claude models from every model picker/);
+  screen.getByText(/Hide the built-in Claude Code models from every model picker/);
 
   fireEvent.click(toggle);
   await waitFor(() => assert.deepEqual(calls, [{ provider: 'claude', enabled: true }]));
@@ -334,7 +334,7 @@ test('the model picker says which providers list only your models', () => {
         provider="claude"
         setProvider={() => {}}
         textareaRef={{ current: null }}
-        providerModels={{ claude: 'default', codex: 'gpt-5.6-sol', cursor: 'auto', opencode: '', workbuddy: 'fast-model' }}
+        providerModels={{ claude: 'default', codex: 'gpt-5.6-sol', cursor: 'auto', opencode: '', workbuddy: 'fast-model', 'deepseek-harness': 'configured' }}
         setProviderModel={() => {}}
         providerModelCatalog={providerModelCatalog}
         providerModelActions={createActions(async () => {})}
@@ -366,6 +366,6 @@ test('the model picker says which providers list only your models', () => {
   flagWithoutModels.unmount();
 
   renderPicker({ claude: CUSTOM_ONLY_CATALOG, codex });
-  screen.getByText('Only your models are listed for Anthropic');
+  screen.getByText('Only your models are listed for Claude Code');
   assert.equal(isShown('Built-in and custom models in one list'), false);
 });

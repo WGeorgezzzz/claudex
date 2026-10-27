@@ -33,6 +33,7 @@ class FakeWebSocket {
   static readonly CLOSING = 2;
   static readonly CLOSED = 3;
   static instances: FakeWebSocket[] = [];
+  static failNextConstructor = false;
 
   readyState = FakeWebSocket.CONNECTING;
   onopen: (() => void) | null = null;
@@ -41,6 +42,7 @@ class FakeWebSocket {
   onerror: ((error: unknown) => void) | null = null;
 
   constructor(readonly url: string) {
+    if (FakeWebSocket.failNextConstructor) { FakeWebSocket.failNextConstructor = false; throw new Error('network unavailable'); }
     FakeWebSocket.instances.push(this);
   }
 
@@ -70,11 +72,13 @@ const { WebSocketProvider, useWebSocket } = await import('@/shared/context/WebSo
 /** Every status the provider rendered, in order, so a one-render flash is caught too. */
 let seen: string[] = [];
 let isConnected: boolean | null = null;
+let transportSend: ((message: unknown) => unknown) | undefined;
 
 function RecordStatus() {
   const value = useWebSocket();
   seen.push(String(value.connectionStatus));
   useEffect(() => {
+    transportSend = value.sendMessage;
     isConnected = value.isConnected;
   });
   return null;
@@ -87,6 +91,7 @@ const lastStatus = () => seen[seen.length - 1];
 beforeEach(() => {
   vi.useFakeTimers();
   FakeWebSocket.instances = [];
+  FakeWebSocket.failNextConstructor = false;
   seen = [];
   isConnected = null;
   AUTH.current = { user: AUTH.user, token: 'token-1', isLoading: false };
@@ -203,4 +208,39 @@ test('signing out while connected stops reporting a live connection', () => {
   assert.equal(socket(0).readyState, FakeWebSocket.CLOSED, 'the socket was closed on sign-out');
   assert.equal(lastStatus(), 'connecting');
   assert.equal(isConnected, false, 'isConnected no longer reports the closed socket as live');
+});
+
+test('constructor failures retry instead of leaving the frontend disconnected forever', () => {
+  FakeWebSocket.failNextConstructor = true;
+  renderProvider();
+  assert.equal(lastStatus(), 'disconnected');
+  act(() => { vi.advanceTimersByTime(3000); });
+  assert.equal(FakeWebSocket.instances.length, 1);
+  act(() => socket(0).serverOpens());
+  assert.equal(lastStatus(), 'connected');
+});
+
+test('a stalled handshake times out and retries without manual reload', () => {
+  renderProvider();
+  act(() => { vi.advanceTimersByTime(10000); });
+  assert.equal(socket(0).readyState, FakeWebSocket.CLOSED);
+  assert.equal(lastStatus(), 'disconnected');
+  act(() => { vi.advanceTimersByTime(3000); });
+  assert.equal(FakeWebSocket.instances.length, 2);
+});
+
+test('online resumes a dropped connection immediately without a second retry socket', () => {
+  renderProvider(); act(() => socket(0).serverOpens()); act(() => socket(0).serverDrops());
+  act(() => window.dispatchEvent(new Event('online')));
+  assert.equal(FakeWebSocket.instances.length,2);
+  act(() => socket(1).serverOpens());
+  act(() => { vi.advanceTimersByTime(3000); });
+  assert.equal(FakeWebSocket.instances.length,2);
+});
+
+test('the transport reports an unsent frame instead of silently accepting it', () => {
+  renderProvider();
+  assert.equal(transportSend?.({type:'chat.send',content:'keep my draft'}),false);
+  act(() => socket(0).serverOpens());
+  assert.equal(transportSend?.({type:'chat.send',content:'send once'}),true);
 });

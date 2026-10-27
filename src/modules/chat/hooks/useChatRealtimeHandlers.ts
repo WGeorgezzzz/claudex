@@ -142,6 +142,8 @@ export function useChatRealtimeHandlers({
           // Ack for chat.subscribe: authoritative processing state plus any
           // pending tool-permission prompts for the run.
           if (!sid) return;
+          // The server may have restarted or started a new run with a lower sequence.
+          if (typeof msg.lastSeq === 'number' && Number.isFinite(msg.lastSeq)) lastSeqRef.current.set(sid, Math.max(0, msg.lastSeq));
 
           if (msg.isProcessing) {
             onSessionProcessing?.(sid);

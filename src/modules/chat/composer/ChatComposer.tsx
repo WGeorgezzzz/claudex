@@ -14,7 +14,7 @@ import { ListPlus, OctagonX, PaperclipIcon, MessageSquareIcon, XIcon, Loader2, C
 
 import { useVoiceInput } from '@/modules/chat/hooks/useVoiceInput';
 import { useVoiceAvailable } from '@/modules/chat/hooks/useVoiceAvailable';
-import type { BackgroundSendChoice, BackgroundSendPrompt, ScheduledMessage, SlashCommand,SessionActivity,PendingPermissionRequest,PermissionMode,ProviderModelOption } from '@/shared/types';
+import type { BackgroundSendChoice, BackgroundSendPrompt, ScheduledMessage, SlashCommand,SessionActivity,PendingPermissionRequest,PermissionMode,ProviderModelOption, LLMProvider } from '@/shared/types';
 import {
   PromptInput,
   PromptInputHeader,
@@ -45,6 +45,7 @@ type MentionableFile = {
 };
 
 type ChatComposerProps = {
+  provider?: LLMProvider;
   extraActions?: ReactNode;
   pendingTray?: ReactNode;
   submissionNotice?: string;
@@ -157,6 +158,7 @@ export default function ChatComposer({
   permissionModeNamespace,
   onSelectPermissionMode,
   providerLabel,
+  provider,
   effort,
   availableEffortOptions,
   onSelectEffort,
@@ -504,6 +506,7 @@ export default function ChatComposer({
             {extraActions}
             </ComposerActions>
             <ComposerModelMenu
+              provider={provider}
               providerLabel={providerLabel}
               effort={effort}
               effortOptions={availableEffortOptions}

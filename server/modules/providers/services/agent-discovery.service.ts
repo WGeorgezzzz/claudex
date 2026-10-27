@@ -1,6 +1,8 @@
+import { readFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
+import { resolveDeepSeekHarnessInstallation } from '@/modules/providers/list/deepseek-harness/deepseek-harness-installation.provider.js';
 import { appConfigDb, userDb } from '@/modules/database/index.js';
 import { getCurrentUserContext, withUserContext } from '@/modules/auth/index.js';
 import { AppError, getCloudCliHomeDir } from '@/shared/index.js';
@@ -12,6 +14,7 @@ const AGENTS = [
   { id: 'codex', name: 'Codex', commands: ['codex'], config: '.codex', sessions: 'sessions', install: 'npm install -g @openai/codex', supported: true },
   { id: 'cursor', name: 'Cursor', commands: ['cursor-agent', 'agent'], config: '.cursor', sessions: 'chats', install: 'curl https://cursor.com/install -fsS | bash', supported: true },
   { id: 'opencode', name: 'OpenCode', commands: ['opencode'], config: '.local/share/opencode', sessions: 'storage/session', install: 'npm install -g opencode-ai', supported: true },
+  { id: 'deepseek-harness', name: 'DeepSeek Harness', commands: ['dsh'], config: '.dsh', sessions: 'sessions', install: 'https://deepseek.com/harness/', supported: true },
   { id: 'workbuddy', name: 'WorkBuddy', commands: ['workbuddy'], config: '.workbuddy', sessions: 'transcripts', install: 'https://www.codebuddy.cn/work/', supported: true },
   { id: 'gemini', name: 'Gemini CLI', commands: ['gemini'], config: '.gemini', sessions: 'tmp', install: 'npm install -g @google/gemini-cli', supported: false },
   { id: 'qwen', name: 'Qwen Code', commands: ['qwen'], config: '.qwen', sessions: 'projects', install: 'npm install -g @qwen-code/qwen-code', supported: false },
@@ -25,7 +28,15 @@ const userScans = new Map<number, Promise<unknown>>();
 
 async function scanHost() {
   if (!hostScan) hostScan = (async () => {
-    const found = await Promise.all(AGENTS.map(async agent => [agent.id, await probeAgent(agent.commands)] as const));
+    const found = await Promise.all(AGENTS.map(async agent => {
+      if (agent.id === 'deepseek-harness') {
+        const install = resolveDeepSeekHarnessInstallation();
+        if (!install) return [agent.id, null] as const;
+        const pkg = JSON.parse(await readFile(install.packageFile, 'utf8'));
+        return [agent.id, { executable: install.launcher, version: String(pkg.version) }] as const;
+      }
+      return [agent.id, await probeAgent(agent.commands)] as const;
+    }));
     programs = new Map(found);
     // Existing runtime launchers inherit PATH, including Agents installed outside the service's original PATH.
     const directories = found.filter(([id, value]) => value && AGENTS.find(a => a.id === id)?.supported).map(([, value]) => path.dirname(value!.executable));
@@ -53,10 +64,11 @@ export const agentDiscoveryService = {
           try { authenticated = Boolean((await providerRegistry.resolveProvider(agent.id).auth.getStatus()).authenticated); } catch { /* Report unavailable auth without exposing raw paths or credentials. */ }
         }
         const configDirectory = agent.id === 'claude' ? identity.claudeConfigDir : agent.id === 'codex' ? identity.codexHome
-          : agent.id === 'workbuddy' ? path.join(getCloudCliHomeDir(), 'workbuddy') : path.join(os.homedir(), agent.config);
+          : agent.id === 'workbuddy' ? path.join(getCloudCliHomeDir(), 'workbuddy')
+          : agent.id === 'deepseek-harness' ? path.join(resolveDeepSeekHarnessInstallation()?.directory || '', 'home') : path.join(os.homedir(), agent.config);
         const sessionCount = await countAgentSessions(path.join(configDirectory, agent.sessions),
           agent.id === 'opencode' ? path.join(configDirectory, 'opencode.db') : undefined,
-          ['opencode', 'gemini'].includes(agent.id) ? /\.json$/ : undefined);
+          agent.id === 'deepseek-harness' ? /\.jsonl\.zstd$/ : ['opencode', 'gemini'].includes(agent.id) ? /\.json$/ : undefined);
         return { id: agent.id, name: agent.name, installed: Boolean(program), version: program?.version ?? null,
           supported: agent.supported, authenticated, enabled: Boolean(program && authenticated && !disabled.includes(agent.id)),
           disabled: disabled.includes(agent.id), installCommand: agent.install,
