@@ -11,6 +11,7 @@ type SectionsState = {
   error: string;
   change: (input: Record<string, unknown>) => Promise<boolean>;
   openMove: (target: WorkspaceSectionTarget, point?: { x: number; y: number }) => void;
+  prepareNewSession: (sectionId: string) => void;
 };
 const SectionsContext = createContext<SectionsState | null>(null);
 async function read(response: Response): Promise<WorkspaceSectionsSnapshot> {
@@ -36,6 +37,7 @@ export function WorkspaceSectionsProvider({ children }: { children: ReactNode })
   // Preserve the draft on validation errors so it can be corrected in place.
   const [name, setName] = useState('');
   const writing = useRef(false), sequence = useRef(0), current = useRef(layout);
+  const pendingNewSession = useRef<string | null>(null);
   current.current = layout;
   useEffect(() => {
     let live = true;
@@ -45,6 +47,17 @@ export function WorkspaceSectionsProvider({ children }: { children: ReactNode })
     };
     void load(); const timer = setInterval(() => void load(), 15000);
     return () => { live = false; clearInterval(timer); };
+  }, []);
+  useEffect(() => {
+    const handleEstablished = (event: Event) => {
+      const sessionId = (event as CustomEvent<{ sessionId?: string }>).detail?.sessionId;
+      const sectionId = pendingNewSession.current;
+      if (!sectionId || !sessionId || !current.current) return;
+      pendingNewSession.current = null;
+      void change({ action: 'assign', kind: 'session', targetId: sessionId, sectionId });
+    };
+    window.addEventListener('workspace:session-established', handleEstablished);
+    return () => window.removeEventListener('workspace:session-established', handleEstablished);
   }, []);
   const change = async (input: Record<string, unknown>) => {
     if (!current.current || writing.current) return false;
@@ -63,11 +76,12 @@ export function WorkspaceSectionsProvider({ children }: { children: ReactNode })
     setPosition(window.innerWidth >= 768 ? { x: Math.max(8, Math.min(point?.x ?? bounds?.right ?? 280, window.innerWidth - 328)), y: Math.max(8, Math.min(point?.y ?? bounds?.top ?? 160, window.innerHeight - 420)) } : null);
     setTarget(next); setCreating(false); setName(''); setError('');
   };
+  const prepareNewSession = (sectionId: string) => { pendingNewSession.current = sectionId; };
   const assign = async (sectionId: string | null) => {
     if (target && await change({ action: 'assign', kind: target.kind, targetId: target.targetId, sectionId })) setTarget(null);
   };
   const selected = layout?.assignments.find(row => row.kind === target?.kind && row.targetId === target?.targetId)?.sectionId;
-  return <SectionsContext.Provider value={{ layout, busy, error, change, openMove }}>
+  return <SectionsContext.Provider value={{ layout, busy, error, change, openMove, prepareNewSession }}>
     {children}
     <Dialog open={!!target} onOpenChange={open => { if (!open) setTarget(null); }}><DialogContent wrapperClassName={position ? 'z-[110] [&>div:first-child]:bg-transparent [&>div:first-child]:backdrop-blur-none' : 'z-[110]'} aria-label="移到分区"
       className={position ? 'max-h-[80dvh] w-80 max-w-sm translate-x-0 translate-y-0 overflow-y-auto p-3' : 'bottom-0 left-0 top-auto max-h-[80dvh] w-full max-w-none translate-x-0 translate-y-0 overflow-y-auto rounded-b-none p-4'}
