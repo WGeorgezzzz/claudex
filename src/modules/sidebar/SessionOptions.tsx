@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { Check, Edit2, GitBranch, Mail, MailOpen, MoreHorizontal, Sparkles, Pin, PinOff, Trash2, X } from 'lucide-react';
+import { Check, Clock3, Edit2, FolderInput, GitBranch, Mail, MailOpen, MoreHorizontal, Sparkles, Pin, PinOff, Trash2, X } from 'lucide-react';
 import type { TFunction } from 'i18next';
 
 import { useWorkspaceSections } from '@/modules/sidebar/context/WorkspaceSectionsContext';
@@ -11,6 +11,7 @@ import { useSessionForkingProviders } from '@/shared/hooks/useProviderCapabiliti
 import { useProviderSessionIdCopy } from '@/modules/sidebar/hooks/useProviderSessionIdCopy';
 import { PROVIDER_LABELS } from '@/modules/sidebar/utils/sidebarProjectFormatting';
 import { useSessionWorkspace } from '@/modules/sidebar/context/SessionWorkspaceContext';
+import { useMonitorSummaries } from '@/shared/hooks/useMonitorSummaries';
 
 type SessionOptionsProps = {
   sessionId: string;
@@ -32,6 +33,7 @@ type SessionOptionsProps = {
   onDeleteSession: (sessionId: string, sessionTitle: string) => void;
   /** Bound by the caller, which owns the session object the fork needs. */
   onFork?: () => void;
+  onEditOrganization?: () => void;
   /** Withheld where the row has nowhere to send a delete. */
   canDelete?: boolean;
   className?: string;
@@ -61,6 +63,7 @@ export default function SessionOptions({
   onSaveEditingSession,
   onDeleteSession,
   onFork,
+  onEditOrganization,
   canDelete = true,
   className,
   t,
@@ -69,6 +72,7 @@ export default function SessionOptions({
   const containerRef = useRef<HTMLDivElement>(null);
   const workspace=useSessionWorkspace();
   const sections = useWorkspaceSections();
+  const monitors = useMonitorSummaries()[sessionId] ?? [];
   const organization=workspace?.byId.get(sessionId);
   const providerLabel = PROVIDER_LABELS[provider];
   const { copyState, copyLabel, setOptionsOpen, handleCopyAction, isCopyPending, CopyStateIcon } =
@@ -156,7 +160,7 @@ export default function SessionOptions({
           variant="ghost"
           size="icon"
           onOpenChange={setOptionsOpen}
-          triggerClassName="h-7 w-7 text-muted-foreground opacity-70 hover:bg-muted hover:opacity-100"
+          triggerClassName="h-7 w-7 text-muted-foreground hover:bg-muted [@media(hover:hover)]:opacity-0 group-hover/session:opacity-100 group-focus-within/session:opacity-100 aria-expanded:opacity-100"
           menuClassName="z-[100] w-[260px] rounded-xl p-1.5 shadow-xl"
           header={(
             <div className="mb-1 border-b border-border px-3 py-2">
@@ -168,6 +172,8 @@ export default function SessionOptions({
           )}
           items={[
             ...(sections?.layout ? [{ key: 'section', label: '移到分区 ▸', disabled: sections.busy, onSelect: () => sections.openMove({kind:'session',targetId:sessionId,title:sessionName}) }] : []),
+            {key:'organization',label:'会话归属与工作区',icon:FolderInput,onSelect:onEditOrganization??(()=>window.dispatchEvent(new CustomEvent('sidebar:session-organization',{detail:sessionId})))},
+            ...(monitors.length ? [{key:'monitor',label:'会话监测',icon:Clock3,onSelect:()=>Array.from(document.querySelectorAll<HTMLButtonElement>('[data-monitor-session]')).find(button=>button.dataset.monitorSession===sessionId)?.click()}] : []),
             ...(workspace?.ready?[
               {key:'pin',label:t(organization?.pinnedAt?'workspace.unpin':'workspace.pin'),icon:organization?.pinnedAt?PinOff:Pin,
                 onSelect:()=>{void workspace.change(sessionId,{pinned:!organization?.pinnedAt}).catch(()=>{});}},

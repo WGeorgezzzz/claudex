@@ -1,9 +1,9 @@
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Inbox, Mail, MailOpen, Pin, RefreshCw, X } from 'lucide-react';
+import { Inbox, RefreshCw, X } from 'lucide-react';
 
-import { SectionRow } from '@/modules/sidebar/SectionRow';
-import { Dialog, DialogContent, SessionMonitorBadge } from '@/shared/ui';
+import { WorkspaceSessionRow } from '@/modules/sidebar/WorkspaceSessionRow';
+import { Dialog, DialogContent } from '@/shared/ui';
 import type { SessionWorkspaceChange, SessionWorkspaceEntry } from '@/shared/types';
 import { useSessionWorkspace } from '@/modules/sidebar/context/SessionWorkspaceContext';
 
@@ -85,14 +85,11 @@ export function SessionInbox({ onSelect }: { onSelect: (projectId: string | null
           {rows.length === 0 && <p className="px-2 py-12 text-center text-sm text-muted-foreground">{t('inbox.empty')}</p>}
           {rows.map(row => {
             const timestamp = row.lastActivityAt ? Date.parse(row.lastActivityAt) : NaN;
-            return <SectionRow key={row.sessionId} target={{kind:'session',targetId:row.sessionId,title:row.title}}><article aria-label={row.title} className="flex items-start gap-2 rounded-lg border-b border-border/50 px-2 py-3 hover:bg-muted/40">
-              <a href={`/session/${encodeURIComponent(row.sessionId)}`} className="min-w-0 flex-1 rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring" onClick={event => {
-                if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
-                event.preventDefault(); setOpen(false); onSelect(row.projectId, row.sessionId, row.provider);
-              }}>
-                <div className={`break-words text-sm ${row.unread ? 'font-semibold' : ''}`}>{row.unread && <span className="mr-1 text-primary" aria-label={t('workspace.unread')}>●</span>}<SessionMonitorBadge sessionId={row.sessionId}/>{row.title}</div>
-                <p className="mt-1 break-all text-xs text-muted-foreground">{row.projectPath || t('inbox.noProject')} · {row.provider}</p>
-                <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+            return <article key={row.sessionId} aria-label={row.title} className="border-b border-border/50 py-1">
+              <WorkspaceSessionRow id={row.sessionId} title={row.title} provider={row.provider} projectId={row.projectId} onSelect={()=>{setOpen(false);onSelect(row.projectId,row.sessionId,row.provider);}} subtitle={<>
+                {row.projectPath || t('inbox.noProject')} · {row.provider}
+              </>}/>
+                <div className="mb-2 ml-8 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
                   {row.approvalCount > 0 && <span className="text-amber-600 dark:text-amber-400">{t('workspace.waitingApproval', { count: row.approvalCount })}</span>}
                   {row.blockedCount > 0 && <span className="text-destructive">{t('workspace.blocked', { count: row.blockedCount })}</span>}
                   {row.queuePaused && row.queuedCount > 0 && <span>{t('workspace.paused', { count: row.queuedCount })}</span>}
@@ -100,14 +97,7 @@ export function SessionInbox({ onSelect }: { onSelect: (projectId: string | null
                   {row.runningCount > 0 && <span>{t('inbox.running', { count: row.runningCount })}</span>}
                   {Number.isFinite(timestamp) && <time dateTime={row.lastActivityAt!}>{new Date(timestamp).toLocaleString(i18n.resolvedLanguage, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</time>}
                 </div>
-              </a>
-              <div className="flex shrink-0 gap-1">
-                <button type="button" disabled={busy} aria-label={t(row.unread ? 'inbox.markRead' : 'inbox.markUnread', { title: row.title })}
-                  onClick={() => void write([{ row, input: row.unread ? { unread: false, readThrough: row.lastActivityAt } : { unread: true } }])} className="rounded p-2 text-muted-foreground hover:bg-muted disabled:opacity-40">{row.unread ? <MailOpen size={15}/> : <Mail size={15}/>}</button>
-                <button type="button" disabled={busy} aria-pressed={row.pinnedAt !== null} aria-label={t(row.pinnedAt !== null ? 'inbox.unpin' : 'inbox.pin', { title: row.title })}
-                  onClick={() => void write([{ row, input: { pinned: row.pinnedAt === null } }])} className={`rounded p-2 hover:bg-muted disabled:opacity-40 ${row.pinnedAt !== null ? 'text-primary' : 'text-muted-foreground'}`}><Pin size={15}/></button>
-              </div>
-            </article></SectionRow>;
+            </article>;
           })}
         </div>
       </DialogContent>

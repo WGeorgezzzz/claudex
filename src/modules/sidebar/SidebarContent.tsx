@@ -3,6 +3,7 @@ import { Activity, Archive, Folder, MessageSquare, RotateCcw, Search, Trash2 } f
 import type { TFunction } from 'i18next';
 
 import { WorkspaceSectionsProvider } from '@/modules/sidebar/context/WorkspaceSectionsContext';
+import { SessionRowActionsProvider } from '@/modules/sidebar/context/SessionRowActionsContext';
 import { LLMProviderLogo, ScrollArea } from '@/shared/ui';
 import type { ArchivedProjectListItem, ArchivedSessionListItem, ConversationSearchResults, Project, RecentConversationListItem, ReleaseInfo, SearchProgress, SidebarProjectListProps, SidebarSearchMode } from '@/shared/types';
 import { formatCompactAge, getAllSessions } from '@/modules/sidebar/utils/sidebarProjectFormatting';
@@ -12,6 +13,7 @@ import SidebarProjectList from '@/modules/sidebar/SidebarProjectList';
 import SidebarRecentConversations from '@/modules/sidebar/SidebarRecentConversations';
 import { SessionWorkspacePanel } from '@/modules/sidebar/SessionWorkspacePanel';
 import { WorkspaceSections } from '@/modules/sidebar/WorkspaceSections';
+import { ProjectOrganization } from '@/modules/sidebar/ProjectOrganization';
 
 function HighlightedSnippet({ snippet, highlights }: { snippet: string; highlights: { start: number; end: number }[] }) {
   const parts: ReactNode[] = [];
@@ -190,7 +192,7 @@ export default function SidebarContent({
   const isRenamingOnMobile = isMobile && projectListProps.activeRename !== null;
 
   return (
-    <WorkspaceSectionsProvider><div
+    <SessionRowActionsProvider actions={projectListProps}><WorkspaceSectionsProvider><div
       className="workspace-sidebar flex h-full flex-col md:w-full md:select-none"
       style={{}}
     >
@@ -215,7 +217,7 @@ export default function SidebarContent({
         t={t}
       />
 
-      <ScrollArea className="flex-1 overflow-y-auto overscroll-contain md:px-1.5 md:py-2">
+      <ScrollArea className="min-h-0 flex-1 overscroll-contain md:px-1.5 md:py-2" viewportClassName="overflow-y-auto overflow-x-hidden">
         {!searchFilter.trim()&&<SessionWorkspacePanel onSelect={onConversationResultClick}/>}
         {showConversationSearch ? (
           isSearching && !conversationResults ? (
@@ -704,6 +706,7 @@ export default function SidebarContent({
           t={t}
         />
       )}
-    </div></WorkspaceSectionsProvider>
+      {searchMode!=='projects'&&<ProjectOrganization props={projectListProps} editorOnly/>}
+    </div></WorkspaceSectionsProvider></SessionRowActionsProvider>
   );
 }

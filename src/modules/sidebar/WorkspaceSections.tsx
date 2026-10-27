@@ -4,13 +4,12 @@ import { useTranslation } from 'react-i18next';
 import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, FolderPlus, MoreHorizontal, Plus, Trash2, X } from 'lucide-react';
 
 import { useWorkspaceSections } from '@/modules/sidebar/context/WorkspaceSectionsContext';
-import { SectionRow } from '@/modules/sidebar/SectionRow';
 import { api, readApiErrorMessage } from '@/shared/api';
-import { ActionMenu, Dialog, DialogContent, SessionMonitorBadge } from '@/shared/ui';
+import { ActionMenu, Dialog, DialogContent } from '@/shared/ui';
+import { WorkspaceSessionRow } from '@/modules/sidebar/WorkspaceSessionRow';
 import type { BridgeSessionPage, SidebarProjectListProps } from '@/shared/types';
 import { ProjectOrganization } from '@/modules/sidebar/ProjectOrganization';
 import SidebarProjectList from '@/modules/sidebar/SidebarProjectList';
-import { useSessionWorkspace } from '@/modules/sidebar/context/SessionWorkspaceContext';
 
 async function unwrap<T>(response: Response): Promise<T> {
   const body = await response.json(); if (!response.ok) throw new Error(readApiErrorMessage(body) || `HTTP ${response.status}`);
@@ -19,7 +18,7 @@ async function unwrap<T>(response: Response): Promise<T> {
 
 /** SidebarContent renders persistent custom sections around its existing project rows. */
 export function WorkspaceSections({ projectListProps, onSelect }: { projectListProps: SidebarProjectListProps; onSelect: (projectId: string | null, sessionId: string, provider: string) => void }) {
-  const { t } = useTranslation('sidebar'); const workspace = useSessionWorkspace();
+  const { t } = useTranslation('sidebar');
   // A server snapshot lets sections survive reloads and synchronize between clients.
   const state = useWorkspaceSections();
   const layout = state?.layout;
@@ -107,10 +106,7 @@ export function WorkspaceSections({ projectListProps, onSelect }: { projectListP
           { key: 'delete', label: '删除分区', description: '只取消归类，保留项目和会话。', isDanger: true, disabled: busy, onSelect: () => { void change({ action: 'delete', id: section.id }).then(ok => { if (ok) setNotice('已删除分区，只取消归类，项目和会话均已保留。'); }); } },
         ]}/></div>
         {!section.collapsed && <>{projects.length > 0 && <SidebarProjectList {...listProps} projects={projects} filteredProjects={projects}/>}
-          {sessions.map(session => <SectionRow key={session.sessionId} target={{kind:'session',targetId:session.sessionId,title:session.title}}><a title={session.projectPath||session.provider} href={`/session/${encodeURIComponent(session.sessionId)}`} className={`mx-3 block rounded px-2 py-2 text-[13px] hover:bg-muted ${projectListProps.selectedSession?.id === session.sessionId ? 'bg-muted' : ''}`} onClick={event => {
-            if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
-            event.preventDefault(); onSelect(session.projectId, session.sessionId, session.provider);
-          }}><span className="block truncate">{projectListProps.activeSessions.has(session.sessionId) ? '◌ ' : workspace?.byId.get(session.sessionId)?.unread ? '● ' : ''}<SessionMonitorBadge sessionId={session.sessionId}/>{session.title}</span></a></SectionRow>)}
+          {sessions.map(session => <WorkspaceSessionRow key={session.sessionId} id={session.sessionId} title={session.title} provider={session.provider} projectId={session.projectId} selected={projectListProps.selectedSession?.id===session.sessionId} onSelect={()=>onSelect(session.projectId,session.sessionId,session.provider)}/>)}
           {projects.length + sessions.length === 0 && <p className="mx-5 py-2 text-[11px] text-muted-foreground">{t('sections.empty')}</p>}
         </>}
       </section>;

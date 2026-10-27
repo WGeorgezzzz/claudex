@@ -53,8 +53,9 @@ test('bulk read only acknowledges the search results through their displayed act
 test('a completion newer than the acknowledged snapshot stays unread', async () => {
   vi.mocked(api.sessionWorkspace.update).mockImplementation(async () => response({ ...base, lastActivityAt: '2026-10-22T00:01:00.000Z', unread: true }));
   const dialog = await open();
-  fireEvent.click(within(dialog).getByRole('button', { name: /Mark Alpha review read|将 Alpha review 标为已读/ }));
-  await waitFor(() => assert.ok(within(dialog).getByRole('button', { name: /Mark Alpha review read|将 Alpha review 标为已读/ }).hasAttribute('disabled') === false));
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Session options for Alpha review' }));
+  fireEvent.click(await screen.findByRole('menuitem', { name: /Mark Alpha review read|将 Alpha review 标为已读/ }));
+  await waitFor(() => assert.equal(vi.mocked(api.sessionWorkspace.update).mock.calls.length,1));
   assert.deepEqual(vi.mocked(api.sessionWorkspace.update).mock.calls[0], ['alpha', { unread: false, readThrough: base.lastActivityAt }]);
   assert.ok(within(dialog).getByRole('article', { name: 'Alpha review' }));
 });
@@ -74,8 +75,11 @@ test('partial batch failure remains visible after later successes and duplicate 
 
 test('pin and unread controls never navigate or mutate queue permissions', async () => {
   const select = vi.fn(); const dialog = await open(select);
-  fireEvent.click(within(dialog).getByRole('button', { name: /^Pin Alpha review$|^置顶 Alpha review$/ }));
-  await waitFor(() => assert.ok(within(dialog).getByRole('button', { name: /^Unpin Alpha review$|^取消置顶 Alpha review$/ })));
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Session options for Alpha review' }));
+  fireEvent.click(await screen.findByRole('menuitem', { name: /^Pin Alpha review$|^置顶 Alpha review$/ }));
+  await waitFor(() => assert.deepEqual(vi.mocked(api.sessionWorkspace.update).mock.calls, [['alpha', { pinned: true }]]));
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Session options for Alpha review' }));
+  assert.ok(await screen.findByRole('menuitem', { name: /^Unpin Alpha review$|^取消置顶 Alpha review$/ }));
   assert.deepEqual(vi.mocked(api.sessionWorkspace.update).mock.calls, [['alpha', { pinned: true }]]);
   assert.equal(select.mock.calls.length, 0);
 });
