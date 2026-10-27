@@ -3,7 +3,7 @@ import path from 'node:path';
 
 import type { WebSocket } from 'ws';
 
-import { sessionsDb } from '@/modules/database/index.js';
+import { getSessionOwnerId, sessionsDb, sessionWorkspaceDb } from '@/modules/database/index.js';
 import { providerModelsService, sessionsService } from '@/modules/providers/index.js';
 import { chatRunRegistry } from '@/modules/websocket/services/chat-run-registry.service.js';
 import { connectedClients, WS_OPEN_STATE, clientUserIds } from '@/modules/websocket/services/websocket-state.service.js';
@@ -74,6 +74,8 @@ export type ProviderRuntimeGateway = {
     writer: ProviderRuntimeWriter,
   ): Promise<unknown>;
   abort(provider: LLMProvider, sessionId: string): Promise<boolean>;
+  /** Kills the session's process tree and tears the run down; works even when nothing can be interrupted. */
+  forceStop(provider: LLMProvider, sessionId: string): Promise<{ killedPids: number[] }>;
   stopBackgroundTask(provider: LLMProvider, sessionId: string, taskId: string): Promise<boolean>;
   /** Whether a provider runtime still holds background work for the session after its turn ended. */
   hasBackgroundWork(sessionId: string): boolean;
@@ -443,18 +445,45 @@ async function handleChatAbort(
     return;
   }
 
-  if (!sessionsDb.getSessionById(sessionId)) {
+  const session = sessionsDb.getSessionById(sessionId);
+  if (!session) {
     sendProtocolError(ws, 'SESSION_NOT_FOUND', 'Session not found.', sessionId); return;
   }
   const run = chatRunRegistry.getRun(sessionId);
-  if (!run || run.status !== 'running') {
+  const activeRun = run && run.status === 'running' ? run : null;
+
+  // Force stop: no precondition. The session may be wedged in a held process,
+  // background work, or a CLI Nexagent does not own — all of which a normal
+  // stop either cannot reach or waits on forever. Repeating it is harmless.
+  if (data.force === true) {
+    const provider = (activeRun?.provider ?? session.provider) as LLMProvider;
+    const { killedPids } = await dependencies.runtime.forceStop(provider, sessionId);
+    if (activeRun) {
+      chatRunRegistry.completeRunIfCurrent(activeRun, { exitCode: 0, aborted: true });
+    }
+    const ownerId = getSessionOwnerId(sessionId);
+    if (ownerId !== null) {
+      // A forced kill is an explicit boundary: queued turns must wait for a
+      // deliberate resume instead of starting against a torn-down runtime.
+      withUserContext(ownerId, () => sessionWorkspaceDb.update(ownerId, sessionId, { queuePaused: true }));
+    }
+    sendJson(ws, {
+      kind: 'force_stopped',
+      sessionId,
+      killedPids,
+      timestamp: new Date().toISOString(),
+    });
+    return;
+  }
+
+  if (!activeRun) {
     sendProtocolError(ws, 'NO_ACTIVE_RUN', `Session "${sessionId}" has no active run.`, sessionId);
     return;
   }
 
-  const success = await dependencies.runtime.abort(run.provider, sessionId);
+  const success = await dependencies.runtime.abort(activeRun.provider, sessionId);
 
-  chatRunRegistry.completeRunIfCurrent(run, {
+  chatRunRegistry.completeRunIfCurrent(activeRun, {
     exitCode: success ? 0 : 1,
     aborted: true,
   });

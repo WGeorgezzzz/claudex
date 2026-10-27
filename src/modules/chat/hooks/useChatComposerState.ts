@@ -32,6 +32,9 @@ import { useFileMentions } from '@/modules/chat/hooks/useFileMentions';
 import { useInputHistory } from '@/modules/chat/hooks/useInputHistory';
 import { useSlashCommands } from '@/modules/chat/hooks/useSlashCommands';
 
+/** How long a normal stop may take before the composer offers a force stop. */
+const FORCE_STOP_OFFER_MS = 3000;
+
 type UseChatComposerStateArgs = {
   enqueueMessage?: (submission:QueueSubmission,sessionId:string)=>Promise<void>;
   sendLiveMessage?: (submission:QueueSubmission,sessionId:string)=>Promise<'live'|'queued'|void>;
@@ -1386,6 +1389,26 @@ export function useChatComposerState({
     setIsTextareaExpanded(false);
   }, [resetCommandMenuState]);
 
+  // A normal stop that has not ended the run within this window offers a force
+  // stop. A run that cannot be interrupted at all (a CLI Nexagent does not
+  // own) offers it straight away — the normal stop has nothing to send.
+  const [stopRequestedAt, setStopRequestedAt] = useState<number | null>(null);
+  const [stopTimedOut, setStopTimedOut] = useState(false);
+  useEffect(() => {
+    if (!isLoading) {
+      setStopRequestedAt(null);
+      setStopTimedOut(false);
+      return;
+    }
+    if (stopRequestedAt === null) {
+      return;
+    }
+    const timer = setTimeout(() => setStopTimedOut(true), Math.max(0, stopRequestedAt + FORCE_STOP_OFFER_MS - Date.now()));
+    return () => clearTimeout(timer);
+  }, [isLoading, stopRequestedAt]);
+  const canForceStop = isLoading && (stopTimedOut || !canAbortSession);
+  const isStopping = isLoading && stopRequestedAt !== null;
+
   const handleAbortSession = useCallback(() => {
     if (!canAbortSession) {
       return;
@@ -1403,7 +1426,20 @@ export function useChatComposerState({
       type: 'chat.abort',
       sessionId: targetSessionId,
     });
+    setStopRequestedAt((previous) => previous ?? Date.now());
   }, [canAbortSession, currentSessionId, selectedSession?.id, sendMessage]);
+
+  const handleForceStopSession = useCallback(() => {
+    const targetSessionId = selectedSession?.id || currentSessionId || null;
+    if (!targetSessionId) {
+      return;
+    }
+    sendMessage({
+      type: 'chat.abort',
+      sessionId: targetSessionId,
+      force: true,
+    });
+  }, [currentSessionId, selectedSession?.id, sendMessage]);
 
   const handleGrantToolPermission = useCallback(
     (suggestion: { entry: string; toolName: string }) => {
@@ -1515,6 +1551,9 @@ export function useChatComposerState({
     syncInputOverlayScroll,
     handleClearInput,
     handleAbortSession,
+    handleForceStopSession,
+    canForceStop,
+    isStopping,
     handlePermissionDecision,
     handleGrantToolPermission,
     handleInputFocusChange,

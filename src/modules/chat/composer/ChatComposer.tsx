@@ -10,7 +10,7 @@ import type {
   RefObject,
   TouchEvent,
 } from 'react';
-import { ListPlus, PaperclipIcon, MessageSquareIcon, XIcon, Loader2, CornerDownRight, PencilIcon, Monitor } from 'lucide-react';
+import { ListPlus, OctagonX, PaperclipIcon, MessageSquareIcon, XIcon, Loader2, CornerDownRight, PencilIcon, Monitor } from 'lucide-react';
 
 import { useVoiceInput } from '@/modules/chat/hooks/useVoiceInput';
 import { useVoiceAvailable } from '@/modules/chat/hooks/useVoiceAvailable';
@@ -62,6 +62,10 @@ type ChatComposerProps = {
   activity: SessionActivity | null;
   isLoading: boolean;
   onAbortSession: () => void;
+  /** Offered once a normal stop has hung, or at once when the run cannot be interrupted. */
+  canForceStop?: boolean;
+  isStopping?: boolean;
+  onForceStopSession?: () => void;
   permissionMode: PermissionMode;
   availablePermissionModes: PermissionMode[];
   permissionModeNamespace?: string;
@@ -145,6 +149,9 @@ export default function ChatComposer({
   activity,
   isLoading,
   onAbortSession,
+  canForceStop = false,
+  isStopping = false,
+  onForceStopSession,
   permissionMode,
   availablePermissionModes,
   permissionModeNamespace,
@@ -509,6 +516,25 @@ export default function ChatComposer({
           </PromptInputTools>
           <div className="ml-auto flex shrink-0 items-center gap-2">
             {onVoiceTranscript && voiceAvailable && <VoiceInputButton state={voiceState} onToggle={voiceToggle} errorMsg={voiceError} />}
+            {isStopping && !canForceStop && (
+              <span className="text-xs text-muted-foreground" data-testid="composer-stopping">{t('stopControl.stopping')}</span>
+            )}
+            {canForceStop && onForceStopSession && (
+              <button
+                type="button"
+                onClick={(e: MouseEvent<HTMLButtonElement>) => {
+                  e.preventDefault();
+                  onForceStopSession();
+                }}
+                title={t('stopControl.forceHint')}
+                aria-label={t('stopControl.force')}
+                data-testid="composer-force-stop"
+                className="inline-flex h-10 shrink-0 items-center gap-1 rounded-xl bg-red-600 px-3 text-xs font-medium text-white hover:bg-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400"
+              >
+                <OctagonX className="h-4 w-4" />
+                <span>{t('stopControl.force')}</span>
+              </button>
+            )}
             <PromptInputSubmit
               onClick={
                 canQueueDraft

@@ -5,6 +5,8 @@ import { agentDiscoveryService } from './agent-discovery.service.js';
 import { AppError, userContextStorage } from '@/shared/utils.js';
 import { withUserContext, assertUserPath, getCurrentUserContext } from '@/modules/auth/index.js';
 import { providerRegistry } from '@/modules/providers/provider.registry.js';
+import { findClaudeCliProcessIds } from '@/modules/providers/services/claude-cli-liveness.service.js';
+import { killProcessTree } from '@/shared/process-tree.js';
 import { providerModelsService } from '@/modules/providers/services/provider-models.service.js';
 import { sessionsService } from '@/modules/providers/services/sessions.service.js';
 import { createMonitorQuery } from '@/modules/monitors/index.js';
@@ -25,6 +27,8 @@ type ProviderRuntimeServiceDependencies = {
   listProviders(): IProvider[];
   resolveProvider(provider: string): IProvider;
   resolveProviderSessionId(sessionId: string | null | undefined): string | null;
+  findClaudeCliProcessIds(providerSessionId: string): Promise<number[]>;
+  killProcessTree(pid: number): Promise<boolean>;
   resolveResumeModel(
     provider: LLMProvider,
     sessionId: string | undefined,
@@ -37,6 +41,8 @@ const defaultDependencies: ProviderRuntimeServiceDependencies = {
   listProviders: () => providerRegistry.listProviders(),
   resolveProvider: (provider) => providerRegistry.resolveProvider(provider),
   resolveProviderSessionId: (sessionId) => sessionsService.resolveProviderSessionId(sessionId),
+  findClaudeCliProcessIds,
+  killProcessTree,
   resolveResumeModel: (provider, sessionId, requestedModel) =>
     providerModelsService.resolveResumeModel(provider, sessionId, requestedModel),
   getProviderModels: (provider) => providerModelsService.getProviderModels(provider),
@@ -154,6 +160,45 @@ export function createProviderRuntimeService(
 
     async abort(providerName: LLMProvider, sessionId: string): Promise<boolean> {
       return Boolean(await dependencies.resolveProvider(providerName).runtime.abort(sessionId));
+    },
+
+    /**
+     * Stops a session no matter what state its process is in: the normal abort
+     * is started first (so the run loop knows the end is a cancel, not a
+     * crash), then every live CLI process tied to the session is killed with
+     * its whole tree — shells, sub-agents, MCP servers. Also reaches a Claude
+     * CLI Nexagent did not start, which a normal stop cannot interrupt.
+     */
+    async forceStop(providerName: LLMProvider, sessionId: string): Promise<{ killedPids: number[] }> {
+      const { runtime } = dependencies.resolveProvider(providerName);
+      let abortPromise: Promise<unknown>;
+      try {
+        // Call synchronously so the runtime records the cancellation before
+        // process discovery starts. This prevents a late run callback from
+        // recreating state while its CLI tree is being killed.
+        abortPromise = Promise.resolve(runtime.abort(sessionId));
+      } catch (error) {
+        abortPromise = Promise.reject(error);
+      }
+      abortPromise = abortPromise.catch((error) => {
+          console.error(`[ForceStop] abort failed for ${sessionId}:`, error?.message || error);
+          return false;
+        });
+
+      const killedPids: number[] = [];
+      if (providerName === 'claude') {
+        const providerSessionId = dependencies.resolveProviderSessionId(sessionId);
+        const pids = providerSessionId ? await dependencies.findClaudeCliProcessIds(providerSessionId) : [];
+        for (const pid of pids) {
+          if (await dependencies.killProcessTree(pid)) {
+            killedPids.push(pid);
+          }
+        }
+      }
+
+      await abortPromise;
+      console.log(`[ForceStop] ${providerName} session ${sessionId} stopped; killed pids: ${killedPids.join(',') || 'none'}`);
+      return { killedPids };
     },
 
     async stopBackgroundTask(providerName: LLMProvider, sessionId: string, taskId: string): Promise<boolean> {

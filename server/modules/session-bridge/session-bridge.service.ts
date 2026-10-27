@@ -1,13 +1,19 @@
 import { withUserContext } from '@/modules/auth/index.js';
 import { assertOwnedSession, requireContextUserId } from '@/modules/access-control/index.js';
-import { messageQueueDb, sessionBridgeDb } from '@/modules/database/index.js';
+import { getSessionOwnerId, messageQueueDb, sessionBridgeDb } from '@/modules/database/index.js';
 import { assertSessionOwnerAvailable, sessionsService } from '@/modules/providers/index.js';
 import { messageQueueService } from '@/modules/message-queue/index.js';
 import { AppError } from '@/shared/index.js';
 
-function requireSession(id: string, userId = requireContextUserId()) {
-  const session = assertOwnedSession(userId, id);
-  if (!session || session.isArchived) throw new AppError('Choose an existing active conversation.', { statusCode: 404 });
+function resolveSession(id: string, userId: number) {
+  return withUserContext(userId, () => sessionBridgeDb.resolve(id));
+}
+function requireSession(id: string, userId = requireContextUserId(), options: { allowArchived?: boolean } = {}) {
+  const owner = getSessionOwnerId(id);
+  if (owner !== null && owner !== userId) assertOwnedSession(userId, id);
+  let session;
+  session = resolveSession(id, userId);
+  if (!session || (session.isArchived && !options.allowArchived)) throw new AppError(options.allowArchived ? 'Conversation not found.' : 'Choose an existing active conversation.', { statusCode: 404 });
   return session;
 }
 function receipt(row: NonNullable<ReturnType<typeof messageQueueDb.get>>) {
@@ -27,10 +33,10 @@ export const sessionBridgeService = {
     }) };
   },
   async read(sessionId: string, offset = 0, userId = requireContextUserId()) {
-    const session = requireSession(sessionId, userId);
+    const session = requireSession(sessionId, userId, { allowArchived: true });
     if (!Number.isSafeInteger(offset) || offset < 0 || offset > 100000) throw new AppError('Invalid history offset.', { statusCode: 400 });
-    const page = await withUserContext(userId, () => sessionsService.fetchHistory(sessionId, { limit: 20, offset }));
-    return { sessionId, title: session.custom_name || 'New conversation', provider: session.provider,
+    const page = await withUserContext(userId, () => sessionsService.fetchHistory(session.session_id, { limit: 20, offset }));
+    return { sessionId: session.session_id, providerSessionId: session.provider_session_id, archived: Boolean(session.isArchived), title: session.custom_name || 'New conversation', provider: session.provider,
       projectPath: session.project_path, offset: page.offset, hasMore: page.hasMore, total: page.total,
       // Tool inputs/results and hidden reasoning are not copied into another model's context.
       messages: page.messages.filter(message => message.kind === 'text' && ['user', 'assistant'].includes(message.role ?? ''))

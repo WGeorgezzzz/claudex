@@ -520,5 +520,10 @@
     "exportChat": "导出对话",
     "showTokenUsage": "显示 Token 用量",
     "escClosesModal": "按 Esc 关闭。"
+  },
+  "stopControl": {
+    "force": "强制停止",
+    "forceHint": "结束这个会话的进程及其启动的全部子进程",
+    "stopping": "正在停止…"
   }
 }

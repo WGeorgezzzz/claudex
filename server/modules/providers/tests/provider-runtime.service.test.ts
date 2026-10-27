@@ -178,3 +178,56 @@ test('only authenticated Claude sessions receive the monitor query factory', asy
   await service.run('codex','hello',{sessionId:'a'},{send(){},userId:1});
   assert.deepEqual(seen,[true,false,false]);
 });
+
+test('forceStop starts the abort before killing the Claude CLI tree and reports killed pids', async () => {
+  const events: string[] = [];
+  const claude = createProvider('claude', createRuntime({
+    abort(sessionId) {
+      events.push(`abort:${sessionId}`);
+      return Promise.resolve(true);
+    },
+  }));
+  const service = createProviderRuntimeService({
+    listProviders: () => [claude],
+    resolveProvider: () => claude,
+    resolveProviderSessionId: (sessionId) => `native-${sessionId}`,
+    async findClaudeCliProcessIds(providerSessionId) {
+      events.push(`find:${providerSessionId}`);
+      return [101, 202];
+    },
+    async killProcessTree(pid) {
+      events.push(`kill:${pid}`);
+      return pid === 101;
+    },
+  });
+
+  const result = await service.forceStop('claude', 'app-1');
+
+  assert.deepEqual(result, { killedPids: [101] });
+  assert.equal(events[0], 'abort:app-1');
+  assert.deepEqual(events.slice(1), ['find:native-app-1', 'kill:101', 'kill:202']);
+});
+
+test('forceStop survives a throwing abort and kills nothing for non-Claude providers', async () => {
+  const kills: number[] = [];
+  const codex = createProvider('codex', createRuntime({
+    abort() {
+      throw new Error('stuck');
+    },
+  }));
+  const service = createProviderRuntimeService({
+    listProviders: () => [codex],
+    resolveProvider: () => codex,
+    resolveProviderSessionId: (sessionId) => sessionId ?? null,
+    async findClaudeCliProcessIds() {
+      return [303];
+    },
+    async killProcessTree(pid) {
+      kills.push(pid);
+      return true;
+    },
+  });
+
+  assert.deepEqual(await service.forceStop('codex', 'app-2'), { killedPids: [] });
+  assert.deepEqual(kills, []);
+});

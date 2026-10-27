@@ -330,5 +330,10 @@
     "inserted": "插入",
     "insertedHint": "在助手回覆過程中傳送，並已送入該回合",
     "textOnly": "插入僅支援 Claude 或 Codex 正在回覆時的文字；附件請加入下一輪佇列。"
+  },
+  "stopControl": {
+    "force": "強制停止",
+    "forceHint": "結束這個會話的程序及其啟動的全部子程序",
+    "stopping": "正在停止…"
   }
 }

@@ -1525,8 +1525,20 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
   }
 }
 
+/** How long `interrupt()` gets before the stop escalates to a forced teardown. */
+const ABORT_INTERRUPT_TIMEOUT_MS = 5000;
+
 /**
- * Aborts an active SDK session
+ * Aborts an active SDK session.
+ *
+ * `interrupt()` waits for the CLI to acknowledge, which never happens while it
+ * is stuck in a tool call, a background shell or a sub-agent. The stop must not
+ * inherit that wait: after ABORT_INTERRUPT_TIMEOUT_MS the session is torn down
+ * anyway — stdin is closed (which is what actually lets the CLI exit and takes
+ * its background children with it), the map entry is dropped and the run is
+ * marked aborted so it never resumes on its own. A failed interrupt no longer
+ * clears the aborted flag, so an error can never leave the run going.
+ *
  * @param {string} sessionId - Session identifier
  * @returns {boolean} True if session was aborted, false if not found
  */
@@ -1538,32 +1550,41 @@ async function abortClaudeSDKSession(sessionId) {
     return false;
   }
 
+  // Mark before interrupting so the run loop knows not to emit its own
+  // terminal complete (the abort handler sends the aborted one).
+  abortedSessionIds.add(sessionId);
+
+  const teardown = () => {
+    try {
+      // Release the held stdin stream; without this the CLI stays up for the
+      // rest of the post-turn hold even though the user cancelled.
+      session.releaseInput?.();
+    } catch (error) {
+      console.error(`Error releasing stdin for session ${sessionId}:`, error);
+    }
+    session.status = 'aborted';
+    removeSession(sessionId);
+  };
+
+  let timer = null;
   try {
     console.log(`Aborting SDK session: ${sessionId}`);
-
-    // Mark before interrupting so the run loop knows not to emit its own
-    // terminal complete (the abort handler sends the aborted one).
-    abortedSessionIds.add(sessionId);
-
-    // Call interrupt() on the query instance
-    await session.instance.interrupt();
-
-    // Release the held stdin stream; without this the CLI stays up for the rest
-    // of the post-turn hold even though the user cancelled.
-    session.releaseInput?.();
-
-    // Update session status
-    session.status = 'aborted';
-
-    // Clean up session
-    removeSession(sessionId);
-
+    await Promise.race([
+      session.instance.interrupt(),
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error('interrupt timed out')), ABORT_INTERRUPT_TIMEOUT_MS);
+      }),
+    ]);
+    teardown();
     return true;
   } catch (error) {
-    console.error(`Error aborting session ${sessionId}:`, error);
-    // The run keeps going; let it emit its own terminal complete.
-    abortedSessionIds.delete(sessionId);
-    return false;
+    // Escalated stop: the CLI did not answer, so tear the session down instead
+    // of waiting for it. The process tree ends with the closed stdin.
+    console.error(`Force-stopping session ${sessionId} after interrupt failed:`, error?.message || error);
+    teardown();
+    return true;
+  } finally {
+    if (timer) clearTimeout(timer);
   }
 }
 

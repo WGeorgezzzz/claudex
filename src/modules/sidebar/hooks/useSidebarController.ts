@@ -756,6 +756,7 @@ export function useSidebarController({
     return archivedSessions.filter((session) => {
       const searchableFields = [
         session.sessionTitle,
+        session.sessionId,
         session.projectDisplayName,
         session.projectPath ?? '',
         session.provider,
@@ -791,6 +792,7 @@ export function useSidebarController({
 
         return [
           sessionSummary,
+          typeof session.id === 'string' ? session.id : '',
           session.__provider,
         ].some((value) => value.toLowerCase().includes(normalizedSearch));
       });
