@@ -4,8 +4,8 @@ Thanks for your interest in contributing to Nexagent! Before you start, please t
 
 ## Before You Start
 
-- **Search first.** Check [existing issues](https://github.com/WGeorgezzzz/claudex/issues) and [pull requests](https://github.com/WGeorgezzzz/claudex/pulls) to avoid duplicating work.
-- **Discuss first** for new features. Open an [issue](https://github.com/WGeorgezzzz/claudex/issues/new) to discuss your idea before investing time in implementation. We may already have plans or opinions on how it should work.
+- **Search first.** Check [existing issues](https://github.com/WGeorgezzzz/nexagent/issues) and [pull requests](https://github.com/WGeorgezzzz/nexagent/pulls) to avoid duplicating work.
+- **Discuss first** for new features. Open an [issue](https://github.com/WGeorgezzzz/nexagent/issues/new) to discuss your idea before investing time in implementation. We may already have plans or opinions on how it should work.
 - **Bug fixes are always welcome.** If you spot a bug, feel free to open a PR directly.
 
 ## Prerequisites
@@ -18,8 +18,8 @@ Thanks for your interest in contributing to Nexagent! Before you start, please t
 1. Fork the repository
 2. Clone your fork:
    ```bash
-   git clone https://github.com/<your-username>/claudex.git
-   cd claudex
+   git clone https://github.com/<your-username>/nexagent.git
+   cd nexagent
    ```
 3. Install dependencies:
    ```bash

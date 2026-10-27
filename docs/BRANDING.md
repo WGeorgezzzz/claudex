@@ -26,5 +26,5 @@ namespaces, and persisted storage keys. Compatibility artwork URLs
 `/nexcode-mark.svg`, `/gaci-mark.svg`, and `/claudex-mark.svg` remain available.
 
 Current pages and installers display Nexagent. Preserve LICENSE and NOTICE,
-including their historical upstream names. The GitHub repository remains
-`WGeorgezzzz/claudex`.
+including their historical upstream names. The GitHub repository is
+`WGeorgezzzz/nexagent`.

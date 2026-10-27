@@ -3,7 +3,7 @@
 One backend for Claude Code, Codex, Cursor, OpenCode, and WorkBuddy, on your
 desktop, phone, or remote device.
 
-[简体中文](README.zh-CN.md) · [Releases](https://github.com/WGeorgezzzz/claudex/releases)
+[简体中文](README.zh-CN.md) · [Releases](https://github.com/WGeorgezzzz/nexagent/releases)
 · [Changelog](CHANGELOG.md) · [Contributing](CONTRIBUTING.md)
 
 ![Nexagent desktop workspace with fictional demo conversations](public/screenshots/desktop-main.png)
@@ -28,7 +28,7 @@ desktop, phone, or remote device.
 
 ### Desktop installers
 
-Get **Nexagent 1.0.0** from [Releases](https://github.com/WGeorgezzzz/claudex/releases).
+Get **Nexagent 1.0.0** from [Releases](https://github.com/WGeorgezzzz/nexagent/releases).
 The release is prepared as a **draft** until maintainer review; draft assets are
 visible only to repository maintainers. Compare the download with `SHA256SUMS`.
 
@@ -73,8 +73,8 @@ in to your chosen agent locally; detection never automatically installs agents.
 ### From source
 
 ```bash
-git clone https://github.com/WGeorgezzzz/claudex.git
-cd claudex
+git clone https://github.com/WGeorgezzzz/nexagent.git
+cd nexagent
 npm ci
 npm run build
 node dist-server/server/modules/cli/cli.js start --port 3001

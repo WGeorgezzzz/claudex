@@ -30,7 +30,7 @@ export function createSystemUpdateService(dependencies: SystemUpdateDependencies
     /** Selects and executes the correct update workflow for this installation. */
     async updateSystem() {
       if (dependencies.environment.CLOUDCLI_DISTRIBUTION==='workbench') {
-        return {success:false as const,error:'Use the independent installer from https://github.com/WGeorgezzzz/claudex/releases to update this desktop installation.'};
+        return {success:false as const,error:'Use the independent installer from https://github.com/WGeorgezzzz/nexagent/releases to update this desktop installation.'};
       }
       const updateCommand = dependencies.isPlatform
         ? 'npm run update:platform'

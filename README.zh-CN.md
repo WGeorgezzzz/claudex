@@ -3,7 +3,7 @@
 一个后端统一管理 Claude Code、Codex、Cursor、OpenCode 和 WorkBuddy，
 在桌面、手机和远程设备上继续工作。
 
-[English](README.md) · [安装包](https://github.com/WGeorgezzzz/claudex/releases)
+[English](README.md) · [安装包](https://github.com/WGeorgezzzz/nexagent/releases)
 · [更新日志](CHANGELOG.md) · [参与贡献](CONTRIBUTING.md)
 
 ![Nexagent 桌面工作区，使用虚构演示数据](public/screenshots/desktop-main.png)
@@ -23,7 +23,7 @@
 
 ### 安装包
 
-从 [Releases](https://github.com/WGeorgezzzz/claudex/releases) 获取安装包，
+从 [Releases](https://github.com/WGeorgezzzz/nexagent/releases) 获取安装包，
 并对照 `SHA256SUMS` 校验。本轮 v1.0.0 保持草稿，维护者核对前仅仓库维护者可见。
 
 | 平台 | 文件 | 说明 |
@@ -63,8 +63,8 @@ npx --no-install nexagent start --port 3001
 ### 源码
 
 ```bash
-git clone https://github.com/WGeorgezzzz/claudex.git
-cd claudex
+git clone https://github.com/WGeorgezzzz/nexagent.git
+cd nexagent
 npm ci
 npm run build
 node dist-server/server/modules/cli/cli.js start --port 3001

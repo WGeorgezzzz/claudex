@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { CLOUDCLI_WORDMARK_FONT_FAMILY } from '@/shared/constants';
 import { useVersionCheck } from '@/shared/hooks/useVersionCheck';
 
-const GITHUB_REPO_URL = 'https://github.com/WGeorgezzzz/claudex';
+const GITHUB_REPO_URL = 'https://github.com/WGeorgezzzz/nexagent';
 
 function GitHubIcon({ className }: { className?: string }) {
   return (

@@ -28,13 +28,13 @@
     "LICENSE",
     "NOTICE"
   ],
-  "homepage": "https://github.com/WGeorgezzzz/claudex",
+  "homepage": "https://github.com/WGeorgezzzz/nexagent",
   "repository": {
     "type": "git",
-    "url": "https://github.com/WGeorgezzzz/claudex.git"
+    "url": "https://github.com/WGeorgezzzz/nexagent.git"
   },
   "bugs": {
-    "url": "https://github.com/WGeorgezzzz/claudex/issues"
+    "url": "https://github.com/WGeorgezzzz/nexagent/issues"
   },
   "scripts": {
     "dev": "concurrently --kill-others \"npm run server:dev\" \"npm run client\"",
