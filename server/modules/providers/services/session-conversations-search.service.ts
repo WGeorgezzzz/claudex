@@ -184,7 +184,12 @@ function findSessionTitleResults(
     .flatMap((session) => {
       const sessionTitle = toSummaryText(session.custom_name, session.session_id, session.session_id);
       const normalizedTitle = sessionTitle.toLocaleLowerCase().replace(/\s+/g, ' ');
-      const matchIndex = normalizedTitle.indexOf(normalizedQuery);
+      // A pasted session id is the fastest way to reach a conversation whose
+      // title says nothing about it, so the id is searched alongside the title.
+      const normalizedSessionId = session.session_id.toLocaleLowerCase();
+      const titleMatchIndex = normalizedTitle.indexOf(normalizedQuery);
+      const idMatchIndex = normalizedSessionId.indexOf(normalizedQuery);
+      const matchIndex = titleMatchIndex !== -1 ? titleMatchIndex : idMatchIndex;
       if (matchIndex === -1) {
         return [];
       }
