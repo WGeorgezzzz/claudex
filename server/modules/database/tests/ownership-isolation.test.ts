@@ -130,12 +130,13 @@ test('real SQLite, HTTP, provider scans, private caches and websocket transport 
 
     // A real message event on an authenticated websocket cannot replay or abort another user's run.
     const socket=new Connection(); let aborts=0;
-    const runtime:any={abort:async()=>{aborts++;return true;},hasBackgroundWork:()=>false,getPendingApprovalsForSession:()=>[],resolveToolApproval:()=>{throw new Error('unexpected approval');}};
+    const runtime:any={abort:async()=>{aborts++;return true;},forceStop:async()=>{aborts++;return {killedPids:[]};},hasBackgroundWork:()=>false,getPendingApprovalsForSession:()=>[],resolveToolApproval:()=>{throw new Error('unexpected approval');}};
     handleChatConnection(socket as any,{user:{userId:3}} as any,{runtime});
     socket.emit('message',Buffer.from(JSON.stringify({type:'chat.subscribe',sessions:[{sessionId:'alice-session'}]})));
     socket.emit('message',Buffer.from(JSON.stringify({type:'chat.abort',sessionId:'alice-session'})));
+    socket.emit('message',Buffer.from(JSON.stringify({type:'chat.abort',sessionId:'alice-session',force:true})));
     await new Promise(resolve=>setImmediate(resolve));
-    assert.equal(aborts,0); assert.equal(socket.frames.filter(frame=>frame.kind==='protocol_error').length,2);
+    assert.equal(aborts,0); assert.equal(socket.frames.filter(frame=>frame.kind==='protocol_error').length,3);
     socket.close();
   } finally { connectedClients.clear(); closeConnection(); await rm(fixture,{recursive:true,force:true}); }
 });

@@ -158,7 +158,10 @@ export const filterProjects = (projects: Project[], searchFilter: string): Proje
     // `project.path`/`fullPath` is the most useful search target now that the
     // folder-derived name is gone; fall back to displayName above.
     const searchPath = (project.path || project.fullPath || '').toLowerCase();
-    return displayName.includes(normalizedSearch) || searchPath.includes(normalizedSearch);
+    // A pasted conversation id finds the project that holds it.
+    return displayName.includes(normalizedSearch)
+      || searchPath.includes(normalizedSearch)
+      || getAllSessions(project).some((session) => typeof session.id === 'string' && session.id.toLowerCase().includes(normalizedSearch));
   });
 };
 

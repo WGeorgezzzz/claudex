@@ -120,3 +120,42 @@ export async function listBusyClaudeCliSessions(): Promise<LiveClaudeCliSession[
 
   return sessions.filter((session): session is LiveClaudeCliSession => session !== null);
 }
+
+/**
+ * Pids of every live Claude CLI process the registry ties to one Claude
+ * session, busy or idle — what a force stop has to kill. Covers both the
+ * processes Nexagent spawned through the SDK and a CLI the user runs in a
+ * terminal, which Nexagent can otherwise only report, not stop.
+ */
+export async function findClaudeCliProcessIds(providerSessionId: string): Promise<number[]> {
+  if (!providerSessionId) {
+    return [];
+  }
+
+  let entries: string[];
+  try {
+    entries = await fsp.readdir(registryDirectory());
+  } catch {
+    return [];
+  }
+
+  const pids = await Promise.all(
+    entries
+      .filter((entry) => entry.endsWith('.json'))
+      .slice(0, MAX_REGISTRY_FILES)
+      .map(async (entry) => {
+        try {
+          const record = JSON.parse(await fsp.readFile(path.join(registryDirectory(), entry), 'utf8')) as Record<string, unknown>;
+          const pid = typeof record?.pid === 'number' ? record.pid : NaN;
+          if (record?.sessionId !== providerSessionId || !Number.isInteger(pid) || pid <= 0) {
+            return null;
+          }
+          return (await isRecordedProcessAlive(pid, record.procStart)) ? pid : null;
+        } catch {
+          return null;
+        }
+      }),
+  );
+
+  return pids.filter((pid): pid is number => pid !== null);
+}

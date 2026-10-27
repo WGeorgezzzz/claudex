@@ -598,5 +598,10 @@
       "shell": "Terminal",
       "browser": "Browser"
     }
+  },
+  "stopControl": {
+    "force": "Force stop",
+    "forceHint": "Kill this conversation's process and everything it started",
+    "stopping": "Stopping…"
   }
 }

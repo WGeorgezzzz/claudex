@@ -169,6 +169,15 @@ export function useChatRealtimeHandlers({
           return;
         }
 
+        case 'force_stopped': {
+          // A force stop leaves nothing running — no run, no held process, no
+          // background work — so the session is idle whatever it was doing.
+          if (sid) {
+            onSessionIdle?.(sid);
+          }
+          return;
+        }
+
         case 'protocol_error': {
           console.error('[Chat] Protocol error:', msg.code, msg.error);
           if (sid) {

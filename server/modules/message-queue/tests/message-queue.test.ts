@@ -84,7 +84,7 @@ test('live input routes to the running provider (Codex steer) and reports no-run
 function runtime(run?:ProviderRuntimeGateway['run'],busy=false):ProviderRuntimeGateway {
   return {hasRuntime:()=>true,hasBackgroundWork:()=>busy,
     run:run??(async(_provider,_command,options,writer)=>{writer.send(createCompleteMessage({provider:'claude',sessionId:String(options.sessionId),exitCode:0}));}),
-    abort:async()=>{throw new Error('Queue must never abort existing work');},stopBackgroundTask:async()=>false,
+    abort:async()=>{throw new Error('Queue must never abort existing work');},forceStop:async()=>{throw new Error('Queue must never force-stop existing work');},stopBackgroundTask:async()=>false,
     resolveToolApproval:()=>{},getPendingApprovalsForSession:()=>[]};
 }
 

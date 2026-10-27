@@ -59,3 +59,17 @@ test('providers without live input expose only the next-turn send action',()=>{
   assert.equal(screen.queryByRole('button',{name:'Insert into current task'}),null);
   assert.ok(screen.getByRole('button',{name:'Send next turn'}));
 });
+
+test('force stop is hidden until offered, then sends through its own handler',()=>{
+  const force=vi.fn();
+  const {rerender}=render(<ChatComposer {...props({input:'',onForceStopSession:force})}/>);
+  assert.equal(screen.queryByRole('button',{name:'Force stop'}),null);
+  rerender(<ChatComposer {...props({input:'',isStopping:true,onForceStopSession:force})}/>);
+  assert.ok(screen.getByText('Stopping…'));
+  assert.equal(screen.queryByRole('button',{name:'Force stop'}),null);
+  rerender(<ChatComposer {...props({input:'',isStopping:true,canForceStop:true,onForceStopSession:force})}/>);
+  fireEvent.click(screen.getByRole('button',{name:'Force stop'}));
+  assert.equal(force.mock.calls.length,1);
+  assert.equal(screen.queryByText('Stopping…'),null);
+  assert.ok(screen.getByRole('button',{name:/^Stop$/}));
+});

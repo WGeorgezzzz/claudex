@@ -70,7 +70,7 @@ test('scheduled tool context can stop itself but cannot create or broaden jobs',
 function runtime(run?:ProviderRuntimeGateway['run'],busy=false):ProviderRuntimeGateway {
   return {hasRuntime:()=>true,hasBackgroundWork:()=>busy,
     run:run??(async(_provider,_command,options,writer)=>{writer.send(createCompleteMessage({provider:'claude',sessionId:String(options.sessionId),exitCode:0}));}),
-    abort:async()=>{throw Error('Must not abort current work');},stopBackgroundTask:async()=>false,
+    abort:async()=>{throw Error('Must not abort current work');},forceStop:async()=>{throw Error('Must not force-stop current work');},stopBackgroundTask:async()=>false,
     resolveToolApproval:()=>{},getPendingApprovalsForSession:()=>[]};
 }
 test('recurs after completion with one receipt per execution and catches up once',()=>fixture(async user=>{
