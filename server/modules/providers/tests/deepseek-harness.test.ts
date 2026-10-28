@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { DeepSeekHarnessSessions, deepSeekHarnessTranscriptPath } from '@/modules/providers/list/deepseek-harness/deepseek-harness-sessions.provider.js';
 import { resolveDeepSeekHarnessInstallation } from '@/modules/providers/list/deepseek-harness/deepseek-harness-installation.provider.js';
+import { readDeepSeekHarnessModels,resolveDeepSeekHarnessModel } from '../list/deepseek-harness/deepseek-harness-models.js';
 import { userContextStorage } from '@/shared/utils.js';
 import type { UserRuntimeContext } from '@/shared/types.js';
 
@@ -55,4 +56,12 @@ test('Harness history follows the stable app id across native resume and retains
     assert(path.basename(directory).startsWith('harness-history-test-'));
     await rm(directory, { recursive: true, force: true });
   }
+});
+
+
+test('Harness catalog follows TokenHub status and exposes every native model and effort without changing files',async()=>{
+ const root=await mkdtemp(path.join(os.tmpdir(),'harness-models-')),previous=process.env.DEEPSEEK_HARNESS_INSTALL_DIR;process.env.DEEPSEEK_HARNESS_INSTALL_DIR=root;
+ try{await mkdir(path.join(root,'runtime/node_modules/@deepseek-ai/dsh'),{recursive:true});await writeFile(path.join(root,'runtime/node_modules/@deepseek-ai/dsh/package.json'),'{}');await writeFile(path.join(root,'run.ps1'),"param([string]$Provider='rp')");await writeFile(path.join(root,'status.json'),JSON.stringify({endpoint:'https://tokenhub.example.invalid/v1',model:'native-pro'}));await writeFile(path.join(root,'tokenhub.dpapi'),'fixture');const patch=JSON.stringify([{id:'llm-pi-ai',config:{providers:{tokenhub:{models:[{id:'native-flash',name:'Native Flash',contextWindow:1000000,reasoningEfforts:{false:null,high:'high'}},{id:'native-pro',name:'Native Pro',contextWindow:1000000},{id:'native-glm',name:'Native GLM'}]}}}},{id:'agent-default-model',config:{provider:'tokenhub',model:'native-flash'}}]);await writeFile(path.join(root,'tokenhub.patch.yml'),'\uFEFF'+patch);
+ const models=readDeepSeekHarnessModels();assert.equal(models.DEFAULT,'native-pro');assert.equal(models.OPTIONS.length,3);assert.deepEqual(models.OPTIONS[0].effort?.values.map(e=>e.value),['off','high']);assert.equal(resolveDeepSeekHarnessModel('native-glm')?.provider,'tokenhub');assert.equal(resolveDeepSeekHarnessModel('unconfigured'),undefined);assert.equal(await import('node:fs/promises').then(fs=>fs.readFile(path.join(root,'tokenhub.patch.yml'),'utf8')),'\uFEFF'+patch);
+ }finally{if(previous===undefined)delete process.env.DEEPSEEK_HARNESS_INSTALL_DIR;else process.env.DEEPSEEK_HARNESS_INSTALL_DIR=previous;}
 });

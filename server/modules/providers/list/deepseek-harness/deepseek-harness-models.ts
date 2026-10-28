@@ -1,16 +1,19 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { resolveDeepSeekHarnessInstallation } from './deepseek-harness-installation.provider.js';
+import {parse} from 'yaml';
+import {resolveDeepSeekHarnessInstallation} from './deepseek-harness-installation.provider.js';
 
-/** Read the effective TokenHub model catalog without changing the user's DSH files. */
-export function readDeepSeekHarnessModels(){
-  const install=resolveDeepSeekHarnessInstallation();
-  let model='', models:string[]=[];
-  if(install)try{const text=fs.readFileSync(path.join(install.directory,'tokenhub.patch.yml'),'utf8');
-    models=[...text.matchAll(/^\s+- id:\s*([^\s#]+)\s*$/gm)].map(match=>match[1]).filter(id=>id.startsWith('deepseek-')||id.startsWith('glm-'));
-    const block=text.split(/^- id:\s*agent-default-model\s*$/m)[1];
-    model=(block?.match(/^\s+model:\s*['"]?([^\s'"#]+)['"]?/m)?.[1]||'').trim();
-  }catch{/* Missing configuration is reported, never substituted with a shipped model list. */}
-  const options=[...new Set(models)].map(value=>({value,label:value,description:'DeepSeek Harness · Tencent TokenHub'}));
-  return {CUSTOM_MODELS_SUPPORTED:false,OPTIONS:options,DEFAULT:model||options[0]?.value||''};
-}
+type NativeModel={id:string;name?:string;contextWindow?:number;reasoningEfforts?:Record<string,unknown>};
+function catalog(){const install=resolveDeepSeekHarnessInstallation();if(!install)return {install,models:[] as {provider:string;model:NativeModel}[],defaultModel:''};const models:{provider:string;model:NativeModel}[]=[];let defaultModel='';
+ for(const provider of [install.selectedProvider,...(['tokenhub','rp'].filter(p=>p!==install.selectedProvider))])try{
+  if(!fs.existsSync(path.join(install.directory,provider+'.dpapi')))continue;
+  const rows=parse(fs.readFileSync(path.join(install.directory,provider+'.patch.yml'),'utf8').replace(/^\uFEFF+/,'')) as {id:string;config?:{providers?:Record<string,{models?:NativeModel[]}>;model?:string}}[];
+  const list=rows.find(row=>row.id==='llm-pi-ai')?.config?.providers?.[provider]?.models||[];
+  for(const model of list)if(model&&typeof model.id==='string'&&!models.some(item=>item.model.id===model.id))models.push({provider,model});
+  if(provider===install.selectedProvider)defaultModel=list.some(model=>model.id===install.statusModel)?install.statusModel!:rows.find(row=>row.id==='agent-default-model')?.config?.model||list[0]?.id||'';
+ }catch{/* Invalid local config has no selectable models; do not invent a catalog. */}
+ return {install,models,defaultModel};}
+/** Discovery, chat menus and task execution read the selected native provider and its entire local catalog. */
+export function readDeepSeekHarnessModels(){const {models,defaultModel}=catalog();return {CUSTOM_MODELS_SUPPORTED:false,DEFAULT:defaultModel,OPTIONS:models.map(({provider,model})=>({value:model.id,label:(provider==='rp'?'RoboParty 网关 · ':'')+(model.name||model.id),contextWindow:model.contextWindow,description:(provider==='rp'?'RoboParty 网关':'Tencent TokenHub')+(model.contextWindow?' · 上下文 '+model.contextWindow.toLocaleString()+' tokens':''),...(model.reasoningEfforts?{effort:{default:'off',values:Object.keys(model.reasoningEfforts).map(key=>({value:key==='false'?'off':key,description:key==='false'?'关闭推理':key}))}}:{})}))};}
+/** Runtime validates the exact model/provider pair before writing a process-local selection overlay. */
+export function resolveDeepSeekHarnessModel(model:string){return catalog().models.find(item=>item.model.id===model);}

@@ -1,4 +1,4 @@
-import { readDeepSeekHarnessModels } from './deepseek-harness-models.js';
+import { resolveDeepSeekHarnessModel } from './deepseek-harness-models.js';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { appendFileSync, mkdirSync, mkdtempSync, writeFileSync, rmSync } from 'node:fs';
@@ -19,10 +19,11 @@ const normalizer = new DeepSeekHarnessSessions();
 export const deepSeekHarnessRuntime: IProviderRuntime = {
   async run(command, options, writer, context) {
     const install = resolveDeepSeekHarnessInstallation();
-    if (!install?.configured) throw new Error('Configure the local DeepSeek Harness launcher and RP credential first.');
+    if (!install?.configured) throw new Error('Configure the selected DeepSeek Harness provider locally first.');
     if (options.images?.length) throw new Error('This Harness integration does not support image attachments.');
     const model = await context.resolveResumeModel(options.sessionId, options.model) || 'configured';
-    if (model !== 'configured' && !readDeepSeekHarnessModels().OPTIONS.some(option => option.value === model)) throw new Error('所选模型不在本机 TokenHub Harness 配置中，请刷新模型列表。');
+    const selection=resolveDeepSeekHarnessModel(model);
+    if (model !== 'configured' && !selection) throw new Error('所选模型不在本机 Harness 当前配置中，请刷新模型列表。');
     const permission = modes[options.permissionMode || 'bypassPermissions'];
     if (!permission) throw new Error('Unsupported Harness permission mode.');
     const previous = context.resolveProviderSessionId(options.sessionId);
@@ -45,8 +46,12 @@ export const deepSeekHarnessRuntime: IProviderRuntime = {
     const taskFile = path.join(scratch, 'task.txt');
     writeFileSync(taskFile, prompt, 'utf8');
     persist({ type: 'user', text: prompt });
+    let selectionPatch:string|undefined;
+
+
     let nativeId = previous;
     try {
+    if(selection){const effort=typeof options.effort==='string'?options.effort:'off';const nativeEffort=effort==='off'&&selection.model.reasoningEfforts&&!Object.hasOwn(selection.model.reasoningEfforts,'off')?'false':effort;if(selection.model.reasoningEfforts&&!Object.hasOwn(selection.model.reasoningEfforts,nativeEffort))throw new Error('Unsupported native Harness reasoning effort.');selectionPatch=path.join(scratch,'selection.json');writeFileSync(selectionPatch,JSON.stringify([{id:'agent-default-model',config:{provider:selection.provider,model:selection.model.id,...(selection.model.reasoningEfforts?{reasoningEffort:nativeEffort}:{})}}]));persist({type:'model_selection',provider:selection.provider,model:selection.model.id,effort});}
       await new Promise<void>((resolve, reject) => {
         let stderr = '';
         let errorMessage = '';
@@ -55,8 +60,8 @@ export const deepSeekHarnessRuntime: IProviderRuntime = {
         let announced = false;
         let lastToolFailure = '';
         const child = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', install.bridge,
-          '-Launcher', install.launcher, '-TaskFile', taskFile, '-Workspace', options.cwd || options.projectPath || process.cwd(), '-Model', model,
-          ...(previous ? ['-SessionId', previous] : [])], {
+          '-Launcher', install.launcher, '-TaskFile', taskFile, '-Workspace', options.cwd || options.projectPath || process.cwd(),'-Provider',selection?.provider||install.selectedProvider,
+          ...(previous ? ['-SessionId', previous] : []),...(selectionPatch?['-SelectionPatch',selectionPatch]:[])], {
           cwd: options.cwd || options.projectPath || process.cwd(), windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'],
           env: { ...process.env, DSH_PERMISSION_MODE: permission },
         });

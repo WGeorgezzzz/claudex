@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs';
+import { existsSync,readFileSync } from 'node:fs';
 import path from 'node:path';
 import { getCurrentUserContext } from '@/modules/auth/index.js';
 import { findApplicationRoot, getModuleDirectory } from '@/shared/index.js';
@@ -11,6 +11,9 @@ export function resolveDeepSeekHarnessInstallation() {
   const packageFile = path.join(directory, 'runtime/node_modules/@deepseek-ai/dsh/package.json');
   const bridge = path.join(findApplicationRoot(getModuleDirectory(import.meta.url)), 'scripts/deepseek-harness/launch.ps1');
   if (!existsSync(launcher) || !existsSync(packageFile) || !existsSync(bridge)) return null;
-  return { directory, launcher, packageFile, bridge,
-    configured: existsSync(path.join(directory, 'rp.patch.yml')) && existsSync(path.join(directory, 'rp.dpapi')) };
+  let status:{provider?:string;endpoint?:string;model?:string}={};try{status=JSON.parse(readFileSync(path.join(directory,'status.json'),'utf8').replace(/^\uFEFF+/,''));}catch{/* The launcher default remains authoritative when no status exists. */}
+  const launcherText=readFileSync(launcher,'utf8');
+  const selectedProvider=status.provider==='rp'||status.provider==='tokenhub'?status.provider:/tokenhub/i.test(status.endpoint||'')?'tokenhub':launcherText.match(/\$Provider\s*=\s*['"](rp|tokenhub)['"]/)?.[1]||'rp';
+  return { directory, launcher, packageFile, bridge,selectedProvider,statusModel:status.model,
+    configured: existsSync(path.join(directory, selectedProvider+'.patch.yml')) && existsSync(path.join(directory, selectedProvider+'.dpapi')) };
 }

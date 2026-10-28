@@ -1,5 +1,5 @@
 import { IntelligentTasksPanel } from '@/modules/task-master/IntelligentTasksPanel';
-import { TaskExecutionPanel } from '@/modules/task-master/TaskExecutionPanel';
+import { TaskExecutionPanel,prefetchTaskExecutionModels } from '@/modules/task-master/TaskExecutionPanel';
 import type { LLMProvider } from '@/shared/types';
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -69,6 +69,7 @@ export function InfoHubNavigation() {
 export function GlobalTasksPage({ onMenuClick }: { onMenuClick: () => void }) {
   const { projects, error, loading, load, setError,infohub } = useGlobalTasks(), navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  useEffect(()=>{prefetchTaskExecutionModels();},[]);
   // Project scope stays stable while polling updates the collection.
   const [projectId, setProjectId] = useState(searchParams.get('project') || '');
   // Priority filtering is independent of task status.

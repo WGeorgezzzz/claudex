@@ -8,6 +8,9 @@ const providers=[['claude','Claude'],['codex','Codex'],['gemini','Gemini'],['dee
 const modes:Record<string,string>={default:'按需审批',acceptEdits:'允许编辑',plan:'只规划',bypassPermissions:'免确认',auto:'自动审批'};
 const control='min-h-10 w-full rounded-lg border bg-background px-3 text-sm';
 async function value(response:Response){const body=await response.json();if(!response.ok)throw Error(body.error?.message||body.message||'无法读取执行设置');return body.data??body;}
+let prefetchedUntil=0;
+/** GlobalTasksPage warms independent native catalogs before the user opens the execution picker. */
+export function prefetchTaskExecutionModels(){if(typeof localStorage==='undefined'||Date.now()<prefetchedUntil)return;prefetchedUntil=Date.now()+60000;for(const id of ['claude','codex','deepseek-harness'] as const)void api.providers.models(id).then(value).then(data=>{const key='task-execution-cache-v2';let prior:any={};try{prior=JSON.parse(localStorage.getItem(key)||'{}');}catch{/* Ignore damaged optional cache. */}localStorage.setItem(key,JSON.stringify({...prior,catalogs:{...prior.catalogs,[id]:data.models}}));}).catch(()=>{});}
 export function TaskExecutionPanel({title,cwd,open,onClose,onConfirm,busy}:{title:string;cwd:string;open:boolean;onClose:()=>void;onConfirm:(settings:TaskExecutionSettings)=>Promise<void>;busy:boolean}){
   const cacheKey='task-execution-cache-v2';
   function saved(){try{return JSON.parse(localStorage.getItem(cacheKey)||'{}');}catch{return {};}}
@@ -32,7 +35,7 @@ export function TaskExecutionPanel({title,cwd,open,onClose,onConfirm,busy}:{titl
     void load('settings',()=>inboxTasksApi.executionSettings(),last=>setSettings(old=>({...old,...last,permissionMode:last.permissionMode||'bypassPermissions',cwd:last.cwd||cwd})));
     void load('discovery',()=>api.providers.discovery(),data=>setAgents(data.agents||[]));
     void load('capabilities',()=>api.providers.capabilities(),data=>setCapabilities(data.providers||[]));
-    for(const [id] of providers)void load(id,()=>api.providers.models(id),data=>{setCatalogs(old=>({...old,[id]:data.models}));setSettings(old=>old.provider===id&&!old.model?{...old,model:data.models?.DEFAULT||''}:old);});
+    for(const [id] of providers)void load(id,()=>api.providers.models(id),data=>{setCatalogs(old=>({...old,[id]:data.models}));setSettings(old=>old.provider===id&&(!old.model||!data.models?.OPTIONS.some((model:any)=>model.value===old.model&&!model.disabled))?{...old,model:data.models?.DEFAULT||''}:old);});
     return()=>{active=false;};
   },[open,cwd,retry]);
   const selected=catalogs[settings.provider]?.OPTIONS.find(m=>m.value===settings.model),agent=agents.find(a=>a.id===settings.provider),capability=capabilities.find(c=>c.provider===settings.provider);
