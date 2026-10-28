@@ -1,4 +1,4 @@
-﻿import path from 'node:path';
+import path from 'node:path';
 import { readFile } from 'node:fs/promises';
 import { createHash, randomUUID } from 'node:crypto';
 import { withUserContext, assertUserPath } from '@/modules/auth/index.js';
@@ -116,6 +116,7 @@ export const sessionBridgeService = {
     const sessionId = randomUUID();
     const target = withUserContext(userId, () => {
       sessionsDb.createAppSession(sessionId, provider, projectPath, input.title?.trim() || 'New conversation');
+      if(input.title?.trim()) sessionsDb.updateSessionCustomName(sessionId,input.title.trim());
       return sessionBridgeDb.resolve(sessionId)!;
     });
     return { sessionId: target.session_id, providerSessionId: target.provider_session_id, provider: target.provider,
@@ -202,3 +203,4 @@ export const sessionBridgeService = {
     return receipt(row);
   },
 };
+

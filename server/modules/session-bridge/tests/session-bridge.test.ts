@@ -40,7 +40,7 @@ test('session parity actions create codex, hand off, wait, compact, and manage m
     const created=sessionBridgeService.create(user,'source',{provider:'codex',cwd:root,title:'Codex target',prompt:'hello codex',requestId:'create-codex'});
     assert.equal(sessionBridgeService.create(user,'source',{provider:'codex',cwd:root,title:'Codex target',prompt:'hello codex',requestId:'create-codex'}).sessionId,created.sessionId);
     assert.throws(()=>sessionBridgeService.create(user,'source',{prompt:'different',requestId:'create-codex'}),/different/);
-    assert.equal(created.provider,'codex'); assert.equal(created.providerSessionId,null); assert.equal(created.receipt.status,'queued');
+    assert.equal(withUserContext(user,()=>sessionsDb.getSessionById(created.sessionId))?.title_source,'user'); assert.equal(created.provider,'codex'); assert.equal(created.providerSessionId,null); assert.equal(created.receipt.status,'queued');
     assert.equal(JSON.parse(messageQueueDb.get(user,created.receipt.id)!.options).cloudcliBridgeSourceSessionId,'source');
     const other=Number(userDb.createUser('parity-other','hash').id);
     getConnection().prepare('UPDATE users SET allowed_folders=? WHERE id=?').run(JSON.stringify([root]),other);
@@ -65,3 +65,4 @@ test('session parity actions create codex, hand off, wait, compact, and manage m
     await assert.rejects(() => executeSessionBridgeTool({userId:user,sessionId:'source',autonomous:true,planMode:false},{action:'create',prompt:'blocked',requestId:'blocked-1'}),/cannot.*dispatch/);
   } finally { closeConnection(); if(old===undefined)delete process.env.DATABASE_PATH; else process.env.DATABASE_PATH=old; await rm(root,{recursive:true,force:true}); }
 });
+
