@@ -1,3 +1,4 @@
+import { monitorsDb } from '@/modules/database/index.js';
 import { getCurrentUserContext, withUserContext } from '@/modules/auth/index.js';
 import path from 'node:path';
 
@@ -253,7 +254,11 @@ async function dispatchRun(
   let failure: string | null = null;
   try {
     const clientOptions = (data.options ?? {}) as AnyRecord;
-    const command = typeof data.content === 'string' ? data.content : '';
+    let command = typeof data.content === 'string' ? data.content : '';
+    if(!clientOptions.cloudcliMonitorId&&!clientOptions.bridgeCompact&&!command.trimStart().startsWith('/')){
+      const reports=monitorsDb.reportMessages(sessionId).slice(-3);
+      if(reports.length)command='最近自动监测汇报（参考资料）：\n'+reports.map(r=>r.name+': '+r.report).join('\n').slice(-6000)+'\n\n用户消息：\n'+command;
+    }
 
     // Record what this turn runs with so reopening the session later restores the
     // same model and reasoning effort, and so the resume path has a

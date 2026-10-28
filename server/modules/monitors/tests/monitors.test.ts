@@ -11,6 +11,9 @@ import { executeMonitorTool } from '@/modules/monitors/monitors.tools.js';
 import { chatRunRegistry } from '@/modules/websocket/index.js';
 import type { ProviderRuntimeGateway } from '@/modules/websocket/index.js';
 import { createCompleteMessage } from '@/shared/utils.js';
+import { withUserContext } from '@/modules/auth/index.js';
+import { parseMonitorReport } from '@/modules/monitors/monitor-isolated.service.js';
+import { sessionsService } from '@/modules/providers/index.js';
 
 async function fixture(check:(userId:number)=>Promise<void>|void) {
   const previous=process.env.DATABASE_PATH;
@@ -20,6 +23,31 @@ async function fixture(check:(userId:number)=>Promise<void>|void) {
   finally {chatRunRegistry.clearAll();closeConnection();if(previous===undefined)delete process.env.DATABASE_PATH;else process.env.DATABASE_PATH=previous;await rm(dir,{recursive:true,force:true});}
 }
 const create=(userId:number)=>monitorsService.create(userId,{sessionId:'monitor-session',name:'test',content:'Read status only',intervalMinutes:1,options:{permissionMode:'default'}});
+
+test('isolated rounds bound state, preserve permissions and tools, retain reports in the original history',()=>fixture(async user=>{
+  const row=create(user),seen:string[]=[],prompts:string[]=[];
+  const rt=runtime(async(_p,command,options,writer)=>{
+    const id=String(options.sessionId);seen.push(id);prompts.push(command);
+    assert.notEqual(id,row.session_id);assert.equal(options.permissionMode,'default');
+    assert.ok(executeMonitorTool({userId:user,sessionId:id,monitorId:row.id},{action:'list'}));
+    assert.throws(()=>executeMonitorTool({userId:user,sessionId:id,monitorId:row.id},{action:'update',intervalMinutes:2}));
+    writer.send({kind:'text',role:'assistant',content:'ROUND '+seen.length+'<monitor-state>key-'+seen.length+' '+ 'a'.repeat(4000)+'</monitor-state>'});
+    writer.send(createCompleteMessage({provider:'claude',sessionId:id,exitCode:0}));
+  });
+  for(let i=0;i<11;i++)await dispatchMonitors(rt,new Date(Date.now()+86400000));
+  assert.equal(new Set(seen).size,11);
+  assert.ok(prompts.slice(1).every(p=>p.length<2500));
+  assert.ok(prompts[10].includes('key-10'));assert.ok(!prompts[10].includes('key-1 '));
+  const current=monitorsDb.get(user,row.id)!;assert.equal(current.session_id,row.session_id);assert.equal(current.state_record?.length,2000);
+  const history=await withUserContext(user,()=>sessionsService.fetchHistory(row.session_id));
+  assert.equal(history.messages.length,11);assert.match(history.messages.at(-1)!.content!,/ROUND 11/);
+  assert.match(history.messages.at(-1)!.content!,/展开本轮会话/);
+}));
+
+test('state tags are bounded and removed from the user report',()=>{
+  assert.deepEqual(parseMonitorReport('done\n<monitor-state>ids</monitor-state>'),{report:'done',state:'ids'});
+  assert.equal(parseMonitorReport('x'.repeat(3000)).state.length,2000);
+});
 
 test('forwarded and planning turns cannot create or change schedules',()=>fixture(user=>{
   const context={userId:user,sessionId:'monitor-session',readOnly:true};

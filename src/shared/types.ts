@@ -1644,10 +1644,10 @@ export type MonitorCalendarSchedule = {frequency:'daily'|'weekly';time:string;ti
 export type MonitorTaskRecord = {
   id:string;session_id:string;name:string;content:string;interval_minutes:number;schedule_json?:string|null;
   consecutive_failures?:number;pause_reason?:string|null;
-  status:'active'|'paused'|'stopped';next_run_at:string;running_id:string|null;run_count:number;last_error:string|null;options?:string;
+  status:'active'|'paused'|'stopped';next_run_at:string;running_id:string|null;run_count:number;last_error:string|null;options?:string;state_record?:string;
 };
 /** A bounded execution receipt displayed by both monitor history views. */
-export type MonitorRunReceipt = {id:string;started_at:string;finished_at?:string|null;status:string;error:string|null};
+export type MonitorRunReceipt = {id:string;started_at:string;finished_at?:string|null;status:string;error:string|null;session_id?:string|null;report?:string|null;input_tokens?:number|null;context_tokens?:number|null};
 
 // ---------------------------
 
@@ -1988,6 +1988,7 @@ export type QuotaCache<T> = { data: T | null; updatedAt: string | null; stale: b
 export type QuotaKeyStats = { requests: number | null; tokens: number | null; cost: number | null };
 /** Public quota contract. Pool is absent for members; credentials and raw upstream payloads are never included. */
 export type QuotaOverview = {
+  local?: {provider:string;status:string;checkedAt:string;note:string;windows:{label:string;usedPercent:number|null;remainingPercent:number|null}[];lastSuccess?:{checkedAt:string;windows:{label:string;usedPercent:number|null;remainingPercent:number|null}[]}}[];
   claude: QuotaCache<{ windows: QuotaWindow[]; extraUsageEnabled: boolean }>;
   key: QuotaCache<{ mode: string; message?: string; balance?: number | null; remaining?: number | null; quota?: number | null; used?: number | null; unit?: string; today?: QuotaKeyStats | null; last7d?: QuotaKeyStats | null; last30d?: QuotaKeyStats | null }>;
   pool?: QuotaCache<{ thresholds: { fiveHour: number | null; sevenDay: number | null }; warnings: string[]; accounts: { id: number; name: string; status: string; schedulable: boolean; autoPause: { fiveHour: { disabled: boolean; threshold: number | null }; sevenDay: { disabled: boolean; threshold: number | null } }; windows: QuotaWindow[]; balance: string | null; balanceChange: string | null; consumed: string | null; warnings: string[]; creditUpdatedAt: string | null; usageUpdatedAt: string | null; creditStale: boolean; usageStale: boolean }[] }>;
@@ -1999,9 +2000,9 @@ export type QuotaOverview = {
 export type SessionMonitorSummary = {id:string;session_id:string;name:string;status:string;interval_minutes:number;schedule_json:string|null;next_run_at:string;running_id:string|null;last_error:string|null;consecutive_failures:number;last_result:string|null};
 /** Account-scoped navigation snapshot; physical cwd remains independent of explicit project membership. */
 export type ProjectOrganizationSnapshot = {
-  revision:number;mode:'project'|'flat';
+  revision:number;mode:'project'|'flat'|'name';
   projects:{id:string;name:string;path:string;rootPaths:string[];collapsed:boolean}[];
-  sessions:{id:string;title:string;provider:string;cwd:string;roots:string[];updatedAt:string;sourceProjectId:string|null;projectId:string|null}[];
+  sessions:{id:string;title:string;provider:string;cwd:string;roots:string[];updatedAt:string;sourceProjectId:string|null;projectId:string|null;monitorId?:string;monitorName?:string}[];
   threadOrders:Record<string,string[]>;
 };
 

@@ -13,7 +13,7 @@ function userId(req: Request): number {
 /** Used by the server entrypoint behind its existing authentication middleware. */
 export const monitorsRoutes=express.Router();
 monitorsRoutes.get('/context-settings', asyncHandler(async(req,res) => { res.json(createApiSuccessResponse(monitorsService.contextSettings(userId(req)))); }));
-monitorsRoutes.put('/context-settings', asyncHandler(async(req,res) => { res.json(createApiSuccessResponse(monitorsService.saveContextSettings(userId(req), req.body?.threshold))); }));
+monitorsRoutes.put('/context-settings', asyncHandler(async(req,res) => { res.json(createApiSuccessResponse(monitorsService.saveContextSettings(userId(req), req.body?.threshold,req.body?.percent))); }));
 monitorsRoutes.get('/capabilities',asyncHandler(async(req,res)=>{
   userId(req);res.json(createApiSuccessResponse({calendar:true,scheduleVersion:1}));
 }));
@@ -33,6 +33,6 @@ monitorsRoutes.post('/:id/action',asyncHandler(async(req,res)=>{
 monitorsRoutes.patch('/:id',asyncHandler(async(req,res)=>{
   const body=req.body??{};
   res.json(createApiSuccessResponse(monitorsService.update(userId(req),String(req.params.id),{
-    name:body.name,content:body.content,intervalMinutes:body.intervalMinutes,schedule:body.schedule,
+    name:body.name,content:body.content,intervalMinutes:body.intervalMinutes,schedule:body.schedule,runMode:body.runMode,
   })));
 }));

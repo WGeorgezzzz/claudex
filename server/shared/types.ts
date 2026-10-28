@@ -1680,11 +1680,13 @@ export type MonitorRecord = {
   schedule_json: string|null;
   consecutive_failures: number; pause_reason: string|null;
   running_id: string|null; run_count: number; last_error: string|null; created_at: string;
+  state_record?: string;
 };
 /** One attempted monitor execution. Failures/interruption stay recorded while active monitors retry with backoff. */
 export type MonitorRunRecord = {
   id: string; monitor_id: string; started_at: string; finished_at: string|null;
   status: 'running'|'succeeded'|'failed'|'interrupted'; error: string|null;
+  session_id?:string|null;report?:string|null;input_tokens?:number|null;context_tokens?:number|null;
 };
 // ---------------------------
 //----------------- DOT ASSISTANT STATE ------------
@@ -1712,7 +1714,7 @@ export type UserRuntimeContext = {
 //----------------- ACCOUNT PROJECT ORGANIZATION ------------
 /** Account-local navigation metadata; never changes transcript locations or execution paths implicitly. */
 export type ProjectOrganizationLayout = {
-  version: 1; revision: number; mode: 'project' | 'flat'; order: string[];
+  version: 1; revision: number; sortVersion?:2; mode: 'project' | 'flat' | 'name'; order: string[];
   projects: Record<string, { name: string; rootPaths: string[]; collapsed: boolean }>;
   threads: Record<string, { projectId: string | null; cwd: string; roots: string[] }>;
   threadOrders: Record<string, string[]>;

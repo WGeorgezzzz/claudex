@@ -383,10 +383,10 @@ export const api = {
   },
   monitors: {
     contextSettings: () => get('/api/monitors/context-settings'),
-    saveContextSettings: (threshold: number) => put('/api/monitors/context-settings', { threshold }),
+    saveContextSettings: (threshold?: number, percent?:number) => put('/api/monitors/context-settings', { threshold,percent }),
     summaries: () => get('/api/monitors/summaries'),
     capabilities: (options: ApiRequestOptions = {}) => get('/api/monitors/capabilities',options),
-    update: (id: string, input: {name:string;content:string;intervalMinutes:number;schedule?:MonitorCalendarSchedule|null}) => patch('/api/monitors/' + encodeURIComponent(id), input),
+    update: (id: string, input: {name:string;content:string;intervalMinutes:number;schedule?:MonitorCalendarSchedule|null;runMode?:string}) => patch('/api/monitors/' + encodeURIComponent(id), input),
     list: (sessionId?: string) => get('/api/monitors' + (sessionId ? '?sessionId=' + encodeURIComponent(sessionId) : '')),
     create: (input: Record<string, unknown>) => post('/api/monitors', input),
     action: (id: string, action: string) => post('/api/monitors/' + encodeURIComponent(id) + '/action', {action}),

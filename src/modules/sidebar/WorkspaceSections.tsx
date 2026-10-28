@@ -17,7 +17,7 @@ async function unwrap<T>(response: Response): Promise<T> {
 }
 
 /** SidebarContent renders persistent custom sections around its existing project rows. */
-export function WorkspaceSections({ projectListProps, onSelect }: { projectListProps: SidebarProjectListProps; onSelect: (projectId: string | null, sessionId: string, provider: string) => void }) {
+export function WorkspaceSections({ projectListProps, onSelect, searchQuery='' }: { searchQuery?:string; projectListProps: SidebarProjectListProps; onSelect: (projectId: string | null, sessionId: string, provider: string) => void }) {
   const { t } = useTranslation('sidebar');
   // A server snapshot lets sections survive reloads and synchronize between clients.
   const state = useWorkspaceSections();
@@ -80,7 +80,7 @@ export function WorkspaceSections({ projectListProps, onSelect }: { projectListP
     event.preventDefault(); event.stopPropagation(); event.dataTransfer.dropEffect = 'move'; setHover(id);
   };
   // Older backends still show their ordinary project list without unsupported controls.
-  if (!layout) return <ProjectOrganization props={projectListProps}/>;
+  if (!layout) return <ProjectOrganization props={projectListProps} searchQuery={searchQuery}/>;
   const assignedProject = (id: string) => layout.assignments.find(item => item.kind === 'project' && item.targetId === id)?.sectionId;
   const listProps = projectListProps;
   const startNewSession = (sectionId: string, project: (typeof projectListProps.projects)[number] | null) => {

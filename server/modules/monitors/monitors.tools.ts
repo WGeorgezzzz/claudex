@@ -2,7 +2,7 @@ import { createSdkMcpServer, query, tool } from '@anthropic-ai/claude-agent-sdk'
 import type { Options, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
 import { z } from 'zod';
 
-import { sessionsDb } from '@/modules/database/index.js';
+import { sessionsDb, monitorsDb } from '@/modules/database/index.js';
 import { monitorsService } from '@/modules/monitors/monitors.service.js';
 import type { ProviderRuntimeContext } from '@/shared/types.js';
 import { parseMonitorCalendarSchedule } from '@/shared/index.js';
@@ -12,6 +12,7 @@ const shape={
   id:z.string().optional().describe('Existing monitor id returned by list/create. Required except for list/create.'),
   name:z.string().min(1).max(120).optional(),
   content:z.string().min(1).max(20000).optional().describe('Instructions for each check, including scope, reporting rule and stop condition requested by the user.'),
+  runMode:z.enum(['isolated','original']).optional().describe('Default isolated: a new short conversation per round. original: run in the original conversation.'),
   intervalMinutes:z.number().int().min(1).max(10080).optional().describe('Minutes after each completed check. Required for interval scheduling.'),
   schedule:z.discriminatedUnion('frequency',[
     z.object({frequency:z.literal('daily'),time:z.string(),timeZone:z.string()}).strict(),
@@ -37,24 +38,24 @@ export function executeMonitorTool(context:ToolContext,input:unknown): unknown {
   // Scheduled turns may inspect/stop themselves but cannot broaden their own schedule.
   if(context.monitorId && !['list','history','pause','stop','update'].includes(args.action))
     throw new Error('自动监测期间只能查看、修改自身说明、暂停或停止自身任务；调度修改请由用户在聊天中提出。');
-  if(context.monitorId && args.action==='update' && (args.intervalMinutes!==undefined || args.schedule!==undefined))
+  if(context.monitorId && args.action==='update' && (args.intervalMinutes!==undefined || args.schedule!==undefined || args.runMode!==undefined))
     throw new Error('监测回合只能修改自身 name 和 content；间隔、日历规则和权限模式请由用户在聊天里修改。');
-  if(args.action==='list')return {monitors:monitorsService.list(context.userId,context.sessionId)
+  if(args.action==='list')return {monitors:monitorsService.list(context.userId,context.monitorId?undefined:context.sessionId)
     .filter(row=>!context.monitorId||row.id===context.monitorId).map(visible)};
   if(args.action==='create') {
     const schedule=parseMonitorCalendarSchedule(args.schedule);
     if(!args.name||!args.content||(!args.intervalMinutes&&!schedule))throw new Error('创建必须提供名称、检查内容，以及间隔或日历规则。');
     const scheduleJson=schedule?JSON.stringify(schedule):null;
-    const duplicate=monitorsService.list(context.userId,context.sessionId).find(row=>row.status!=='stopped'&&row.name===args.name!.trim()&&row.content===args.content!.trim()&&row.schedule_json===scheduleJson&&(schedule||row.interval_minutes===args.intervalMinutes));
+    const duplicate=monitorsService.list(context.userId,context.sessionId).find(row=>row.status!=='stopped'&&row.name===args.name!.trim()&&row.content===args.content!.trim()&&row.schedule_json===scheduleJson&&(schedule||row.interval_minutes===args.intervalMinutes)&&(JSON.parse(row.options).runMode||'isolated')===(args.runMode||'isolated'));
     if(duplicate)return {monitor:visible(duplicate),reused:true};
     const row=monitorsService.create(context.userId,{sessionId:context.sessionId,name:args.name,content:args.content,intervalMinutes:args.intervalMinutes,schedule,
-      options:{model:session.model||context.model,effort:session.effort||context.effort,permissionMode: context.permissionMode || 'default'}});
+      options:{model:session.model||context.model,effort:session.effort||context.effort,permissionMode: context.permissionMode || 'default',...(args.runMode?{runMode:args.runMode}:{})}});
     return {monitor:visible(row),reused:false,permissionMode:JSON.parse(row.options).permissionMode,note:'已保存到本地调度器。权限沿用创建时的会话设置。电脑和本地服务需运行，关闭聊天页面不影响调度。'};
   }
   const id=args.id||context.monitorId;
   if(!id)throw new Error('请先列出监测并提供确切任务 id。');
   const row=monitorsService.require(context.userId,id);
-  if(row.session_id!==context.sessionId||(context.monitorId&&id!==context.monitorId))throw new Error('只能管理当前会话范围内的监测。');
+  if((row.session_id!==context.sessionId&&!(context.monitorId===id&&monitorsDb.isRunSession(context.userId,id,context.sessionId)))||(context.monitorId&&id!==context.monitorId))throw new Error('只能管理当前会话范围内的监测。');
   if(args.action==='history')return {id,runs:monitorsService.history(context.userId,id)};
   if(args.action==='update')return {monitor:visible(monitorsService.update(context.userId,id,args))};
   return {monitor:visible(monitorsService.action(context.userId,id,args.action==='run_now'?'run-now':args.action)!),note:'暂停或停止不会强制中断已开始的一轮。'};

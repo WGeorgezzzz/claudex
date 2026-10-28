@@ -25,7 +25,7 @@ export const projectOrganizationService = {
     const snapshot=this.list(userId);
     projectOrganizationDb.update(userId,Number(input.revision),layout=>{
       if(input.action==='mode') {
-        if(input.mode!=='project'&&input.mode!=='flat')throw invalid('Choose project or flat.');layout.mode=input.mode;return;
+        if(input.mode!=='project'&&input.mode!=='flat'&&input.mode!=='name')throw invalid('Choose project, flat or name.');layout.mode=input.mode;return;
       }
       const project=snapshot.projects.find(p=>p.id===input.projectId);
       if(input.action==='assign') {

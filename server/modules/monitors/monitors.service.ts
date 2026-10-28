@@ -5,8 +5,9 @@ import { parseMonitorCalendarSchedule } from '@/shared/index.js';
 
 /** Used by monitor HTTP routes for validation and lifecycle changes. */
 export const monitorsService = {
-  contextSettings(userId: number) { return { threshold: Number(userPreferencesDb.getPreferences(userId).monitorContextThreshold ?? 300000) }; },
-  saveContextSettings(userId: number, value: unknown) {
+  contextSettings(userId: number) { const prefs=userPreferencesDb.getPreferences(userId);return { threshold:Number(prefs.monitorContextThreshold??300000),percent:Number(prefs.monitorContextPercent??40) }; },
+  saveContextSettings(userId: number, value: unknown, percent?:unknown) {
+    if(percent!==undefined){if(typeof percent!=='number'||!Number.isFinite(percent)||percent<5||percent>80)throw new AppError('窗口比例应为 5–80%',{statusCode:400});userPreferencesDb.savePreferences(userId,{monitorContextPercent:percent});if(value===undefined)return this.contextSettings(userId);}
     if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 1000 || value > 2000000) throw new AppError('上下文阈值应为 1000–2000000 token 的整数。', { statusCode: 400 });
     userPreferencesDb.savePreferences(userId, { monitorContextThreshold: value });
     return this.contextSettings(userId);
@@ -37,6 +38,7 @@ export const monitorsService = {
     for(const key of ['model','effort']) if(typeof options[key]==='string') safeOptions[key]=options[key];
     if(['default','acceptEdits','plan','bypassPermissions'].includes(String(options.permissionMode))) safeOptions.permissionMode=options.permissionMode;
     safeOptions.permissionMode ??= 'default';
+    if(options.runMode!==undefined){if(!['isolated','original'].includes(String(options.runMode)))throw new AppError('无效运行方式',{statusCode:400});safeOptions.runMode=options.runMode;}
     return monitorsDb.create({userId,sessionId,name,content,intervalMinutes,schedule,options:safeOptions});
   },
   list(userId: number,sessionId?: string) {if(sessionId) assertOwnedSession(userId,sessionId); return monitorsDb.list(userId,sessionId);},
@@ -50,6 +52,7 @@ export const monitorsService = {
     const schedule=input.schedule===undefined ? (row.schedule_json?parseMonitorCalendarSchedule(JSON.parse(row.schedule_json)):null) : parseMonitorCalendarSchedule(input.schedule);
     if(!name||name.length>120||!content||content.length>20000||typeof intervalMinutes!=='number'||!Number.isInteger(intervalMinutes)||intervalMinutes<1||intervalMinutes>10080)
       throw new AppError('名称、内容或间隔无效。',{code:'INVALID_MONITOR',statusCode:400});
+    if(input.runMode!==undefined){if(!['isolated','original'].includes(String(input.runMode)))throw new AppError('无效运行方式',{statusCode:400});monitorsDb.setMode(userId,id,String(input.runMode));}
     monitorsDb.update(userId,id,{name,content,intervalMinutes,schedule});
     return this.require(userId,id);
   },

@@ -3,7 +3,7 @@ import fsp from 'node:fs/promises';
 import path from 'node:path';
 
 import { buildTemporaryTitle } from '@/modules/providers/services/session-title-text.service.js';
-import { projectsDb, sessionsDb, userPreferencesDb } from '@/modules/database/index.js';
+import { projectsDb, sessionsDb, userPreferencesDb, monitorsDb } from '@/modules/database/index.js';
 import { getCurrentUserContext } from '@/modules/auth/index.js';
 import { broadcastSessionUpserted, chatRunRegistry } from '@/modules/websocket/index.js';
 import { providerRegistry } from '@/modules/providers/provider.registry.js';
@@ -18,7 +18,7 @@ import type {
   NormalizedMessage,
   WorkflowAgentActivity,
 } from '@/shared/types.js';
-import { AppError, sliceTailPage } from '@/shared/utils.js';
+import { AppError, sliceTailPage, createNormalizedMessage } from '@/shared/utils.js';
 
 /**
  * One session the running-sessions poll reports as busy.
@@ -516,9 +516,10 @@ export const sessionsService = {
     // App-created sessions that never produced a provider transcript yet
     // (e.g. first message still streaming) simply have no history.
     if (!session.provider_session_id) {
+      const messages=monitorMessages(sessionId,session.provider as LLMProvider);
       return {
-        messages: [],
-        total: 0,
+        messages,
+        total: messages.length,
         hasMore: false,
         offset: options.offset ?? 0,
         limit: options.limit ?? null,
@@ -555,9 +556,12 @@ export const sessionsService = {
     if (fullHistory) {
       // Providers slice with this same helper, so a cached page is identical
       // to what a direct `(limit, offset)` read would have returned.
-      const { page, hasMore } = sliceTailPage(fullHistory.messages, requestedLimit, Math.max(0, requestedOffset));
+      const reports=monitorMessages(sessionId,provider);
+      const merged=[...fullHistory.messages,...reports].sort((a,b)=>String(a.timestamp).localeCompare(String(b.timestamp)));
+      const { page, hasMore } = sliceTailPage(merged, requestedLimit, Math.max(0, requestedOffset));
       result = {
         ...fullHistory,
+        total:merged.length,
         messages: page,
         hasMore,
         offset: requestedOffset,
@@ -572,6 +576,10 @@ export const sessionsService = {
       });
     }
 
+    if(!fullHistory){
+      const reports=monitorMessages(sessionId,provider);
+      if(reports.length){const native=await providerSessions.fetchHistory(sessionId,{limit:null,offset:0,projectPath,providerSessionId});const merged=[...native.messages,...reports].sort((a,b)=>String(a.timestamp).localeCompare(String(b.timestamp)));const sliced=sliceTailPage(merged,requestedLimit,Math.max(0,requestedOffset));result={...result,total:merged.length,messages:sliced.page,hasMore:sliced.hasMore};}
+    }
     return {
       ...result,
       messages: result.messages.map((message) => ({
@@ -781,3 +789,7 @@ export const sessionsService = {
     return { sessionId, summary };
   },
 };
+
+function monitorMessages(sessionId:string,provider:LLMProvider) {
+  return monitorsDb.reportMessages(sessionId).map((r,index)=>createNormalizedMessage({id:'monitor-report:'+r.id,kind:'text',role:'assistant',provider,sessionId,timestamp:r.started_at,content:'**监测「'+r.name+'」· 第 '+(r.round_number??index+1)+' 轮**\n\n'+r.report+'\n\n[展开本轮会话](/session/'+r.session_id+')'}));
+}

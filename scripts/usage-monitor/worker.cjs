@@ -15,16 +15,18 @@ const failure = (provider, status, note) => ({ provider, status, checkedAt: now(
 
 async function codex() {
   const child = spawn(process.execPath, [require.resolve('@openai/codex/bin/codex.js'), 'app-server'], {
-    windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'], env: process.env,
+    windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'], env: {...process.env, CODEX_HOME: process.env.CLAUDEX_QUOTA_CODEX_HOME || path.join(os.homedir(), '.codex')},
   });
   child.stderr.resume(); child.stdin.on('error', () => {});
+  let closed=false;child.on('exit',()=>{closed=true;for(const callback of pending.values())callback({error:{message:'process exited'}});pending.clear();});
   const reader = readline.createInterface({ input: child.stdout });
   let sequence = 0; const pending = new Map();
   reader.on('line', line => { try { const row = JSON.parse(line); pending.get(row.id)?.(row); } catch {} });
   const call = (method, params = {}) => new Promise((resolve, reject) => {
+    if(closed){reject(Error('Codex quota process exited'));return;}
     const id = ++sequence;
     const timer = setTimeout(() => { pending.delete(id); reject(Error('Codex quota timeout')); }, 20000);
-    pending.set(id, row => { clearTimeout(timer); pending.delete(id); row.error ? reject(Error('Codex quota unavailable')) : resolve(row.result); });
+    pending.set(id, row => { clearTimeout(timer); pending.delete(id); row.error ? reject(Error('Codex quota unavailable: '+String(row.error.code??'')+' '+String(row.error.message||'').replace(/(?:sk-|eyJ)[A-Za-z0-9_.-]+/g,'[redacted]').slice(0,180))) : resolve(row.result); });
     child.stdin.write(JSON.stringify({ jsonrpc: '2.0', id, method, params }) + '\n');
   });
   try {
@@ -44,7 +46,7 @@ async function codex() {
     }
     return { provider: 'codex', status: windows.length ? 'ok' : 'unavailable', checkedAt: now(), windows,
       sourceUrl: 'https://chatgpt.com/codex/settings/usage', note: windows.length ? 'Codex 登录账号实时额度' : '当前账号未返回套餐额度；API Key 账号可能不提供此数据。' };
-  } finally { reader.close(); child.kill(); }
+  } finally { reader.close(); child.stdin.end(); if(process.platform==='win32'){await execute('taskkill.exe',['/PID',String(child.pid),'/T','/F'],{windowsHide:true,timeout:5000}).catch(()=>{});}else child.kill(); }
 }
 
 function installation() {
@@ -99,7 +101,7 @@ function parseClaude(text) {
 
 async function browserUsage(provider, login = false) {
   if (provider === 'claude' && !login && fs.existsSync(path.join(state, 'chrome-bridge.json'))) {
-    return readChromeQuota(state) || failure('claude', 'unavailable', '等待当前 Chrome 的 wenClaude 页面同步；请保持已登录的仪表盘标签页开启。');
+    return readChromeQuota(state) || failure('claude', 'unavailable', '未连接：本机接收端没有网页额度快照。请在当前 Chrome 的 Tampermonkey 安装 provider-usage/wenclaude-quota.user.js，并打开已登录的 wenClaude 仪表盘。');
   }
   const profile = path.join(state, 'browser-profile');
   if (!login && !fs.existsSync(path.join(profile, 'Default'))) return failure(provider, 'login_required', '请在专用浏览器登录一次，之后自动更新。');
@@ -151,6 +153,9 @@ async function report(rows) {
   return result.result.slice(0, 1200);
 }
 
+async function codexWithRetry(){
+  try{return await codex();}catch{try{const row=await codex();return {...row,note:row.note+'（首次读取失败，已重试）'};}catch(error){return failure('codex','unavailable','Codex 原生额度接口失败；已重试，保留上次成功值。'+String(error.message).slice(0,240));}}
+}
 async function main() {
   fs.mkdirSync(state, { recursive: true });
   const lock = path.join(state, 'run.lock');
@@ -167,7 +172,7 @@ async function main() {
     const login = process.argv.indexOf('--login');
     if (login >= 0) { const provider = process.argv[login + 1]; if (!sources[provider]) throw Error('Invalid login source'); await browserUsage(provider, true); return; }
     const rows = [];
-    for (const [provider, read] of [['codex', codex], ['workbuddy', workbuddy], ['claude', () => browserUsage('claude')], ['cursor', () => browserUsage('cursor')]]) {
+    for (const [provider, read] of [['codex', codexWithRetry], ['workbuddy', workbuddy], ['claude', () => browserUsage('claude')], ['cursor', () => browserUsage('cursor')]]) {
       try { rows.push(await read()); } catch { rows.push(failure(provider, 'unavailable', '本次读取失败；未将失败记为零额度。')); }
     }
     rows.push(failure('opencode', 'unsupported', 'OpenCode 使用多个上游账号，没有统一套餐额度接口。'));
@@ -188,5 +193,5 @@ async function main() {
   } finally { fs.unlinkSync(lock); }
 }
 
-module.exports = { parseClaude };
+module.exports = { parseClaude, codex:codexWithRetry };
 if (require.main === module) main().catch(() => { console.error('Usage monitor failed. Previous snapshot is preserved.'); process.exitCode = 1; });

@@ -690,7 +690,7 @@ export default function SidebarContent({
             </div>
           )
         ) : (
-          <WorkspaceSections projectListProps={projectListProps} onSelect={onConversationResultClick}/>
+          <WorkspaceSections searchQuery={searchFilter} projectListProps={projectListProps} onSelect={onConversationResultClick}/>
         )}
       </ScrollArea>
 

@@ -28,6 +28,9 @@ export function initializeMonitorTables(db: Database.Database): void {
   if(!columns.some(column=>column.name==='schedule_json')) db.exec('ALTER TABLE monitors ADD COLUMN schedule_json TEXT');
   if(!columns.some(column=>column.name==='consecutive_failures')) db.exec('ALTER TABLE monitors ADD COLUMN consecutive_failures INTEGER NOT NULL DEFAULT 0');
   if(!columns.some(column=>column.name==='pause_reason')) db.exec('ALTER TABLE monitors ADD COLUMN pause_reason TEXT');
+  if(!columns.some(column=>column.name==='state_record')) db.exec("ALTER TABLE monitors ADD COLUMN state_record TEXT NOT NULL DEFAULT ''");
+  const runColumns=db.prepare('PRAGMA table_info(monitor_runs)').all() as {name:string}[];
+  for(const [name,type] of Object.entries({session_id:'TEXT',report:'TEXT',input_tokens:'INTEGER',context_tokens:'INTEGER',round_number:'INTEGER'})) if(!runColumns.some(c=>c.name===name)) db.exec(`ALTER TABLE monitor_runs ADD COLUMN ${name} ${type}`);
 }
 
 // Retry transport/model failures without tight loops: 1, 2, 4, 8, 16, then 30 minutes.
@@ -35,6 +38,29 @@ const retryAt = (failures: number, now: Date) => new Date(now.getTime() + Math.m
 
 /** Used by the monitors module to atomically reserve runs and retain their outcomes. */
 export const monitorsDb = {
+  isMonitorSession(userId:number,sessionId:string) {
+    return !!getConnection().prepare('SELECT 1 FROM monitor_runs r JOIN monitors m ON m.id=r.monitor_id WHERE m.user_id=? AND r.session_id=? AND (r.session_id<>m.session_id OR r.id=m.running_id) LIMIT 1').get(userId,sessionId);
+  },
+  attachSession(id:string,runId:string,sessionId:string) {
+    getConnection().prepare('UPDATE monitor_runs SET session_id=?,round_number=(SELECT run_count+1 FROM monitors WHERE id=monitor_id) WHERE id=? AND monitor_id=?').run(sessionId,runId,id);
+  },
+  saveReport(userId:number,id:string,runId:string,report:string,state:string,usage:{inputTokens?:number;used?:number}) {
+    const db=getConnection();db.transaction(()=>{
+      const row=this.get(userId,id);if(!row||row.running_id!==runId)throw new Error('Monitor run changed');
+      db.prepare('UPDATE monitor_runs SET report=?,input_tokens=?,context_tokens=? WHERE id=? AND monitor_id=?').run(report.slice(0,20000),usage.inputTokens??null,usage.used??null,runId,id);
+      db.prepare('UPDATE monitors SET state_record=? WHERE id=? AND user_id=?').run(state.slice(0,2000),id,userId);
+    })();
+  },
+  reportMessages(sessionId:string) {
+    return getConnection().prepare(`SELECT r.id,r.report,r.session_id,COALESCE(r.finished_at,r.started_at) AS started_at,r.round_number,m.name,m.id AS monitor_id FROM monitor_runs r JOIN monitors m ON m.id=r.monitor_id JOIN sessions s ON s.session_id=m.session_id WHERE m.session_id=? AND r.session_id<>m.session_id AND r.report IS NOT NULL AND s.owner_id=m.user_id ORDER BY r.started_at,r.rowid`).all(sessionId) as {id:string;report:string;session_id:string;started_at:string;name:string;monitor_id:string;round_number:number|null}[];
+  },
+  isRunSession(userId:number,id:string,sessionId:string) {
+    return !!getConnection().prepare('SELECT 1 FROM monitor_runs r JOIN monitors m ON m.id=r.monitor_id WHERE m.id=? AND m.user_id=? AND r.id=m.running_id AND r.session_id=?').get(id,userId,sessionId);
+  },
+  setMode(userId:number,id:string,mode:string) {
+    const row=this.get(userId,id);if(!row)return;
+    getConnection().prepare('UPDATE monitors SET options=? WHERE id=? AND user_id=?').run(JSON.stringify({...JSON.parse(row.options),runMode:mode}),id,userId);
+  },
   /** Monitor lifecycle records compaction receipts alongside the normal run history. */
   recordContext(userId: number, id: string, detail: Record<string, unknown>): void {
     if (!this.get(userId, id)) throw new Error('Monitor not found');

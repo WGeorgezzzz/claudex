@@ -53,3 +53,19 @@ test('search modes retain the session ownership editor without duplicating proje
   window.dispatchEvent(new CustomEvent('sidebar:session-organization',{detail:'s1'}));
   expect(await screen.findByRole('combobox',{name:'归属项目'})).toBeTruthy();
 });
+
+test('time and name orders load all conversations and search beyond the first page',async()=>{
+  snapshot.mode='flat';snapshot.sessions=Array.from({length:205},(_,i)=>({id:'s'+i,title:i===0?'Hidden needle':'Session '+i,provider:'claude',sourceProjectId:'a',projectId:'a',cwd:'/alpha',roots:['/alpha'],updatedAt:new Date(Date.UTC(2026,9,1)+i*60000).toISOString()}));
+  const callbacks={...props(),activeSessions:new Set<string>(),backgroundSessionIds:new Set<string>(),attentionSessionIds:new Set<string>()};
+  const view=render(<ProjectOrganization props={callbacks}/>);
+  await screen.findByRole('button',{name:'加载更多（100/205）'});
+  expect(view.container.querySelector('[data-organization-session]')?.getAttribute('data-organization-session')).toBe('s204');
+  fireEvent.click(screen.getByRole('button',{name:'加载更多（100/205）'}));
+  fireEvent.click(screen.getByRole('button',{name:'加载更多（200/205）'}));
+  expect(view.container.querySelectorAll('[data-organization-session]')).toHaveLength(205);
+  view.rerender(<ProjectOrganization props={callbacks} searchQuery="Hidden needle"/>);
+  expect(view.container.querySelectorAll('[data-organization-session]')).toHaveLength(1);
+  expect(view.container.querySelector('[data-organization-session]')?.getAttribute('data-organization-session')).toBe('s0');
+  fireEvent.change(screen.getByRole('combobox',{name:'侧栏显示模式'}),{target:{value:'name'}});
+  await waitFor(()=>expect(api.projectOrganization.update).toHaveBeenCalledWith(expect.objectContaining({action:'mode',mode:'name'})));
+});

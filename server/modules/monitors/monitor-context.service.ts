@@ -7,16 +7,19 @@ import type { MonitorRecord } from '@/shared/types.js';
 
 /** Dispatcher checks actual transcript usage before/after each monitor run and retains the old conversation. */
 export async function maintainMonitorContext(row: MonitorRecord, runId: string, sessionId: string): Promise<string> {
-  const configured = Number(userPreferencesDb.getPreferences(row.user_id).monitorContextThreshold ?? 300000);
-  const threshold = Number.isFinite(configured) && configured >= 1000 ? configured : 300000;
-  let before: number;
-  try { before = (await providerTokenUsageService.getSessionTokenUsage(sessionId)).used; }
+  const prefs=userPreferencesDb.getPreferences(row.user_id);
+  const configured=Number(prefs.monitorContextThreshold??300000);
+  let threshold=Number.isFinite(configured)&&configured>=1000?configured:300000;
+  let before:number;
+  try { const usage=await providerTokenUsageService.getSessionTokenUsage(sessionId);before=usage.used;
+    if(usage.total)threshold=Math.floor(usage.total*Number(prefs.monitorContextPercent??40)/100);
+  }
   catch { return sessionId; } // A session that has not run yet has no usage record.
   if (before < threshold) return sessionId;
   const started = Date.now();
   let reason = '';
   try {
-    const receipt = sessionBridgeService.compact(row.user_id, sessionId, { requestId: 'monitor-compact:' + randomUUID(), instruction: '保留监测说明、最近结论和任务文件路径。' });
+    const receipt = sessionBridgeService.compact(row.user_id, sessionId, { requestId: 'monitor-compact:' + randomUUID(), instruction: '保留以下监测说明、状态记录、最近三轮结论和任务文件路径。\n监测说明：'+row.content+'\n状态记录：'+(row.state_record||'')+'\n最近结论：'+monitorsDb.history(row.user_id,row.id).filter(r=>r.report).slice(0,3).map(r=>r.report).join('\n').slice(-6000) });
     const result = await sessionBridgeService.wait(row.user_id, { receiptIds: [receipt.id], timeoutSec: 300 });
     if (result.timedOut) throw new Error('CONTEXT_COMPACT_PENDING');
     if (result.receipts[0]?.status !== 'succeeded') throw new Error(result.receipts[0]?.error || 'Native compact failed');

@@ -25,7 +25,8 @@ describe('quota threshold display', () => {
   });
   it('keeps the sidebar neutral for the accepted configuration and repeats real warnings', () => {
     const view = render(<QuotaIndicator onOpen={() => {}} />);
-    expect(screen.queryByTestId('quota-indicator')).toBeNull();
+    expect(screen.getByTestId('quota-indicator')).toBeTruthy();
+    expect(screen.getAllByText('未连接')).toHaveLength(2);
     fixture.warnings = ['账号 demo-account-a 点数被消耗 0.1'];
     view.rerender(<QuotaIndicator onOpen={() => {}} />);
     expect(screen.getByText('账号 demo-account-a 点数被消耗 0.1')).toBeTruthy();

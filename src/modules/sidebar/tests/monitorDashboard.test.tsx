@@ -20,7 +20,7 @@ test('visible entry counts all enabled tasks and edits the selected one',async()
   fireEvent.change(screen.getByLabelText('任务间隔分钟'),{target:{value:'60'}});
   fireEvent.click(screen.getByRole('button',{name:'保存调整'}));
   await waitFor(()=>assert.equal(update.mock.calls.length,1));
-  assert.deepEqual(update.mock.calls[0],['m1',{name:'进度巡检',content:'查看日志',intervalMinutes:60}]);
+  assert.deepEqual(update.mock.calls[0],['m1',{name:'进度巡检',content:'查看日志',intervalMinutes:60,runMode:'isolated'}]);
 });
 test('pause and history target the selected task without switching its chat',async()=>{
   vi.spyOn(api.monitors,'list').mockResolvedValue(response([task]));

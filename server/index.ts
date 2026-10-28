@@ -71,7 +71,7 @@ import { fileTreeRoutes } from './modules/file-tree/index.js';
 import { worktreesRoutes } from './modules/worktrees/index.js';
 import browserUseMcpRoutes from './modules/browser-use/browser-use-mcp.routes.js';
 import { browserUseService } from './modules/browser-use/browser-use.service.js';
-import { initializeDatabase, sessionsDb } from './modules/database/index.js';
+import { initializeDatabase, sessionsDb, monitorsDb } from './modules/database/index.js';
 import { configureWebPush } from './modules/notifications/index.js';
 
 const __dirname = getModuleDirectory(import.meta.url);
@@ -121,7 +121,7 @@ const agentRoutes = createAgentModule({
 // (agents, workflows, backgrounded commands) is still reporting through it.
 chatRunRegistry.setRetentionGuard((sessionId) => providerRuntimeService.hasBackgroundWork(sessionId));
 chatRunRegistry.setCompletionListener((sessionId, userId) => {
-    if (userId === null) return;
+    if (userId === null || monitorsDb.isMonitorSession(Number(userId),sessionId)) return;
     taskmasterAutoService.schedule(sessionId, Number(userId));
     try { withUserContext(userId, () => sessionTitlesService.automatic(sessionId, 'completed')); }
     catch (error) { console.warn('[SessionTitles] Owner context unavailable:', String(error)); }
