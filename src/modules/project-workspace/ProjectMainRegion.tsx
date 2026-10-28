@@ -5,6 +5,7 @@ import { GlobalTasksPage } from '@/modules/task-master';
 import { useProjectMainState } from '@/modules/project-workspace/context/ProjectsStateContext';
 import type { SessionEstablishedContext, SessionNavigationOptions,ProjectWorkspaceShellProps } from '@/shared/types';
 import WorkspaceMain from '@/modules/project-workspace/WorkspaceMain';
+import { InfoHubPage } from '@/modules/info-hub';
 
 /** Rendered by ProjectWorkspaceShell to bind this module's project state to WorkspaceMain. */
 function ProjectMainRegion({
@@ -54,6 +55,7 @@ function ProjectMainRegion({
   }, [refreshProjectsSilently]);
 
   if (location.pathname === '/tasks') return <GlobalTasksPage onMenuClick={handleOpenSidebar}/>;
+  if (location.pathname === '/infohub') return <InfoHubPage onMenuClick={handleOpenSidebar}/>;
   return (
     <WorkspaceMain
       selectedProject={selectedProject}

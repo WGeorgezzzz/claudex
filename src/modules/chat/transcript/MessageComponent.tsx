@@ -86,7 +86,19 @@ const MessageComponent = memo(({ message, prevMessage, createDiff, onFileOpen, s
     !message.isThinking;
 
 
-  const formattedTime = useMemo(() => new Date(message.timestamp).toLocaleTimeString(), [message.timestamp]);
+  const formattedTime = useMemo(() => {
+    const date = new Date(message.timestamp);
+    if (Number.isNaN(date.getTime())) return '';
+    const now = new Date();
+    const sameDay = date.toDateString() === now.toDateString();
+    return new Intl.DateTimeFormat(undefined, sameDay
+      ? { hour: '2-digit', minute: '2-digit' }
+      : { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).format(date);
+  }, [message.timestamp]);
+  const fullTimestamp = useMemo(() => {
+    const date = new Date(message.timestamp);
+    return Number.isNaN(date.getTime()) ? undefined : date.toLocaleString();
+  }, [message.timestamp]);
   const shouldHideThinkingMessage = Boolean(message.isThinking && !showThinking);
 
   if (shouldHideThinkingMessage) {
@@ -158,7 +170,7 @@ const MessageComponent = memo(({ message, prevMessage, createDiff, onFileOpen, s
             ) : (
               /* Attachment-only turn: no text bubble, but the timestamp still shows */
               <div className="flex items-center justify-end gap-1 text-xs text-muted-foreground">
-                <span>{formattedTime}</span>
+                <span title={fullTimestamp}>{formattedTime}</span>
               </div>
             )}
           </div>
@@ -410,7 +422,7 @@ const MessageComponent = memo(({ message, prevMessage, createDiff, onFileOpen, s
               <MemoryCitations citations={message.memoryCitations} />
             )}
 
-            {(shouldShowAssistantCopyControl || !isGrouped) && (
+            {(shouldShowAssistantCopyControl || !isGrouped || message.type === 'assistant') && (
               <div className="mt-1 flex w-full items-center gap-2 text-[11px] text-gray-400 dark:text-gray-500">
                 {shouldShowAssistantCopyControl && (
                   <MessageCopyControl content={assistantCopyContent} messageType="assistant" />
@@ -423,7 +435,10 @@ const MessageComponent = memo(({ message, prevMessage, createDiff, onFileOpen, s
                     copy and speak it is not gated on the copy control, and an
                     exported transcript keeps it wherever the footer renders. */}
                 <MessageModelLabel model={message.model} />
-                {!isGrouped && <span>{formattedTime}</span>}
+                {formattedTime && <span title={fullTimestamp}>{formattedTime}</span>}
+                {message.turnDurationMs !== undefined && message.turnDurationMs >= 0 && (
+                  <span>{`用时 ${Math.floor(message.turnDurationMs / 60000)} 分 ${Math.floor((message.turnDurationMs % 60000) / 1000)} 秒`}</span>
+                )}
               </div>
             )}
           </div>

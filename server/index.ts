@@ -242,6 +242,34 @@ app.use('/api/agent', agentRoutes);
 
 app.use('/api/voice', authenticateToken, voiceRoutes);
 
+// The local info-hub has no account system. Keep it behind Nexagent auth and
+// forward both reads and writes so remote/mobile clients use the same boundary.
+app.use('/infohub', authenticateToken, (req, res) => {
+    const target = new URL(`http://127.0.0.1:8765${req.path || '/'}`);
+    target.search = req.originalUrl.includes('?') ? req.originalUrl.slice(req.originalUrl.indexOf('?')) : '';
+    const body = ['GET', 'HEAD'].includes(req.method) ? undefined : JSON.stringify(req.body ?? {});
+    const proxy = http.request(target, {
+        method: req.method,
+        headers: {
+            ...Object.fromEntries(Object.entries(req.headers).filter(([key]) => !['host', 'content-length', 'connection'].includes(key))),
+            host: '127.0.0.1:8765',
+            'x-forwarded-prefix': '/infohub',
+            ...(body ? { 'content-type': 'application/json', 'content-length': Buffer.byteLength(body).toString() } : {}),
+        },
+    }, upstream => {
+        res.status(upstream.statusCode ?? 502);
+        for (const [key, value] of Object.entries(upstream.headers)) if (value !== undefined && key.toLowerCase() !== 'transfer-encoding') res.setHeader(key, value);
+        upstream.pipe(res);
+    });
+    proxy.on('error', error => {
+        if (!res.headersSent) res.status(503).json({ error: 'INFOHUB_UNAVAILABLE', message: '信息看板暂时不可用，请稍后重试。' });
+        else res.end();
+        console.warn('[infohub proxy]', String(error));
+    });
+    if (body) proxy.write(body);
+    proxy.end();
+});
+
 // Serve public files (like api-docs.html)
 app.use(express.static(path.join(APP_ROOT, 'public')));
 

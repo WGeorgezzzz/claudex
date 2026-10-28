@@ -33,7 +33,7 @@ function SidebarSessionItem(props: SidebarSessionItemProps) {
   const toggle = () => props.onToggleSessionSelected(project.projectId, session.id);
   return <SessionRow sessionId={session.id} title={view.sessionName} provider={session.__provider}
     selected={props.selectedSession?.id === session.id} processing={props.isProcessing}
-    background={props.hasBackgroundWork} attention={props.needsAttention} recent={view.isActive} t={t}
+    background={props.hasBackgroundWork} attention={props.needsAttention} recent={view.isActive} subtitle={view.relativeTime} t={t}
     selecting={props.isSelecting} checked={props.isChecked} disabled={props.isSelecting && !selectable}
     selectionIcon={props.isSelecting ? <SelectionIcon className="h-4 w-4 shrink-0 text-muted-foreground"/> : undefined}
     onSelect={() => { if(props.isSelecting){if(selectable)toggle();}else props.onSessionSelect(session, project.projectId); }}

@@ -32,6 +32,13 @@ function similar(a: string, b: string) {
   return 2 * [...x].filter(g => y.has(g)).length / (x.size + y.size) >= 0.78;
 }
 function fingerprint(message: Message) { return createHash('sha256').update(JSON.stringify(message)).digest('hex'); }
+/** Deterministic info-hub style labels keep task grouping useful without an AI call. */
+function deriveInfoTags(task: Task): string[] {
+  const text = `${task.title} ${String(task.description ?? '')}`.toLowerCase();
+  const topic = /机器人|真机|电机|硬件/.test(text) ? '机器人与现场' : /实验|仿真|训练|模型|数据/.test(text) ? '仿真与研究' : /客户|会议|交付|宣发/.test(text) ? '合作与交付' : /nexagent|会话|部署|服务器|git/.test(text) ? '工作台与基础设施' : '跟进与整理';
+  const type = /决定|决策/.test(text) ? '决策' : /问题|报错|故障/.test(text) ? '问题' : /跟进|确认/.test(text) ? '跟进' : '待办';
+  return [...new Set([...(Array.isArray((task as any).tags) ? (task as any).tags : []), `topic:${topic}`, `type:${type}`, 'source:taskmaster'])];
+}
 async function exclusive<T>(root: string, run: () => Promise<T>): Promise<T> {
   const previous = locks.get(root) ?? Promise.resolve();
   const current = previous.catch(() => {}).then(run); locks.set(root, current);
@@ -156,7 +163,7 @@ export function createTaskmasterWorkspaceService(generate: (input: unknown) => P
     },
     async list(root: string, userId: number) {
       const data = await load(root);
-      return { currentTag: data.tag, tasks: data.tasks.map(t => ({ ...t, sources: (t.sources as { userId: number }[] | undefined)?.filter(source => source.userId === userId), autoUpdate: (t.autoUpdate as { userId: number } | undefined)?.userId === userId ? t.autoUpdate : undefined })) };
+      return { currentTag: data.tag, tasks: data.tasks.map(t => ({ ...t, tags: deriveInfoTags(t), sources: (t.sources as { userId: number }[] | undefined)?.filter(source => source.userId === userId), autoUpdate: (t.autoUpdate as { userId: number } | undefined)?.userId === userId ? t.autoUpdate : undefined })) };
     },
     async snapshot(root: string, userId: number, sessionId: string) {
       const data = await load(root), key = `${userId}:${sessionId}`;
@@ -278,8 +285,8 @@ export function createTaskmasterWorkspaceService(generate: (input: unknown) => P
     async add(root: string, input: Record<string, unknown>) {
       if (input.prompt) return this.extract(root, 0, 'manual', [{ id: 'manual', role: 'user', content: String(input.prompt) }], false);
       return exclusive(root, async () => {
-        const parsed = z.object({ title: z.string().min(1).max(300), description: z.string().max(5000).default(''), priority: z.enum(['high', 'medium', 'low']).default('medium') }).parse(input);
-        const data = await load(root), task = { ...parsed, id: Math.max(0, ...data.tasks.map(t => Number(t.id) || 0)) + 1, status: 'pending' };
+        const parsed = z.object({ title: z.string().min(1).max(300), description: z.string().max(5000).default(''), priority: z.enum(['high', 'medium', 'low']).default('medium'), tags: z.array(z.string().max(120)).max(30).default([]) }).parse(input);
+        const data = await load(root), task = { ...parsed, id: Math.max(0, ...data.tasks.map(t => Number(t.id) || 0)) + 1, status: 'pending', createdAt: new Date().toISOString() };
         data.tasks.push(task); await atomic(data.file, data.document); changed(root, 'tasks'); return { task };
       });
     },

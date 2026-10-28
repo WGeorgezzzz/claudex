@@ -368,6 +368,8 @@ export type ChatMessage = {
   content?: string;
   displayText?: string;
   timestamp: string | number | Date;
+  /** Optional provider supplied duration for the completed turn, in milliseconds. */
+  turnDurationMs?: number;
   images?: ChatImage[];
   files?: ChatAttachment[];
   reasoning?: string;
@@ -1832,6 +1834,14 @@ export type TaskMasterTask = {
   autoUpdate?: { evidence: string };
   createdAt?: string;
   updatedAt?: string;
+  /** Namespaced info-hub style labels used for deterministic filtering and views. */
+  tags?: string[];
+  /** Stable topic node used to render the task tree without changing task status. */
+  topicId?: string;
+  /** Reversible merge and closure provenance retained by the task workspace. */
+  mergedFrom?: TaskId[];
+  /** User supplied execution instructions or a saved note. */
+  userInput?: string;
   [key: string]: unknown;
 };
 

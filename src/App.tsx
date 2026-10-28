@@ -123,6 +123,7 @@ export default function App() {
                     <Routes>
                       <Route path="/" element={<ProjectWorkspaceRoute />} />
                       <Route path="/tasks" element={<ProjectWorkspaceRoute />} />
+                      <Route path="/infohub" element={<ProjectWorkspaceRoute />} />
                       <Route path="/session/:sessionId" element={<ProjectWorkspaceRoute />} />
                     </Routes>
                   </Router>

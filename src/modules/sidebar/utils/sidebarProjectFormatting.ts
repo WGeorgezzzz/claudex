@@ -15,6 +15,7 @@ type SessionViewModel = {
   sessionName: string;
   sessionTime: string;
   messageCount: number;
+  relativeTime: string;
 };
 
 export const formatCompactAge = (
@@ -32,6 +33,19 @@ export const formatCompactAge = (
 
   const hours = Math.floor(minutes / 60);
   return hours < 24 ? `${hours}hr` : `${Math.floor(hours / 24)}d`;
+};
+
+/** Formats a session's latest activity for the compact sidebar row. */
+export const formatRelativeSessionTime = (dateString: string | null | undefined, currentTime: Date): string => {
+  if (!dateString) return '';
+  const date = new Date(dateString);
+  if (Number.isNaN(date.getTime())) return '';
+  const minutes = Math.floor(Math.max(0, currentTime.getTime() - date.getTime()) / 60000);
+  if (minutes < 1) return '刚刚';
+  if (minutes < 60) return `${minutes} 分钟前`;
+  if (minutes < 24 * 60) return `${Math.floor(minutes / 60)} 小时前`;
+  if (minutes < 48 * 60) return '昨天';
+  return `${Math.floor(minutes / (24 * 60))} 天前`;
 };
 
 const getCreatedTimestamp = (session: SessionWithProvider): string => {
@@ -74,6 +88,7 @@ export const createSessionViewModel = (
     sessionName: getSessionName(session, t),
     sessionTime: getSessionTime(session),
     messageCount: Number(session.messageCount || 0),
+    relativeTime: formatRelativeSessionTime(getSessionTime(session), currentTime),
   };
 };
 

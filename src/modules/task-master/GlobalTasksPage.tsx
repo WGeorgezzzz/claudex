@@ -5,7 +5,7 @@ import { AlertCircle, Check, ChevronDown, ExternalLink, ListTodo, Menu, Play, Re
 import { inboxTasksApi } from '@/shared/api';
 import { TASK_WORKSTREAMS, taskWorkstream } from '@/modules/task-master/utils/taskWorkstreams';
 
-type Task = { id: string | number; title: string; description?: string; details?: string; source?: string; due?: string; status: string; priority?: string; recommended?: string; options?: { key: string; label: string; plan: string }[]; executionSessionId?: string };
+type Task = { id: string | number; title: string; description?: string; details?: string; source?: string; due?: string; status: string; priority?: string; recommended?: string; options?: { key: string; label: string; plan: string }[]; executionSessionId?: string; userInput?: string; tags?: string[]; topicId?: string };
 type ProjectTasks = { projectId: string; name: string; tasks: Task[]; error?: string; audits: { id: string; at: string; undone?: boolean; changes: { id: string | number; title: string; status: string }[] }[] };
 const labels: Record<string, string> = { pending: '待处理', 'in-progress': '进行中', done: '已完成', cancelled: '已忽略', blocked: '受阻', deferred: '暂缓', review: '待验收', high: '高优先级', medium: '普通', low: '低优先级' };
 const statusStyles: Record<string, string> = {
@@ -53,6 +53,12 @@ export function TasksNavigation() {
   </button>;
 }
 
+/** SidebarHeader places the authenticated info-hub beside the unified task entry. */
+export function InfoHubNavigation() {
+  const navigate = useNavigate();
+  return <button type="button" className="sidebar-nav-action" onClick={() => navigate('/infohub')} aria-label="信息看板"><ListTodo size={16}/><span>信息看板</span></button>;
+}
+
 /** ProjectMainRegion shows broad workstreams first and expands the original task records on demand. */
 export function GlobalTasksPage({ onMenuClick }: { onMenuClick: () => void }) {
   const { projects, error, loading, load, setError } = useGlobalTasks(), navigate = useNavigate();
@@ -72,6 +78,11 @@ export function GlobalTasksPage({ onMenuClick }: { onMenuClick: () => void }) {
   const [busy, setBusy] = useState(false);
   // Audit receipts support immediate undo without changing provenance.
   const [receipt, setReceipt] = useState<{ projectId: string; auditId: string } | null>(null);
+  // The quick-create form creates a native inbox task in the selected project.
+  const [newTitle, setNewTitle] = useState('');
+  const [newPriority, setNewPriority] = useState('medium');
+  // Info-hub views are deterministic client filters over namespaced task tags.
+  const [view, setView] = useState<'all' | 'today' | 'mine' | 'explore'>('all');
   const act = async (run: () => Promise<Response>, targetProject: string) => {
     setBusy(true); setError('');
     try { const result = await read(await run()); if (result.auditId) setReceipt({ projectId: targetProject, auditId: result.auditId }); await load(); if (result.sessionId) navigate('/session/' + result.sessionId); }
@@ -83,12 +94,15 @@ export function GlobalTasksPage({ onMenuClick }: { onMenuClick: () => void }) {
     attention: all.filter(row => ['blocked', 'review'].includes(row.task.status)).length, done: all.filter(row => row.task.status === 'done').length };
   const rank: Record<string, number> = { high: 0, medium: 1, low: 2 };
   const keywords = search.toLowerCase().trim().split(/\s+/).filter(Boolean);
+  const today = Date.now() + 7 * 24 * 60 * 60 * 1000;
   const filtered = all.filter(({ project, task }) => (!priority || task.priority === priority)
+    && (view === 'all' || view === 'mine' || (view === 'today' && (!task.due || dueTime(task.due) <= today)) || (view === 'explore' && Boolean(task.tags?.length)))
     && (status === 'all' || (status === 'open' ? isOpenTask(task) : status === 'attention' ? ['blocked', 'review'].includes(task.status) : task.status === status))
     && keywords.every(word => [task.title, task.description, task.details, task.source, project.name].filter(Boolean).join(' ').toLowerCase().includes(word)))
     .sort((a, b) => (rank[a.task.priority || 'medium'] ?? 1) - (rank[b.task.priority || 'medium'] ?? 1) || dueTime(a.task.due) - dueTime(b.task.due) || a.task.title.localeCompare(b.task.title));
   const tasks = filtered.filter(row => !category || row.category === category);
-  const summary = [{ id: 'open', label: '未完成', count: totals.open, tone: 'text-foreground' },
+  const summary = [{ id: 'pending', label: '待处理', count: all.filter(row => row.task.status === 'pending').length, tone: 'text-slate-700 dark:text-slate-200' },
+    { id: 'open', label: '未完成', count: totals.open, tone: 'text-foreground' },
     { id: 'in-progress', label: '进行中', count: totals.running, tone: 'text-blue-600 dark:text-blue-400' },
     { id: 'attention', label: '需关注', count: totals.attention, tone: 'text-amber-700 dark:text-amber-400' },
     { id: 'done', label: '已完成', count: totals.done, tone: 'text-emerald-700 dark:text-emerald-400' }];
@@ -100,6 +114,11 @@ export function GlobalTasksPage({ onMenuClick }: { onMenuClick: () => void }) {
     </header>
     <div className="min-h-0 flex-1 overflow-auto">
       <div className="mx-auto max-w-6xl space-y-5 p-4 md:p-6">
+        <form className="flex flex-col gap-2 rounded-xl border border-border bg-card p-3 sm:flex-row" onSubmit={async e => { e.preventDefault(); if (!newTitle.trim() || busy) return; const target = projectId || projects.find(p => p.tasks.length)?.projectId; if (!target) { setError('请先选择一个项目'); return; } setBusy(true); try { await read(await inboxTasksApi.create(target, { title: newTitle.trim(), priority: newPriority })); setNewTitle(''); await load(); } catch (error) { setError(error instanceof Error ? error.message : String(error)); } finally { setBusy(false); } }}>
+          <input aria-label="新建任务" value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="一句话新建任务…" className="min-h-10 min-w-0 flex-1 rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-primary" />
+          <select aria-label="新任务优先级" className={control} value={newPriority} onChange={e => setNewPriority(e.target.value)}><option value="high">高优先级</option><option value="medium">普通</option><option value="low">低优先级</option></select>
+          <button type="submit" className="min-h-10 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-50" disabled={!newTitle.trim() || busy}>新建任务</button>
+        </form>
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4" aria-label="任务概览">
           {summary.map(item => <button key={item.id} type="button" aria-pressed={status === item.id} onClick={() => setStatus(item.id)} className={`rounded-xl border bg-card px-4 py-3 text-left transition-colors hover:border-primary/40 ${status === item.id ? 'border-primary/50 ring-1 ring-primary/10' : 'border-border'}`}>
             <span className="text-xs font-medium text-muted-foreground">{item.label}</span><span className={`mt-1 block text-2xl font-semibold tabular-nums ${item.tone}`}>{loading ? '—' : item.count}</span>
@@ -112,6 +131,7 @@ export function GlobalTasksPage({ onMenuClick }: { onMenuClick: () => void }) {
             <select aria-label="优先级筛选" className={control} value={priority} onChange={e => setPriority(e.target.value)}><option value="">全部优先级</option>{['high', 'medium', 'low'].map(p => <option key={p} value={p}>{labels[p]}</option>)}</select>
             <select aria-label="状态筛选" className={control} value={status} onChange={e => setStatus(e.target.value)}><option value="open">未完成</option><option value="all">全部状态</option><option value="attention">需关注</option>{['pending', 'in-progress', 'done', 'cancelled', 'blocked', 'review', 'deferred'].map(s => <option key={s} value={s}>{labels[s]}</option>)}</select>
           </div>
+          <div className="flex flex-wrap gap-2" aria-label="任务视图"><span className="self-center text-xs text-muted-foreground">视图</span>{[['all','全部'],['today','今天'],['mine','需要我'],['explore','探索']].map(([id,label]) => <button key={id} type="button" className={`min-h-10 rounded-lg px-3 text-xs ${view === id ? 'bg-foreground text-background' : 'border bg-background text-muted-foreground'}`} onClick={() => setView(id as typeof view)}>{label}</button>)}</div>
           <div className="flex flex-wrap gap-2" aria-label="任务大类筛选">
             {[{ id: '', name: '全部类别' }, ...TASK_WORKSTREAMS].map(group => <button key={group.id} type="button" aria-pressed={category === group.id} onClick={() => setCategory(group.id)} className={`rounded-full px-3 py-1.5 text-xs transition-colors ${category === group.id ? 'bg-foreground font-medium text-background' : 'border bg-background text-muted-foreground hover:text-foreground'}`}>
               {group.name}<span className="ml-2 tabular-nums opacity-70">{loading ? '—' : filtered.filter(row => !group.id || row.category === group.id).length}</span>
@@ -152,6 +172,8 @@ export function GlobalTasksPage({ onMenuClick }: { onMenuClick: () => void }) {
 function TaskRow({ project, task, busy, act }: { project: ProjectTasks; task: Task; busy: boolean; act: (run: () => Promise<Response>, project: string) => Promise<void> }) {
   // The selected option stays local until the user explicitly executes it.
   const [option, setOption] = useState(task.recommended || 'A');
+  // Retains a user-written execution note until it is explicitly saved or executed.
+  const [userInput, setUserInput] = useState(task.userInput || '');
   const navigate = useNavigate();
   return <details open className="group border-b border-border/60 last:border-b-0" data-testid="global-task-row">
     <summary className="flex cursor-pointer list-none items-start gap-3 px-4 py-3.5 transition-colors hover:bg-muted/25">
@@ -163,8 +185,9 @@ function TaskRow({ project, task, busy, act }: { project: ProjectTasks; task: Ta
     <div className="space-y-4 border-t border-border/50 bg-muted/10 px-4 py-4 sm:pl-11">
       {(task.details || task.description) && <div><h4 className="mb-1.5 text-xs font-semibold text-muted-foreground">要做什么</h4><p className="whitespace-pre-wrap break-words text-sm leading-6">{task.details || task.description}</p></div>}
       {task.source && <p className="break-words text-xs text-muted-foreground">来源：{task.source}</p>}
+      <div className="space-y-2"><label className="block text-xs font-semibold text-muted-foreground" htmlFor={`task-input-${project.projectId}-${task.id}`}>自己写做法/补充要求</label><textarea id={`task-input-${project.projectId}-${task.id}`} value={userInput} onChange={e => setUserInput(e.target.value)} placeholder="补充执行要求，也可以只保存为备注" className="min-h-20 w-full resize-y rounded-lg border border-border bg-background p-3 text-sm"/><div className="flex flex-wrap gap-2"><button type="button" className={control} disabled={busy} onClick={() => void act(() => inboxTasksApi.saveInput(project.projectId, String(task.id), userInput), project.projectId)}>保存备注</button></div></div>
       {!!task.options?.length && <div><h4 className="mb-2 text-xs font-semibold text-muted-foreground">选择做法</h4><div role="radiogroup" aria-label={`${task.title}的做法`} className="grid gap-2">{task.options.map(o => <label key={o.key} className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 text-sm ${option === o.key ? 'border-primary/50 bg-primary/5' : 'border-border bg-background'}`}><input type="radio" className="mt-1" name={'option-' + project.projectId + task.id} checked={option === o.key} onChange={() => setOption(o.key)}/><span className="min-w-0 break-words"><strong className="font-medium">{o.key} · {o.label}{o.key === task.recommended && <span className="ml-2 rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">推荐</span>}</strong><span className="mt-1 block text-xs leading-5 text-muted-foreground">{o.plan}</span></span></label>)}</div></div>}
-      <div className="flex flex-wrap items-center gap-2"><button className="flex min-h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-40" disabled={busy || ['done', 'cancelled', 'in-progress'].includes(task.status)} onClick={() => void act(() => inboxTasksApi.execute(project.projectId, String(task.id), option), project.projectId)}><Play size={14}/>执行</button>
+      <div className="flex flex-wrap items-center gap-2"><button className="flex min-h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-40" disabled={busy || ['done', 'cancelled', 'in-progress'].includes(task.status)} onClick={() => void act(() => userInput.trim() ? inboxTasksApi.execute(project.projectId, String(task.id), option, userInput) : inboxTasksApi.execute(project.projectId, String(task.id), option), project.projectId)}><Play size={14}/>执行</button>
         {task.executionSessionId && <button className={control + ' flex items-center gap-2'} onClick={() => navigate('/session/' + task.executionSessionId)}><ExternalLink size={14}/>查看执行会话</button>}
         <button className={control + ' flex items-center gap-2'} disabled={busy || task.status === 'done'} onClick={() => void act(() => inboxTasksApi.action(project.projectId, String(task.id), 'done'), project.projectId)}><Check size={14}/>标记完成</button>
         <button className="flex min-h-10 items-center gap-1 px-2 text-xs text-muted-foreground hover:text-foreground disabled:opacity-40" disabled={busy || task.status === 'cancelled'} onClick={() => void act(() => inboxTasksApi.action(project.projectId, String(task.id), 'cancelled'), project.projectId)}><X size={14}/>忽略</button>

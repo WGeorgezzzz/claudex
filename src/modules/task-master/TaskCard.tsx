@@ -42,7 +42,7 @@ function getStatusStyle(status?: string): TaskStatusStyle {
   if (status === 'in-progress') {
     return {
       icon: Clock,
-      statusText: 'In Progress',
+      statusText: '进行中',
       iconColor: 'text-blue-600 dark:text-blue-400',
       textColor: 'text-blue-900 dark:text-blue-100',
     };
@@ -51,7 +51,7 @@ function getStatusStyle(status?: string): TaskStatusStyle {
   if (status === 'review') {
     return {
       icon: AlertCircle,
-      statusText: 'Review',
+      statusText: '待验收',
       iconColor: 'text-amber-600 dark:text-amber-400',
       textColor: 'text-amber-900 dark:text-amber-100',
     };
@@ -60,7 +60,7 @@ function getStatusStyle(status?: string): TaskStatusStyle {
   if (status === 'deferred') {
     return {
       icon: Pause,
-      statusText: 'Deferred',
+      statusText: '暂缓',
       iconColor: 'text-gray-500 dark:text-gray-400',
       textColor: 'text-gray-700 dark:text-gray-300',
     };
@@ -69,7 +69,7 @@ function getStatusStyle(status?: string): TaskStatusStyle {
   if (status === 'cancelled') {
     return {
       icon: X,
-      statusText: 'Cancelled',
+      statusText: '已忽略',
       iconColor: 'text-red-600 dark:text-red-400',
       textColor: 'text-red-900 dark:text-red-100',
     };
@@ -77,7 +77,7 @@ function getStatusStyle(status?: string): TaskStatusStyle {
 
   return {
     icon: Circle,
-    statusText: 'Pending',
+    statusText: '待处理',
     iconColor: 'text-slate-500 dark:text-slate-400',
     textColor: 'text-slate-900 dark:text-slate-100',
   };
@@ -157,7 +157,7 @@ function TaskCard({ task, onClick = null, showParent = false, className = '' }: 
             </Tooltip>
           </div>
 
-          <h3 className="line-clamp-2 text-sm font-medium leading-tight text-gray-900 dark:text-white">
+          <h3 className="line-clamp-3 text-sm font-medium leading-tight text-gray-900 dark:text-white">
             {task.title}
           </h3>
 
@@ -189,12 +189,12 @@ function TaskCard({ task, onClick = null, showParent = false, className = '' }: 
         </Tooltip>
       </div>
 
-      {task.autoUpdate && <p className="text-xs text-green-600">自动更新：依据 {task.autoUpdate.evidence}</p>}
+      {task.autoUpdate && <details className="text-xs text-green-600"><summary className="cursor-pointer truncate">自动更新：依据…</summary><p className="mt-1 break-words">{task.autoUpdate.evidence}</p></details>}
       {task.sources?.slice(-1).map(source => <a key={source.messageId} href={`/session/${encodeURIComponent(source.sessionId)}?taskMessage=${encodeURIComponent(source.messageId)}`} onClick={event => event.stopPropagation()} className="text-xs text-blue-500 underline">查看原对话位置</a>)}
       {progress.total > 0 && (
         <div className="ml-3">
           <div className="mb-1 flex items-center gap-2">
-            <span className="text-xs text-gray-500 dark:text-gray-400">Progress:</span>
+            <span className="text-xs text-gray-500 dark:text-gray-400">进度：</span>
             <div className="h-1.5 flex-1 rounded-full bg-gray-200 dark:bg-gray-700" title={`${progress.completed} of ${progress.total} subtasks completed`}>
               <div
                 className={cn('h-full rounded-full transition-all duration-300', task.status === 'done' ? 'bg-green-500' : 'bg-blue-500')}

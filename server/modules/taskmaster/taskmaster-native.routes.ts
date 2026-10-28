@@ -28,11 +28,13 @@ export function createTaskmasterNativeRouter() {
   router.post('/auto/sessions/:sessionId/undo', action(req => taskmasterAutoService.undo(String(req.params.sessionId), z.string().uuid().parse(req.body.auditId))));
   const root = (req: express.Request) => projectsDb.getProjectPathById(String(req.params.projectId))!;
   router.use('/inbox', requireSharedResourceAdministrator);
-  const execution = z.object({ projectId: z.string().min(1), taskId: z.string().min(1), option: z.enum(['A', 'B', 'C']).optional() });
+  const execution = z.object({ projectId: z.string().min(1), taskId: z.string().min(1), option: z.enum(['A', 'B', 'C']).optional(), userInput: z.string().max(10000).optional() });
   router.post('/inbox/import', action(req => taskmasterInboxService.import(inboxBatchSchema.parse(req.body))));
   router.get('/inbox/global', action(() => taskmasterInboxService.global()));
+  router.post('/inbox/create', action(req => taskmasterInboxService.create(z.string().min(1).parse(req.body.projectId), z.object({ title: z.string().min(1).max(300), priority: z.enum(['high', 'medium', 'low']).optional() }).parse(req.body))));
+  router.post('/inbox/input', action(req => { const p = z.object({ projectId: z.string().min(1), taskId: z.string().min(1), userInput: z.string().max(10000) }).parse(req.body); return taskmasterInboxService.saveInput(p.projectId, p.taskId, p.userInput); }));
   router.get('/inbox/status', action(req => taskmasterInboxService.status(z.string().min(1).parse(req.query.projectId))));
-  router.post('/inbox/execute', action(req => { const p = execution.parse(req.body); return taskmasterInboxService.execute(p.projectId, p.taskId, p.option); }));
+  router.post('/inbox/execute', action(req => { const p = execution.parse(req.body); return taskmasterInboxService.execute(p.projectId, p.taskId, p.option, p.userInput); }));
   router.post('/inbox/action', action(req => { const p = execution.extend({ action: z.enum(['done', 'cancelled']) }).parse(req.body); return taskmasterInboxService.action(p.projectId, p.taskId, p.action); }));
   router.post('/inbox/undo', action(req => { const p = z.object({ projectId: z.string().min(1), auditId: z.string().uuid() }).parse(req.body); return taskmasterInboxService.undo(p.projectId, p.auditId); }));
   router.post('/inbox/test-cleanup', action(req => { const p = execution.extend({ title: z.string().min(1) }).parse(req.body); return taskmasterInboxService.cleanup(p.projectId, p.taskId, p.title); }));
