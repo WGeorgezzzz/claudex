@@ -105,7 +105,7 @@ const PROVIDER_CAPABILITIES: Record<LLMProvider, ProviderCapabilities> = {
   'deepseek-harness': {
     provider: 'deepseek-harness', permissionModeNamespace: 'harnessModes', permissionModes: ['default', 'plan', 'bypassPermissions'], defaultPermissionMode: 'bypassPermissions',
     supportsImages: false, supportsFiles: true, supportsAbort: true, supportsPermissionRequests: false,
-    supportsTokenUsage: false, supportsEffort: false, effortLevels: [], supportsMessageEditing: false, supportsSessionForking: false,
+    supportsTokenUsage: false, supportsEffort: true, effortLevels: ['off','high'], supportsMessageEditing: false, supportsSessionForking: false,
   },
   workbuddy: {
     permissionModeNamespace: 'workbuddyModes',
