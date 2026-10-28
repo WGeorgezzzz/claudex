@@ -1,4 +1,5 @@
 'use strict';
+const {partitionDeploymentSessions}=require('./running-session-ownership.cjs');
 // Prepared only. No production mutation occurs without an explicit --activate or --rollback argument.
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict'),crypto=require('node:crypto'),{execFileSync}=require('node:child_process'),{createRequire}=require('node:module');
 const arg=name=>process.argv.includes(name)?process.argv[process.argv.indexOf(name)+1]:undefined,source=path.resolve(arg('--source')||process.cwd()),target=path.resolve(arg('--release')||path.join(source,'../release-1')),root=path.dirname(target),req=createRequire(path.join(target,'package.json')),DB=req('better-sqlite3');
@@ -31,7 +32,7 @@ async function login(c){
 }
 async function idle(c){
  const latest=read(cfgPath);assert.equal(latest.pid,c.pid,'Primary process changed');assert.equal(norm(latest.runtime),norm(c.runtime));assert.equal(norm(fs.realpathSync(link)),norm(c.runtime));
- const token=await login(c),response=await fetch('http://127.0.0.1:3001/api/providers/sessions/running',{headers:{Authorization:'Bearer '+token},signal:AbortSignal.timeout(10000)});assert(response.ok);const running=await response.json();assert(Array.isArray(running.data?.sessions),'Unrecognized running-session response');write(path.join(root,'running-sessions-before-activation.json'),running);fs.appendFileSync(path.join(root,'STATUS.md'),'\n- 激活前正在运行的会话数：'+running.data.sessions.length+'，详见 running-sessions-before-activation.json。用户授权 deploy-force。\n');
+ const token=await login(c),response=await fetch('http://127.0.0.1:3001/api/providers/sessions/running',{headers:{Authorization:'Bearer '+token},signal:AbortSignal.timeout(10000)});assert(response.ok);const running=await response.json();assert(Array.isArray(running.data?.sessions),'Unrecognized running-session response');const ownership=partitionDeploymentSessions(running.data.sessions);write(path.join(root,'running-sessions-before-activation.json'),ownership.managed);write(path.join(root,'independent-sessions-before-activation.json'),ownership.independent);fs.appendFileSync(path.join(root,'STATUS.md'),'\n- 激活前正在运行的会话数：'+ownership.managed.length+'，详见 running-sessions-before-activation.json。用户授权 deploy-force。\n');
  const db=new DB(c.database,{readonly:true});try{const n=db.prepare("SELECT COUNT(*) n FROM message_queue WHERE status IN ('running','processing','executing')").get().n;write(path.join(root,'running-queue-before-activation.json'),{count:n});}finally{db.close();}
  const p=JSON.parse(ps(`$p=Get-CimInstance Win32_Process -Filter 'ProcessId = ${Number(c.pid)}'; [pscustomobject]@{pid=$p.ProcessId;command=$p.CommandLine;children=@(Get-CimInstance Win32_Process | Where-Object ParentProcessId -eq ${Number(c.pid)}).Count;listeners=@(Get-NetTCPConnection -State Listen -LocalPort 3001 | Select-Object -ExpandProperty OwningProcess -Unique)} | ConvertTo-Json -Compress`));
  assert.equal(p.pid,c.pid);assert(p.command.replaceAll('\\','/').toLowerCase().includes(c.runtime.replaceAll('\\','/').toLowerCase()));assert.deepEqual(p.listeners,[c.pid]);
@@ -127,7 +128,7 @@ function releaseGuard(){
  for(const marker of ['/tasks','任务','打开所在文件夹'])assert(client.includes(marker),'Client marker missing: '+marker);
  for(const marker of ['forceStop','providerSessionId','findResumedProviderProcesses','mcp__claudex_sessions__session'])assert(backend.includes(marker),'Backend marker missing: '+marker);
 }
-async function running(c){const token=await login(c);const r=await fetch('http://127.0.0.1:3001/api/providers/sessions/running',{headers:{Authorization:'Bearer '+token},signal:AbortSignal.timeout(60000)});assert(r.ok);return (await r.json()).data.sessions;}
+async function running(c){const token=await login(c);const r=await fetch('http://127.0.0.1:3001/api/providers/sessions/running',{headers:{Authorization:'Bearer '+token},signal:AbortSignal.timeout(60000)});assert(r.ok);const ownership=partitionDeploymentSessions((await r.json()).data.sessions);write(path.join(root,'independent-sessions-before-activation.json'),ownership.independent);return ownership.managed;}
 async function waitIdle(c){const minutes=Number(arg('--idle-timeout-minutes')||30);assert(Number.isInteger(minutes)&&minutes>=1&&minutes<=30,'Idle timeout must be 1–30 minutes');const started=Date.now();for(;;){const rows=await running(c);write(path.join(root,'running-sessions-before-activation.json'),rows);if(!rows.length||Date.now()-started>=minutes*60*1000)return;console.log('Waiting for idle:',rows.length);await pause(15000);}}
 async function interruptManaged(c){
  const rows=await running(c),token=await login(c),WS=req('ws');
