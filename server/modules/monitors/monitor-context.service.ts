@@ -32,7 +32,12 @@ export async function maintainMonitorContext(row: MonitorRecord, runId: string, 
     // A command with an uncertain completion must settle before a replacement is allowed.
     if (reason === 'CONTEXT_COMPACT_PENDING') throw error;
   }
-  const history = await sessionBridgeService.read(sessionId, 0, row.user_id);
+  // Bound failed handoffs to the tail page instead of loading the full
+  // long-running transcript into memory.
+  const firstPage = await sessionBridgeService.read(sessionId, 0, row.user_id);
+  const history = firstPage.total > 20
+    ? await sessionBridgeService.read(sessionId, Math.max(0, firstPage.total - 20), row.user_id)
+    : firstPage;
   const options = JSON.parse(row.options);
   const summary = history.messages.slice(-12).map(message => `${message.role}: ${message.content}`).join('\n').slice(-10000);
   const next = sessionBridgeService.create(row.user_id, sessionId, {

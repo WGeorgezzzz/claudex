@@ -61,7 +61,9 @@ export async function scanUsageFile(db: Database, file: string, userId: number, 
   if (stat.size > 200 * 1024 * 1024) { console.warn('[Usage] Skipping file over 200 MB:', file); return; }
   const old = db.prepare('SELECT * FROM usage_scan_files WHERE path=?').get(file) as FileRow | undefined;
   if (old && old.size === stat.size && old.mtime_ms === stat.mtimeMs) return;
-  const reset = !old || stat.size < old.size || stat.mtimeMs < old.mtime_ms || (stat.size === old.size && stat.mtimeMs !== old.mtime_ms);
+  // Session JSONL files are append-only; a timestamp-only touch must not
+  // replay a large transcript from the beginning.
+  const reset = !old || stat.size < old.size || stat.mtimeMs < old.mtime_ms;
   const state: State = reset ? { seen: {}, model: 'unknown' } : JSON.parse(old.state_json);
   state.seen = Object.assign(Object.create(null), state.seen);
   let offset = reset ? 0 : old.offset;
@@ -158,12 +160,12 @@ export function rescanUsage(): Promise<void> {
   })().finally(() => { active = null; });
   return active;
 }
-/** Server lifecycle starts scanning after 30 seconds and then every five minutes. */
+/** Server lifecycle starts scanning after 30 seconds and then every ten minutes. */
 export function initializeUsage() {
   stopping = false;
   const run = () => { void rescanUsage().catch(e => console.error('[Usage]',e)); };
   initial = setTimeout(run,30000); initial.unref();
-  periodic = setInterval(run,300000); periodic.unref();
+  periodic = setInterval(run,600000); periodic.unref();
 }
 /** Server shutdown stops future work and lets the current read close cleanly. */
 export function closeUsage() { stopping = true; clearTimeout(initial); clearInterval(periodic); }
