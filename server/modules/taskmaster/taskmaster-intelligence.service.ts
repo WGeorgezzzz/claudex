@@ -106,7 +106,7 @@ export function createTaskIntelligenceService(generate=generateTaskmasterExtract
         const target=state.entries[normalized.duplicate_of];if(target&&target.project===normalized.project&&!target.mergedInto&&target.duplicate_of!==row.id&&row.task.status!=='in-progress'&&!row.task.executionSessionId)entry.mergedInto=normalized.duplicate_of;
       }
     }
-    if(Array.isArray(response.focus))state.focus=response.focus.filter(item=>all.some(row=>row.id===item.id&&!['done','cancelled'].includes(row.task.status))).slice(0,5);
+    // Batch-local suggestions cannot replace priorities ranked across the whole inbox.
     reconcileGroups(state);state.updatedAt=new Date().toISOString();save(user,state);
    }
    if(force){const unfinished=all.filter(row=>!['done','cancelled'].includes(row.task.status)&&state.entries[row.id]&&!state.constraints.some(c=>c.id===row.id&&c.action==='deny-completion'));
@@ -132,7 +132,7 @@ export function createTaskIntelligenceService(generate=generateTaskmasterExtract
    if(force&&state.lastFull!==today()&&state.groups.length>1){const plan=await infer(user,state,{groups:state.groups.map(group=>({...group,count:Object.values(state.entries).filter(e=>e.groupId===group.id).length,examples:all.filter(row=>state.entries[row.id]?.groupId===group.id).slice(0,3).map(row=>row.task.title)})),constraints:state.constraints},'只做夜间组整理。把过小且语义相近的同项目组建议合并，复用目标ID及名称；不要合并只是同一项目但不同事情的组。用户rename锁定的源组不能消失，move锁定任务不能换组。输出JSON {merges:[{from_id,into_id,reason}]}。',2000) as {merges?:{from_id:string;into_id:string;reason:string}[]};for(const merge of plan.merges||[]){const from=state.groups.find(g=>g.id===merge.from_id),into=state.groups.find(g=>g.id===merge.into_id);if(!from||!into||from.id===into.id||from.project!==into.project||state.constraints.some(c=>(c.action==='rename'&&c.id===from.id)||(c.action==='move'&&c.target===from.id)))continue;const members=Object.values(state.entries).filter(e=>e.groupId===from.id),targets=Object.values(state.entries).filter(e=>e.groupId===into.id);if(members.length+targets.length>15)continue;for(const entry of members)entry.groupId=into.id;state.groups=state.groups.filter(g=>g.id!==from.id);}}
    const active=all.filter(row=>!['done','cancelled'].includes(row.task.status)&&!state.entries[row.id]?.completionAuditId&&!state.entries[row.id]?.mergedInto).sort((a,b)=>(state.entries[a.id]?.urgency||3)-(state.entries[b.id]?.urgency||3)).slice(0,20);
    const urgentChanged=selected.some(row=>state.entries[row.id]?.urgency===1);
-   if(active.length&&(state.lastFocus!==today()||urgentChanged)){
+   if(active.length&&(state.lastFocus!==today()||urgentChanged||(state.focus.length>0&&state.focus.length<Math.min(3,active.length)))){
     const ranked=await infer(user,state,{tasks:active.map(row=>({id:row.id,title:row.task.title,summary:state.entries[row.id]?.summary,due:state.entries[row.id]?.due,next_action:state.entries[row.id]?.next_action,urgency:state.entries[row.id]?.urgency}))},'依据全部候选任务的重要性、截止和可执行性选择今天最该做的3至5件；不足3件则全部。只依据资料，不编造。中文返回JSON {focus:[{id,reason:"一句话理由"}]}。',1000) as {focus?:{id:string;reason:string}[]};
     if(Array.isArray(ranked.focus))state.focus=ranked.focus.filter(f=>active.some(row=>row.id===f.id)).slice(0,5);
    }

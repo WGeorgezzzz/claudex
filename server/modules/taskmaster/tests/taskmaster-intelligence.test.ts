@@ -68,3 +68,16 @@ test('completion retrieval reads matching commits from the related repository ma
  const root=await mkdtemp(path.join(os.tmpdir(),'ZXQGitUnique-')),previous=process.env.DATABASE_PATH;closeConnection();process.env.DATABASE_PATH=path.join(root,'test.db');await initializeDatabase();const user=Number(userDb.createUser('git-evidence','hash').id);execFileSync('git',['init','-b','main',root],{windowsHide:true});await writeFile(path.join(root,'proof.md'),'ZXQGitUnique completed');execFileSync('git',['-C',root,'add','proof.md'],{windowsHide:true});execFileSync('git',['-C',root,'-c','user.name=Fixture','-c','user.email=fixture@example.invalid','commit','-m','feat: ZXQGitUnique completed'],{windowsHide:true});
  try{await withUserContext(user,async()=>{const evidence=await retrieveTaskEvidence([{id:'fixture',title:'ZXQGitUnique',project:'测试项目',root,sessionIds:[]}]);assert(evidence.some(item=>item.type==='git'&&item.path.endsWith('@main')&&item.excerpt.includes('ZXQGitUnique completed')));});}finally{closeConnection();if(previous===undefined)delete process.env.DATABASE_PATH;else process.env.DATABASE_PATH=previous;}
 });
+
+
+test('a small incremental batch preserves the full daily priority list',async t=>{
+ const root=await mkdtemp(path.join(os.tmpdir(),'nexagent-focus-')),previous=process.env.DATABASE_PATH,previousHome=process.env.CLOUDCLI_HOME;
+ process.env.CLOUDCLI_HOME=path.join(root,'.cloudcli');closeConnection();process.env.DATABASE_PATH=path.join(root,'test.db');await initializeDatabase();
+ const user=Number(userDb.createUser('focus-test','hash').id),tasks=Array.from({length:4},(_,index)=>({id:index+1,title:'优先列表验收 '+index,status:'pending',description:'初始内容'}));
+ t.mock.method(taskmasterInboxService,'global',async()=>({projects:[{projectId:'fixture',name:'测试项目',root,tasks,audits:[]}],infohub:{}}));
+ const service=createTaskIntelligenceService(async(input,options)=>{options?.onUsage({input_tokens:10,output_tokens:10});const batch=(input as {tasks:{id:string}[]}).tasks;
+ if(options?.instructions.startsWith('依据全部候选任务'))return {focus:batch.slice(0,3).map(row=>({id:row.id,reason:'完整候选列表中的优先事项'}))};
+ return {tasks:batch.map(row=>({id:row.id,summary:'增量理解',project:'测试项目',kind:'todo',due:null,people:[],next_action:'核查结果',urgency:2})),focus:[{id:batch[batch.length-1].id,reason:'仅来自本批的建议'}]};});
+ try{await withUserContext(user,async()=>{await service.run(user,false);const first=(await service.snapshot()).focus;assert.equal(first.length,3);tasks[3].description='新增一条普通变更';await service.run(user,false);assert.deepEqual((await service.snapshot()).focus,first);});}
+ finally{t.mock.restoreAll();closeConnection();if(previous===undefined)delete process.env.DATABASE_PATH;else process.env.DATABASE_PATH=previous;if(previousHome===undefined)delete process.env.CLOUDCLI_HOME;else process.env.CLOUDCLI_HOME=previousHome;}
+});
