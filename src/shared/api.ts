@@ -67,6 +67,9 @@ export const authenticatedFetch = (
 
 type QueryValue = string | number | boolean | null | undefined;
 
+/** Authorizes same-origin iframe navigation using a scoped HttpOnly cookie. */
+export const infoHubApi = { authorize: () => authenticatedFetch('/api/infohub/session', { method: 'POST' }) };
+
 /** Global tasks and the sidebar share the authenticated TaskMaster transport. */
 export const inboxTasksApi = {
   list: () => authenticatedFetch('/api/taskmaster/inbox/global'),

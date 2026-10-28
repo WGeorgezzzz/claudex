@@ -244,23 +244,52 @@ app.use('/api/voice', authenticateToken, voiceRoutes);
 
 // The local info-hub has no account system. Keep it behind Nexagent auth and
 // forward both reads and writes so remote/mobile clients use the same boundary.
-app.use('/infohub', authenticateToken, (req, res) => {
+app.post('/api/infohub/session', authenticateToken, (req, res) => {
+    const token = req.headers.authorization?.replace(/^Bearer /i, '');
+    if (!token) return res.status(401).json({ error: 'Login required' });
+    res.cookie('nexagent_infohub', token, { httpOnly: true, sameSite: 'strict', secure: req.secure || req.headers['x-forwarded-proto'] === 'https', path: '/infohub', maxAge: 15 * 60 * 1000 });
+    res.setHeader('Cache-Control', 'no-store');
+    res.json({ ready: true });
+});
+app.use('/infohub', (req, res, next) => {
+    if (req.path === '/' && req.originalUrl === '/infohub') return res.redirect('/information');
+    const cookie = req.headers.cookie?.split(';').map(value => value.trim()).find(value => value.startsWith('nexagent_infohub='));
+    if (!req.headers.authorization && cookie) {
+        try { req.headers.authorization = `Bearer ${decodeURIComponent(cookie.slice('nexagent_infohub='.length))}`; } catch { /* Invalid cookies remain unauthenticated. */ }
+    }
+    if (!['GET', 'HEAD'].includes(req.method) && req.headers.origin && req.headers.origin !== `${req.headers['x-forwarded-proto'] || req.protocol}://${req.headers.host}`) return res.status(403).json({ error: 'Cross-origin write denied' });
+    next();
+}, authenticateToken, (req, res) => {
     const target = new URL(`http://127.0.0.1:8765${req.path || '/'}`);
     target.search = req.originalUrl.includes('?') ? req.originalUrl.slice(req.originalUrl.indexOf('?')) : '';
     const body = ['GET', 'HEAD'].includes(req.method) ? undefined : JSON.stringify(req.body ?? {});
     const proxy = http.request(target, {
         method: req.method,
         headers: {
-            ...Object.fromEntries(Object.entries(req.headers).filter(([key]) => !['host', 'content-length', 'connection'].includes(key))),
+            ...Object.fromEntries(Object.entries(req.headers).filter(([key]) => !['host', 'content-length', 'connection', 'authorization', 'cookie'].includes(key))),
+            ...(req.headers.cookie ? { cookie: req.headers.cookie.split(';').filter(value => !value.trim().startsWith('nexagent_infohub=')).join(';') } : {}),
             host: '127.0.0.1:8765',
             'x-forwarded-prefix': '/infohub',
+            'accept-encoding': 'identity',
             ...(body ? { 'content-type': 'application/json', 'content-length': Buffer.byteLength(body).toString() } : {}),
         },
     }, upstream => {
         res.status(upstream.statusCode ?? 502);
-        for (const [key, value] of Object.entries(upstream.headers)) if (value !== undefined && key.toLowerCase() !== 'transfer-encoding') res.setHeader(key, value);
-        upstream.pipe(res);
+        const html = String(upstream.headers['content-type']).includes('text/html');
+        for (const [key, value] of Object.entries(upstream.headers)) if (value !== undefined && !['transfer-encoding', 'x-frame-options', ...(html ? ['content-length', 'content-encoding'] : [])].includes(key.toLowerCase())) res.setHeader(key, value);
+        res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+        res.setHeader('Cache-Control', 'no-store');
+        if (html) {
+            const chunks: Buffer[] = [];
+            upstream.on('data', chunk => chunks.push(Buffer.from(chunk)));
+            upstream.on('end', () => {
+                // Compatibility for info-hub builds predating X-Forwarded-Prefix support.
+                const bridge = '<script>const infohubFetch=window.fetch.bind(window);window.fetch=(url,options)=>infohubFetch(typeof url==="string"&&url.startsWith("/api/")?"/infohub"+url:url,options);</script>';
+                res.send(Buffer.concat(chunks).toString('utf8').replace('</head>', `${bridge}</head>`));
+            });
+        } else upstream.pipe(res);
     });
+    proxy.setTimeout(15000, () => proxy.destroy(new Error('info-hub timeout')));
     proxy.on('error', error => {
         if (!res.headersSent) res.status(503).json({ error: 'INFOHUB_UNAVAILABLE', message: '信息看板暂时不可用，请稍后重试。' });
         else res.end();

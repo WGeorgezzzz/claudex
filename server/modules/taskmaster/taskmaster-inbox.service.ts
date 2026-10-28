@@ -3,7 +3,7 @@ import { mkdir } from 'node:fs/promises';
 import { z } from 'zod';
 import { assertContextPath, requireContextUserId } from '@/modules/access-control/index.js';
 import { projectsDb, userPreferencesDb } from '@/modules/database/index.js';
-import { sessionsService } from '@/modules/providers/index.js';
+import { providerModelsService, sessionsService } from '@/modules/providers/index.js';
 import { messageQueueService } from '@/modules/message-queue/index.js';
 import { chatRunRegistry } from '@/modules/websocket/index.js';
 import { AppError } from '@/shared/index.js';
@@ -75,8 +75,9 @@ export const taskmasterInboxService = {
     });
     const task = result.task;
     const sessionId = String(task.executionSessionId);
+    const models = await providerModelsService.getProviderModels('codex');
     messageQueueService.enqueue(userId, { sessionId, requestId: `taskmaster:${sessionId}`, content: task.executionPrompt,
-      options: { model: 'gpt-6.1-sol', permissionMode: 'bypassPermissions' } });
+      options: { model: models.DEFAULT, permissionMode: 'bypassPermissions' } });
     return { sessionId, provider: 'codex', taskId: task.id, status: task.status };
   },
   async action(projectId: string, taskId: string, action: 'done' | 'cancelled') {

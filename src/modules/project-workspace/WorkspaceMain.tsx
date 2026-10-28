@@ -22,6 +22,7 @@ import { useWorkspaceSplit } from '@/modules/project-workspace/hooks/useWorkspac
 import { SideChatPanel } from '@/modules/project-workspace/SideChatPanel';
 
 type WorkspaceMainProps = {
+  onOpenTasks?: (projectId: string) => void;
   selectedProject: Project | null;
   selectedSession: ProjectSession | null;
   activeTab: AppTab;
@@ -46,6 +47,7 @@ type WorkspaceMainProps = {
 
 /** Rendered by ProjectMainRegion to show the selected project's active tab: chat, files, shell, git, tasks, browser or a plugin. */
 function WorkspaceMain({
+  onOpenTasks,
   selectedProject,
   selectedSession,
   activeTab,
@@ -159,8 +161,11 @@ function WorkspaceMain({
   // every WorkspaceMain render re-render the whole chat tree, including during
   // an editor-divider drag.
   const showAllTasks = useCallback(() => {
-    setActiveTab('tasks');
-  }, [setActiveTab]);
+    const projectId = selectedProject?.projectId || '';
+    if (onOpenTasks) onOpenTasks(projectId);
+    else window.location.assign('/tasks?project=' + encodeURIComponent(projectId));
+  }, [onOpenTasks, selectedProject?.projectId]);
+  useEffect(() => { if (activeTab === 'tasks') showAllTasks(); }, [activeTab, showAllTasks]);
 
   const openFile = useCallback((filePath: string) => {
     if (handleFileOpen(filePath)) {

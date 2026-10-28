@@ -55,9 +55,10 @@ function ProjectMainRegion({
   }, [refreshProjectsSilently]);
 
   if (location.pathname === '/tasks') return <GlobalTasksPage onMenuClick={handleOpenSidebar}/>;
-  if (location.pathname === '/infohub') return <InfoHubPage onMenuClick={handleOpenSidebar}/>;
+  if (['/infohub', '/information'].includes(location.pathname)) return <InfoHubPage onMenuClick={handleOpenSidebar}/>;
   return (
     <WorkspaceMain
+      onOpenTasks={projectId => navigate('/tasks?project=' + encodeURIComponent(projectId))}
       selectedProject={selectedProject}
       selectedSession={selectedSession}
       activeTab={activeTab}

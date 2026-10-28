@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { AlertCircle, Check, ChevronDown, ExternalLink, ListTodo, Menu, Play, RefreshCw, RotateCcw, Search, X } from 'lucide-react';
 
 import { inboxTasksApi } from '@/shared/api';
@@ -56,14 +56,15 @@ export function TasksNavigation() {
 /** SidebarHeader places the authenticated info-hub beside the unified task entry. */
 export function InfoHubNavigation() {
   const navigate = useNavigate();
-  return <button type="button" className="sidebar-nav-action" onClick={() => navigate('/infohub')} aria-label="信息看板"><ListTodo size={16}/><span>信息看板</span></button>;
+  return <button type="button" className="sidebar-nav-action" onClick={() => navigate('/information')} aria-label="信息看板"><ListTodo size={16}/><span>信息看板</span></button>;
 }
 
 /** ProjectMainRegion shows broad workstreams first and expands the original task records on demand. */
 export function GlobalTasksPage({ onMenuClick }: { onMenuClick: () => void }) {
   const { projects, error, loading, load, setError } = useGlobalTasks(), navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   // Project scope stays stable while polling updates the collection.
-  const [projectId, setProjectId] = useState('');
+  const [projectId, setProjectId] = useState(searchParams.get('project') || '');
   // Priority filtering is independent of task status.
   const [priority, setPriority] = useState('');
   // Open work is the default; completed and ignored tasks stay accessible.
