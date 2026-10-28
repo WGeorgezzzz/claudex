@@ -2,6 +2,7 @@ export { sessionSynchronizerService } from './services/session-synchronizer.serv
 export { providerSkillsService } from './services/skills.service.js';
 export { providerMcpService } from './services/mcp.service.js';
 export { providerRuntimeService } from './services/provider-runtime.service.js';
+export { providerRegistry } from './provider.registry.js';
 // Server composition runs local program discovery after database initialization.
 export { initializeAgentDiscovery } from './services/agent-discovery.service.js';
 
