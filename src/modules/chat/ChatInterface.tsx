@@ -31,6 +31,7 @@ import ChatMessagesPane from '@/modules/chat/transcript/ChatMessagesPane';
 import ChatComposer from '@/modules/chat/composer/ChatComposer';
 import CommandResultModal from '@/modules/chat/modals/CommandResultModal';
 import { useMessageQueue } from '@/modules/chat/composer/useMessageQueue';
+import { useQueuedTurnSync } from '@/modules/chat/hooks/useQueuedTurnSync';
 import { MessageQueuePanel } from '@/modules/chat/composer/MessageQueuePanel';
 import { restoreLiveInsertionMessages } from '@/modules/chat/utils/liveInsertionMessages';
 import { NextPromptSuggestions } from '@/modules/chat/composer/NextPromptSuggestions';
@@ -321,6 +322,8 @@ function ChatInterface({
     void requestLatestMessages(selectedSession.id, isActive).catch(error => console.warn('Reconnect history refresh failed:', error));
   }, [isActive, requestLatestMessages, selectedProject, selectedSession, sendMessage]);
 
+  useQueuedTurnSync(selectedSession?.id || null, messageQueue.items, handleWebSocketReconnect);
+
   useChatRealtimeHandlers({
     isActive,
     subscribe,
@@ -506,7 +509,7 @@ function ChatInterface({
   const hasActivityIndicator = Boolean(sessionActivity && pendingPermissionRequests.length === 0);
 
   const selectedProviderLabel =
-    provider === 'deepseek-harness' ? 'DeepSeek Harness' : provider === 'workbuddy' ? 'WorkBuddy' : provider === 'cursor'
+    provider === 'gemini' ? 'Gemini' : provider === 'deepseek-harness' ? 'DeepSeek Harness' : provider === 'workbuddy' ? 'WorkBuddy' : provider === 'cursor'
       ? t('messageTypes.cursor')
       : provider === 'codex'
         ? t('messageTypes.codex')
