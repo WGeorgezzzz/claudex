@@ -11,12 +11,14 @@ const control='min-h-10 rounded-lg border bg-background px-3 text-sm';
 async function value(response:Response){const data=await response.json();if(!response.ok)throw Error(data.message||'任务整理请求失败');return data;}
 
 /** GlobalTasksPage renders semantic projects, groups, parent tasks and reversible corrections alongside the legacy view. */
-export function IntelligentTasksPanel({onReady}:{onReady:(ready:boolean)=>void}){
+export function IntelligentTasksPanel({onReady,projectId=""}:{onReady:(ready:boolean)=>void;projectId?:string}){
  const navigate=useNavigate();
  // Persisted server interpretations remain visible while refreshes run or fail.
  const [data,setData]=useState<Snapshot|null>(null);
  // Independent presentation choices do not rewrite task ownership or model results.
  const [axis,setAxis]=useState('project'),[showDone,setShowDone]=useState(false);
+ // Search narrows the semantic cards without rewriting their groups.
+ const [search,setSearch]=useState('');
  // Mutations serialize against the server snapshot and keep errors visible.
  const [busy,setBusy]=useState(false),[error,setError]=useState('');
  // Execution carries the whole parent/merge context into the existing harness picker.
@@ -29,7 +31,7 @@ export function IntelligentTasksPanel({onReady}:{onReady:(ready:boolean)=>void})
  const snapshot=data;
  const all=snapshot.tasks.map(row=>({...row,analysis:snapshot.entries[row.id]}));
  const labels={todo:'要我做',waiting:'等别人',fyi:'知会'};
- const displayed=all.filter(row=>!row.analysis?.mergedInto&&(showDone||!['done','cancelled'].includes(row.task.status)));
+ const displayed=all.filter(row=>(!projectId||row.projectId===projectId)&&(!search.trim()||JSON.stringify([row.task.title,row.task.description,row.analysis?.summary,row.analysis?.next_action]).toLowerCase().includes(search.trim().toLowerCase()))&&!row.analysis?.mergedInto&&(showDone||!['done','cancelled'].includes(row.task.status)));
  const sections=new Map<string,Row[]>();
  for(const row of displayed){const a=row.analysis;const group=snapshot.groups.find(g=>g.id===a?.groupId);const section=axis==='project'?(a?.project||row.project)+' / '+(group?.name||'待归类'):axis==='people'?(a?.people?.join('、')||'未指定人员'):axis==='urgency'?'紧急度 '+(a?.urgency||3):labels[a?.kind as keyof typeof labels]||'待理解';sections.set(section,[...(sections.get(section)||[]),row]);}
  const contexts=(rows:Row[])=>rows.map(row=>JSON.stringify({title:row.task.title,description:row.task.description,details:row.task.details,due:row.analysis?.due||row.task.due,status:row.task.status,sources:row.task.sources})).join('\n').slice(0,9000);
@@ -48,7 +50,7 @@ export function IntelligentTasksPanel({onReady}:{onReady:(ready:boolean)=>void})
   </article>;
  }
  return <section aria-label="智能任务分组" className="space-y-4">
-  <div className="flex flex-wrap items-center gap-2"><select aria-label="智能任务视图" className={control} value={axis} onChange={e=>setAxis(e.target.value)}><option value="project">按项目 → 组</option><option value="people">按人</option><option value="urgency">按紧急度</option><option value="kind">按类型</option></select><button className={control} onClick={()=>setShowDone(v=>!v)}>{showDone?'只看未完成':'显示已完成'}</button><button className={control} disabled={busy||snapshot.running} onClick={()=>void refresh()}>{snapshot.running?'正在整理…':'重新整理'}</button><span className="text-xs text-muted-foreground">今日花费约 ${snapshot.spent.toFixed(3)}</span><label className="text-xs">日预算 $<input aria-label="智能整理日预算" className="ml-1 min-h-10 w-20 rounded-lg border px-2" type="number" min="0.01" step="0.1" defaultValue={snapshot.budget} onBlur={e=>void correct({action:'settings',budget:Number(e.target.value)})}/></label></div>
+  <div className="flex flex-wrap items-center gap-2"><input aria-label="搜索智能任务" placeholder="搜索任务、概括与下一步" className={control+" min-w-0 max-w-full"} value={search} onChange={e=>setSearch(e.target.value)}/><select aria-label="智能任务视图" className={control} value={axis} onChange={e=>setAxis(e.target.value)}><option value="project">按项目 → 组</option><option value="people">按人</option><option value="urgency">按紧急度</option><option value="kind">按类型</option></select><button className={control} onClick={()=>setShowDone(v=>!v)}>{showDone?'只看未完成':'显示已完成'}</button><button className={control} disabled={busy||snapshot.running} onClick={()=>void refresh()}>{snapshot.running?'正在整理…':'重新整理'}</button><span className="text-xs text-muted-foreground">今日花费约 ${snapshot.spent.toFixed(3)}</span><label className="text-xs">日预算 $<input aria-label="智能整理日预算" className="ml-1 min-h-10 w-20 rounded-lg border px-2" type="number" min="0.01" step="0.1" defaultValue={snapshot.budget} onBlur={e=>void correct({action:'settings',budget:Number(e.target.value)})}/></label></div>
   {(error||snapshot.error)&&<p role="status" className="rounded-lg bg-muted p-3 text-sm text-muted-foreground">{error||snapshot.error} · 保留上次结果</p>}
   {!!snapshot.focus.length&&<section aria-label="今天最该做的事" className="rounded-xl border bg-primary/5 p-3"><h2 className="mb-2 text-sm font-semibold">今天最该做的 {snapshot.focus.length} 件</h2>{snapshot.focus.map(f=><p key={f.id} className="py-1 text-sm">{all.find(r=>r.id===f.id)?.task.title} · {f.reason}</p>)}</section>}
   {[...sections].map(([name,items])=>{const parents=new Map<string,Row[]>();const solo:Row[]=[];for(const item of items){const id=item.analysis?.parent?.key;if(id)parents.set(id,[...(parents.get(id)||[]),item]);else solo.push(item);}return <section key={name} className="space-y-3 rounded-xl border bg-muted/10 p-3" onDragOver={e=>e.preventDefault()} onDrop={e=>{e.preventDefault();const group=snapshot.groups.find(g=>name.endsWith(' / '+g.name));if(group)void correct({action:'move',id:e.dataTransfer.getData('text/plain'),target:group.id});}}><header className="flex flex-wrap items-center gap-2"><h2 className="min-w-0 flex-1 break-words text-sm font-semibold">{name} · {items.length} 项</h2>{axis==='project'&&snapshot.groups.filter(g=>name===(g.project+' / '+g.name)).map(g=><input key={g.id+g.name} aria-label={'重命名分组 '+g.name} className={control+' w-40'} defaultValue={g.name} maxLength={12} disabled={snapshot.running||busy} onBlur={e=>{if(e.target.value!==g.name)void correct({action:'rename',id:g.id,value:e.target.value});}}/>)}</header><p className="text-xs text-muted-foreground">{snapshot.groups.find(g=>name.endsWith(' / '+g.name))?.summary}</p>

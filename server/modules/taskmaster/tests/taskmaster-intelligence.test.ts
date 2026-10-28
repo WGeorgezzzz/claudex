@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {mkdtemp,writeFile} from 'node:fs/promises';
 import os from 'node:os';
+import {execFileSync} from 'node:child_process';
 import path from 'node:path';
 import {closeConnection,initializeDatabase,userDb,userPreferencesDb} from '@/modules/database/index.js';
 import {withUserContext} from '@/modules/auth/index.js';
@@ -19,7 +20,7 @@ test('semantic grouping caches unchanged tasks, requires two members and keeps c
  try{await withUserContext(user,async()=>{
   await service.run(user,false);let state=(await service.snapshot()) as {groups:{id:string}[];entries:Record<string,{groupId:string}>};assert.equal(state.groups.length,1);assert.equal(state.entries['fixture:1'].groupId,state.entries['fixture:2'].groupId);
   let execution:unknown[]=[];t.mock.method(taskmasterInboxService,'execute',async(...args:unknown[])=>{execution=args;return {sessionId:'parent-execution'};});await service.executeWithContext({id:'fixture:1',parent:true});assert.match(String(execution[3]),/测试智能分类甲/);assert.match(String(execution[3]),/测试智能分类乙/);assert.match(String(execution[3]),/tasks.json/);
-  const firstCalls=calls;await service.run(user,false);assert.equal(calls,firstCalls,'content hashes skip unchanged tasks');
+  const firstCalls=calls;await service.run(user,false);assert.equal(calls,firstCalls,'content hashes skip unchanged tasks');const queued=service.asyncStart(false);assert.equal(queued.running,true);assert.equal('then' in queued,false,'HTTP trigger returns immediately');while((await service.snapshot()).running)await new Promise(resolve=>setTimeout(resolve,5));assert.equal(calls,firstCalls);
   await service.correct({action:'move',id:'fixture:1',target:'unclassified'});await service.run(user,true);state=(await service.snapshot()) as typeof state;assert.equal(state.entries['fixture:1'].groupId,'unclassified');
   await service.correct({action:'rename',id:state.groups[0].id,value:'锁定分组名'});await service.run(user,true);assert.equal(((await service.snapshot()) as {groups:{name:string}[]}).groups[0].name,'锁定分组名');
  });}finally{t.mock.restoreAll();closeConnection();if(previousHome===undefined)delete process.env.CLOUDCLI_HOME;else process.env.CLOUDCLI_HOME=previousHome;if(previous===undefined)delete process.env.DATABASE_PATH;else process.env.DATABASE_PATH=previous;}
@@ -60,4 +61,10 @@ test('contradictory failure evidence cannot automatically close a task',async t=
  const root=await mkdtemp(path.join(os.tmpdir(),'nexagent-contradiction-')),previous=process.env.DATABASE_PATH,previousHome=process.env.CLOUDCLI_HOME;process.env.CLOUDCLI_HOME=path.join(root,'.cloudcli');closeConnection();process.env.DATABASE_PATH=path.join(root,'test.db');await initializeDatabase();const user=Number(userDb.createUser('contradiction','hash').id),proof='相机恢复验收未通过，四路 CSI 0 帧，仍需修复';await writeFile(path.join(root,'STATUS.md'),proof);
  t.mock.method(taskmasterInboxService,'global',async()=>({projects:[{projectId:'fixture',name:'测试项目',root,tasks:[{id:1,title:'相机恢复验收',status:'pending'}],audits:[]}],infohub:{}}));let changes=0;t.mock.method(taskmasterWorkspace,'changeInboxTask',async()=>{changes++;return {task:{},auditId:'unexpected'};});const service=createTaskIntelligenceService(async input=>{const data=input as {evidence?:{excerpt:string}[]};return {tasks:[{id:'fixture:1',summary:'相机已恢复',project:'测试项目',kind:'todo',due:null,people:[],next_action:'核查相机',urgency:2,completion:{status:'done',confidence:.99,evidence:[{index:data.evidence?.findIndex(e=>e.excerpt.includes(proof))??0,excerpt:proof}]}}]};});
  try{await withUserContext(user,async()=>{await service.run(user,false);assert.equal(changes,0);assert.equal((await service.snapshot()).entries['fixture:1'].completion?.confidence,.85);});}finally{t.mock.restoreAll();closeConnection();if(previous===undefined)delete process.env.DATABASE_PATH;else process.env.DATABASE_PATH=previous;if(previousHome===undefined)delete process.env.CLOUDCLI_HOME;else process.env.CLOUDCLI_HOME=previousHome;}
+});
+
+
+test('completion retrieval reads matching commits from the related repository main branch',async()=>{
+ const root=await mkdtemp(path.join(os.tmpdir(),'ZXQGitUnique-')),previous=process.env.DATABASE_PATH;closeConnection();process.env.DATABASE_PATH=path.join(root,'test.db');await initializeDatabase();const user=Number(userDb.createUser('git-evidence','hash').id);execFileSync('git',['init','-b','main',root],{windowsHide:true});await writeFile(path.join(root,'proof.md'),'ZXQGitUnique completed');execFileSync('git',['-C',root,'add','proof.md'],{windowsHide:true});execFileSync('git',['-C',root,'-c','user.name=Fixture','-c','user.email=fixture@example.invalid','commit','-m','feat: ZXQGitUnique completed'],{windowsHide:true});
+ try{await withUserContext(user,async()=>{const evidence=await retrieveTaskEvidence([{id:'fixture',title:'ZXQGitUnique',project:'测试项目',root,sessionIds:[]}]);assert(evidence.some(item=>item.type==='git'&&item.path.endsWith('@main')&&item.excerpt.includes('ZXQGitUnique completed')));});}finally{closeConnection();if(previous===undefined)delete process.env.DATABASE_PATH;else process.env.DATABASE_PATH=previous;}
 });
