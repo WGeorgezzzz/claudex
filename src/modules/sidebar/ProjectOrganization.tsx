@@ -87,7 +87,7 @@ export function ProjectOrganization({props,editorOnly=false}:{props:SidebarProje
   const editedSession=editor?.kind==='session'?snapshot.sessions.find(s=>s.id===editor.id):undefined;
   return <section aria-label={editorOnly?undefined:'项目与对话'} className={editorOnly?'contents':'min-w-0 pb-3'}>
     {!editorOnly&&<>
-    <div className="mx-3 mb-2 flex min-h-9 min-w-0 flex-wrap items-center justify-between gap-2"><span className="shrink-0 text-xs font-medium text-muted-foreground">项目与对话</span><select aria-label="侧栏显示模式" value={snapshot.mode} disabled={busy} onChange={event=>void change({action:'mode',mode:event.target.value})} className="min-w-0 max-w-full rounded border border-border bg-background px-1 py-1 text-xs"><option value="project">按项目分组</option><option value="flat">按对话平铺</option></select></div>
+    <div className="mx-3 mb-2 flex min-h-10 min-w-0 flex-wrap items-center justify-between gap-2 pr-2"><span className="shrink-0 text-xs font-medium text-muted-foreground">项目与对话</span><select aria-label="侧栏显示模式" value={snapshot.mode} disabled={busy} onChange={event=>void change({action:'mode',mode:event.target.value})} className="min-h-10 min-w-32 max-w-full rounded-lg border border-border bg-background pl-3 pr-7 text-xs"><option value="project">按项目分组</option><option value="flat">按对话平铺</option></select></div>
     {error&&<p role="alert" className="mx-3 py-1 text-xs text-destructive">{error}</p>}
     {snapshot.mode==='flat'?renderRows([...snapshot.sessions].sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt)),false):<>
       {snapshot.projects.filter(project=>needle!==null||props.filteredProjects.some(p=>p.projectId===project.id)).map((project,index)=><section key={project.id} aria-label={project.name} className="mb-2">

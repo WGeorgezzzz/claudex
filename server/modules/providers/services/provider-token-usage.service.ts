@@ -199,10 +199,11 @@ function findCodexTokenUsage(fileContent: string): TokenUsageResult | null {
       let inputTokens = 0;
       let outputTokens = 0;
       let totalTokens = 0;
-      if (tokenInfo.total_token_usage) {
-        inputTokens = readUsageNumber(tokenInfo.total_token_usage.input_tokens);
-        outputTokens = readUsageNumber(tokenInfo.total_token_usage.output_tokens);
-        totalTokens = readUsageNumber(tokenInfo.total_token_usage.total_tokens)
+      const currentUsage = tokenInfo.last_token_usage ?? tokenInfo.total_token_usage;
+      if (currentUsage) {
+        inputTokens = readUsageNumber(currentUsage.input_tokens);
+        outputTokens = readUsageNumber(currentUsage.output_tokens);
+        totalTokens = readUsageNumber(currentUsage.total_tokens)
           || inputTokens + outputTokens;
       }
       return {
@@ -263,6 +264,9 @@ export function summarizeClaudeTokenUsage(
     // number and bounce back on the next main-thread turn.
     if (entry?.isSidechain === true) {
       continue;
+    }
+    if(entry?.type==='system' && entry.subtype==='compact_boundary' && Number.isFinite(entry.compactMetadata?.postTokens)){
+      inputTokens=Math.max(0,Number(entry.compactMetadata.postTokens));break;
     }
 
     const usage = entry?.type === 'assistant' ? entry.message?.usage : null;
@@ -517,12 +521,9 @@ export function createProviderTokenUsageService(
         }
 
         const encodedProjectPath = session.project_path.replace(/[^a-zA-Z0-9-]/g, '-');
-        const projectDirectory = path.join(
-          dependencies.getHomeDirectory(),
-          '.claude',
-          'projects',
-          encodedProjectPath,
-        );
+        const configured=getCurrentUserContext()?.claudeConfigDir || process.env.CLAUDE_CONFIG_DIR;
+        const roots=[configured,path.join(dependencies.getHomeDirectory(),'.claude')].filter((p):p is string=>Boolean(p));
+        const projectDirectory = roots.map(root=>path.join(root,'projects',encodedProjectPath)).find(dir=>dependencies.fileExists(path.join(dir,`${providerSessionId}.jsonl`))) || path.join(roots[0],'projects',encodedProjectPath);
         sessionFilePath = path.join(projectDirectory, `${providerSessionId}.jsonl`);
 
         const relativePath = path.relative(path.resolve(projectDirectory), path.resolve(sessionFilePath));

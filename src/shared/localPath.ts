@@ -17,5 +17,13 @@ export async function openLocalFile(path: string, reveal = false) {
   const api = bridge.cloudcliDesktopNotifications ?? bridge.cloudcliDesktop;
   const action = reveal ? api?.revealLocalPath : api?.openLocalPath;
   if (!action) throw new Error('需在 Nexagent 桌面端使用；仍可复制路径');
-  await action(nativePath(path));
+  const capabilities = api as typeof api & {getCapabilities?: () => Promise<{localPaths:boolean}>};
+  const upgrade = async () => {
+    await copyLocalPath(path, reveal).catch(() => {});
+    window.dispatchEvent(new Event('nexagent-desktop-update'));
+    throw new Error('桌面端需重启以启用此功能；已尝试复制路径，可先粘贴到文件管理器。');
+  };
+  if (capabilities.getCapabilities && !(await capabilities.getCapabilities()).localPaths) return upgrade();
+  try { await action(reveal ? nativePath(path) : path); }
+  catch (error) { if (/No handler registered|remote method/i.test(String(error))) return upgrade(); throw error; }
 }

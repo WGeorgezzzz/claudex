@@ -228,6 +228,7 @@ export const normalizeProjectForSettings = (project: Project): SettingsProject =
 
 /** Display names for the providers a session row can belong to. */
 export const PROVIDER_LABELS: Record<LLMProvider, string> = {
+  gemini: 'Gemini',
   claude: 'Claude',
   codex: 'Codex',
   cursor: 'Cursor',

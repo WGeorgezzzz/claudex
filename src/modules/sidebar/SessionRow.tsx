@@ -27,7 +27,7 @@ export function SessionRow({sessionId,title,provider,selected,processing,backgro
         onKeyDown={event=>{if(selecting&&(event.key===' '||event.key==='Enter')){event.preventDefault();if(!disabled)onSelect();}}}>
         {selectionIcon}
         <span data-provider-slot className="flex h-4 w-4 shrink-0 items-center justify-center">
-          {provider!=='claude'&&<LLMProviderLogo provider={provider} className="h-3 w-3"/>}
+          <LLMProviderLogo provider={provider} className="h-3 w-3"/>
         </span>
         <span className="min-w-0 flex-1"><span data-session-title className="block truncate leading-5" title={title}>{title}</span>
           {subtitle&&<span className="block truncate text-[10px] leading-4 text-muted-foreground">{subtitle}</span>}

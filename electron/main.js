@@ -2,6 +2,8 @@ import { app, BrowserWindow, clipboard, dialog, ipcMain, session, shell } from '
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readFileSync, readdirSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 
 import { CloudController } from './cloud.js';
 import { DesktopWindowManager } from './desktopWindow.js';
@@ -12,6 +14,12 @@ import { loadWorkbenchProfile } from './workbenchProfile.js';
 import { openLocalPath, revealLocalPath } from './localPath.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const shellHash = () => {
+  const hash=createHash('sha256');
+  for(const file of readdirSync(__dirname,{recursive:true}).filter(name=>/\.(?:js|cjs)$/.test(String(name))).sort())hash.update(String(file)).update(readFileSync(path.join(__dirname,String(file))));
+  return hash.digest('hex');
+};
+const loadedShellHash = shellHash();
 
 const workbenchProfile = loadWorkbenchProfile(app.getAppPath());
 const APP_NAME = workbenchProfile?.productName || 'Nexagent';
@@ -759,6 +767,12 @@ function registerIpcHandlers() {
 
   ipcMain.handle('cloudcli-desktop:copy-local-web-url', async () => copyLocalWebUrl());
   ipcMain.handle('cloudcli-desktop:get-state', () => getDesktopState());
+  ipcMain.handle('cloudcli-desktop:capabilities', () => ({ version: 2, localPaths: true, restart: true, updated: loadedShellHash !== shellHash() }));
+  ipcMain.handle('cloudcli-desktop:restart', (event) => {
+    const origin = new URL(event.senderFrame?.url || 'about:blank');
+    if (origin.protocol !== 'file:' && !(origin.protocol === 'http:' && ['127.0.0.1', 'localhost'].includes(origin.hostname))) throw new Error('需在本地桌面窗口使用');
+    app.relaunch(); app.quit();
+  });
   ipcMain.handle('cloudcli-desktop:open-cloud-dashboard', async () => openCloudDashboard());
   ipcMain.handle('cloudcli-desktop:run-active-environment-action', async (_event, action) => runActiveEnvironmentAction(action));
   ipcMain.handle('cloudcli-desktop:open-environment', async (_event, environmentId) => {

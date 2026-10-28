@@ -14,6 +14,15 @@
 .workspace-sidebar {
   background: var(--workspace-sidebar);
 }
+.workspace-sidebar * { scrollbar-width: thin; scrollbar-color: transparent transparent; }
+.workspace-sidebar:hover * { scrollbar-color: hsl(var(--muted-foreground) / .35) transparent; }
+.workspace-sidebar *::-webkit-scrollbar { width: 6px; height: 6px; }
+.workspace-sidebar *::-webkit-scrollbar-thumb { background: hsl(var(--muted-foreground) / .3); border-radius: 8px; }
+.workspace-sidebar *::-webkit-scrollbar-button, .scrollbar-thin::-webkit-scrollbar-button { display: none; }
+@media (max-width: 640px) {
+  .sidebar-nav-action, .workspace-sidebar button, .workspace-sidebar a, .workspace-sidebar summary { min-height: 40px; }
+  .workspace-sidebar button[aria-haspopup="menu"] { min-width: 40px; }
+}
 .sidebar-nav-action {
   display: flex;
   width: 100%;

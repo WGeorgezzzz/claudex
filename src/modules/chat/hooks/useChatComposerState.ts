@@ -992,7 +992,7 @@ export function useChatComposerState({
       // Claude submits new turns into its existing process, preserving its
       // background tasks. Other providers retain the queue/replace choice.
       const backgroundActivity = processingSessionsRef.current?.get(targetSessionId);
-      if (backgroundActivity?.background && provider !== 'claude') {
+      if (backgroundActivity?.background && !['claude','codex'].includes(provider)) {
         const work = ownBackgroundTasks(backgroundActivity.tasks ?? [])
           .map((task) => describeBackgroundTask(task, t));
         const choice = await askBeforeSendingOverBackgroundWork(work);

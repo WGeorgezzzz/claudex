@@ -12,6 +12,8 @@ function userId(req: Request): number {
 
 /** Used by the server entrypoint behind its existing authentication middleware. */
 export const monitorsRoutes=express.Router();
+monitorsRoutes.get('/context-settings', asyncHandler(async(req,res) => { res.json(createApiSuccessResponse(monitorsService.contextSettings(userId(req)))); }));
+monitorsRoutes.put('/context-settings', asyncHandler(async(req,res) => { res.json(createApiSuccessResponse(monitorsService.saveContextSettings(userId(req), req.body?.threshold))); }));
 monitorsRoutes.get('/capabilities',asyncHandler(async(req,res)=>{
   userId(req);res.json(createApiSuccessResponse({calendar:true,scheduleVersion:1}));
 }));

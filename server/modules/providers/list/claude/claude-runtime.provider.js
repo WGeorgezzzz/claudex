@@ -1282,6 +1282,9 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
         // session_id already captured
       }
 
+      if(message.type==='result' && (message.is_error===true || /^error_/.test(message.subtype || ''))){
+        throw new Error('Claude Code returned an error result: '+(Array.isArray(message.errors)?message.errors.join('; '):message.result || message.subtype || 'Unknown provider error'));
+      }
       // Transform and normalize message via adapter
       const transformedMessage = transformMessage(message);
       const sid = capturedSessionId || sessionId || null;

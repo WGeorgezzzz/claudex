@@ -9,6 +9,7 @@ type AgentSelectorSectionProps = {
 };
 
 const AGENT_NAMES: Record<AgentProvider, string> = {
+  gemini: 'Gemini',
   claude: 'Claude',
   cursor: 'Cursor',
   codex: 'Codex',

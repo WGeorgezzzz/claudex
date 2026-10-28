@@ -116,6 +116,7 @@ export const FILE_STATUS_GROUPS: GitStatusGroupEntry[] = [
 
 /** Display name for each provider that can host MCP servers, used in headings and buttons. */
 export const MCP_PROVIDER_NAMES: Record<McpProvider, string> = {
+  gemini: 'Gemini',
   claude: 'Claude',
   cursor: 'Cursor',
   codex: 'Codex',
@@ -126,6 +127,7 @@ export const MCP_PROVIDER_NAMES: Record<McpProvider, string> = {
 
 /** Scopes each provider can install an MCP server into; drives the scope selector and validation. */
 export const MCP_SUPPORTED_SCOPES: Record<McpProvider, McpScope[]> = {
+  gemini: [],
   claude: ['user', 'project', 'local'],
   cursor: ['user', 'project'],
   codex: ['user', 'project'],
@@ -136,6 +138,7 @@ export const MCP_SUPPORTED_SCOPES: Record<McpProvider, McpScope[]> = {
 
 /** Transports each provider can talk to an MCP server over; drives the transport selector and validation. */
 export const MCP_SUPPORTED_TRANSPORTS: Record<McpProvider, McpTransport[]> = {
+  gemini: [],
   claude: ['stdio', 'http', 'sse'],
   cursor: ['stdio', 'http'],
   codex: ['stdio', 'http'],
@@ -149,6 +152,7 @@ export const MCP_GLOBAL_SUPPORTED_TRANSPORTS: McpTransport[] = ['stdio', 'http']
 
 /** Whether a provider honours an MCP server's working-directory setting; the form hides the field when it does not. */
 export const MCP_SUPPORTS_WORKING_DIRECTORY: Record<McpProvider, boolean> = {
+  gemini: false,
   claude: false,
   cursor: false,
   codex: true,
@@ -221,6 +225,7 @@ export const CODE_EDITOR_DEFAULTS = {
  * key and OpenCode sessions would silently inherit Claude's `skipPermissions`.
  */
 export const PROVIDER_PERMISSION_PREFERENCE_KEYS: Record<LLMProvider, UserPreferenceKey> = {
+  gemini: 'geminiPermissions',
   claude: 'claudePermissions',
   cursor: 'cursorPermissions',
   codex: 'codexPermissions',

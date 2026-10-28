@@ -138,7 +138,8 @@ test('restart recovery never resumes a monitor manually paused or stopped while 
 test('invalid intervals, archived/non-Claude sessions and foreign ownership are rejected',()=>fixture(user=>{
   for(const intervalMinutes of [0,-1,1.5,10081,'30'])assert.throws(()=>monitorsService.create(user,{sessionId:'monitor-session',name:'test',content:'status',intervalMinutes}));
   const row=create(user);assert.throws(()=>monitorsService.action(user+1,row.id,'stop'));assert.throws(()=>monitorsService.history(user+1,row.id));
-  sessionsDb.createAppSession('other','codex',tmpdir(),'Other');assert.throws(()=>monitorsService.create(user,{sessionId:'other',name:'test',content:'status',intervalMinutes:1}));
+  sessionsDb.createAppSession('other','cursor',tmpdir(),'Other');assert.throws(()=>monitorsService.create(user,{sessionId:'other',name:'test',content:'status',intervalMinutes:1}));
+  sessionsDb.createAppSession('codex-monitor','codex',tmpdir(),'Codex');assert.equal(monitorsService.create(user,{sessionId:'codex-monitor',name:'test',content:'status',intervalMinutes:1}).session_id,'codex-monitor');
 }));
 
 test('calendar monitor survives restart and completion moves to the next future slot without catch-up',()=>fixture(async user=>{

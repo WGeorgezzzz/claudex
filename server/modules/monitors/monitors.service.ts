@@ -1,10 +1,16 @@
 import { assertOwnedSession } from '@/modules/access-control/index.js';
-import { monitorsDb } from '@/modules/database/index.js';
+import { monitorsDb, userPreferencesDb } from '@/modules/database/index.js';
 import { AppError } from '@/shared/utils.js';
 import { parseMonitorCalendarSchedule } from '@/shared/index.js';
 
 /** Used by monitor HTTP routes for validation and lifecycle changes. */
 export const monitorsService = {
+  contextSettings(userId: number) { return { threshold: Number(userPreferencesDb.getPreferences(userId).monitorContextThreshold ?? 300000) }; },
+  saveContextSettings(userId: number, value: unknown) {
+    if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 1000 || value > 2000000) throw new AppError('上下文阈值应为 1000–2000000 token 的整数。', { statusCode: 400 });
+    userPreferencesDb.savePreferences(userId, { monitorContextThreshold: value });
+    return this.contextSettings(userId);
+  },
   summaries(userId:number) {
     const sessions:Record<string,ReturnType<typeof monitorsDb.summaries>>=Object.create(null);
     for(const row of monitorsDb.summaries(userId))(sessions[row.session_id]??=[]).push(row);
@@ -21,8 +27,8 @@ export const monitorsService = {
       throw new AppError('请填写名称、检查内容和 1–10080 分钟的整数间隔。',{code:'INVALID_MONITOR',statusCode:400});
     }
     const session=assertOwnedSession(userId, sessionId);
-    if (!session || session.provider!=='claude' || session.isArchived) {
-      throw new AppError('请选择一个未归档的 Claude 会话。',{code:'INVALID_MONITOR_SESSION',statusCode:400});
+    if (!session || !['claude', 'codex'].includes(session.provider) || session.isArchived) {
+      throw new AppError('请选择一个未归档的 Claude 或 Codex 会话。',{code:'INVALID_MONITOR_SESSION',statusCode:400});
     }
     const options=input.options && typeof input.options==='object' && !Array.isArray(input.options)
       ? input.options as Record<string,unknown> : {};

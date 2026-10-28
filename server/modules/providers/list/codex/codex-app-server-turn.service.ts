@@ -1,12 +1,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { getCloudCliHomeDir } from '@/shared/index.js';
+import { killProcessTree } from '@/shared/process-tree.js';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { createRequire } from 'node:module';
 import readline from 'node:readline';
 
 import type { AnyRecord } from '@/shared/index.js';
-import type { ProviderLiveInputResult } from '@/shared/types.js';
+import type { ProviderLiveInputResult, BackgroundTaskSummary } from '@/shared/types.js';
 
 /**
  * Runs one Codex turn through `codex app-server` instead of `codex exec`.
@@ -23,6 +24,10 @@ type LiveChannel = {
   submit: (id: string, content: string, settled: (result: ProviderLiveInputResult) => void) => void;
 };
 const channels = new Map<string, LiveChannel>();
+type RetainedServer = {run:(options:CodexAppServerTurnOptions)=>AsyncGenerator<AnyRecord>;abort:()=>boolean;tasks:()=>BackgroundTaskSummary[]};
+const retainedServers = new Map<string, RetainedServer>();
+export function listCodexBackgroundWork(){return [...retainedServers].map(([sessionId,server])=>({sessionId,tasks:server.tasks()})).filter(row=>row.tasks.length);}
+export function abortRetainedCodex(sessionId:string){return retainedServers.get(sessionId)?.abort() || false;}
 
 /** CodexProvider exposes this as `submitLiveInput`; it never starts a turn. */
 export function submitCodexLiveInput(
@@ -51,6 +56,9 @@ export type CodexAppServerTurnOptions = {
   onRequestResolved?: (id: string | number) => void;
   /** A plain prompt, or `codex exec`-style input items (text / local_image). */
   input: string | AnyRecord[];
+  /** Executes the native compact RPC without submitting a text prompt. */
+  compactOnly?: boolean;
+  onBackgroundComplete?: (taskId:string,output:string)=>void;
   signal: AbortSignal;
   /** Keys under which the live channel is reachable (app session id, thread id). */
   sessionKeys: () => Array<string | null | undefined>;
@@ -113,6 +121,9 @@ export function mapCodexAppServerItem(item: AnyRecord | null | undefined): AnyRe
  * `turn/steer` while the turn is in progress.
  */
 export async function* runCodexAppServerTurn(options: CodexAppServerTurnOptions): AsyncGenerator<AnyRecord> {
+  const appSessionId=options.sessionKeys().find(Boolean) || '';
+  const retained=retainedServers.get(appSessionId);
+  if(retained){yield* retained.run(options);return;}
   const child = options.spawnServer?.() ?? spawn(process.execPath, [resolveLauncher(), 'app-server'], {
     windowsHide: true,
     env: options.env,
@@ -151,6 +162,9 @@ export async function* runCodexAppServerTurn(options: CodexAppServerTurnOptions)
   let turnOpen = false;
   let usage: AnyRecord | null = null;
   const steered = new Map<string, (result: ProviderLiveInputResult) => void>();
+  const backgroundCommands=new Map<string,AnyRecord>();
+  let idleTimer:NodeJS.Timeout|undefined;
+  let closed=false;
   const settleSteered = (result: ProviderLiveInputResult) => {
     for (const settled of steered.values()) settled(result);
     steered.clear();
@@ -207,6 +221,9 @@ export async function* runCodexAppServerTurn(options: CodexAppServerTurnOptions)
     const params = message.params ?? {};
     if (params.threadId && threadId && params.threadId !== threadId) return; // subagent threads
     switch (message.method) {
+      case 'thread/compacted':
+        if (options.compactOnly) { push({ type: 'turn.completed', usage: {} }); end(); }
+        break;
       case 'serverRequest/resolved':
         options.onRequestResolved?.(params.requestId);
         break;
@@ -218,8 +235,13 @@ export async function* runCodexAppServerTurn(options: CodexAppServerTurnOptions)
         break;
       case 'item/started':
       case 'item/completed': {
-        if (params.turnId && turnId && params.turnId !== turnId) break;
         const item = mapCodexAppServerItem(params.item);
+        if(params.item?.type==='commandExecution'){
+          const native=params.item;
+          if(message.method==='item/started' || (native.exitCode==null && native.status==='inProgress'))backgroundCommands.set(native.id,native);
+          else if(backgroundCommands.delete(native.id) && retainedServers.has(appSessionId)){options.onBackgroundComplete?.(native.id,String(native.aggregatedOutput||'后台任务已结束'));if(!backgroundCommands.size&&!turnOpen)close();}
+        }
+        if (params.turnId && turnId && params.turnId !== turnId) break;
         if (item) push({ type: message.method === 'item/started' ? 'item.started' : 'item.completed', item });
         break;
       }
@@ -238,7 +260,7 @@ export async function* runCodexAppServerTurn(options: CodexAppServerTurnOptions)
       case 'turn/completed': {
         if (params.turn?.id && turnId && params.turn.id !== turnId) break;
         turnOpen = false;
-        unregister();
+        if(!backgroundCommands.size)unregister();
         const turn = params.turn ?? {};
         const total = usage?.total ?? {};
         if (turn.status === 'failed') {
@@ -271,16 +293,48 @@ export async function* runCodexAppServerTurn(options: CodexAppServerTurnOptions)
     const reason = `codex app-server exited (code ${code ?? 'null'}, signal ${signal ?? 'null'})${stderr ? `: ${stderr.trim().split('\n').slice(-1)[0]}` : ''}`;
     failAll(reason);
     if (!finished) end(options.signal.aborted ? undefined : new Error(reason));
+    close();
   });
   child.stdin?.on('error', () => {});
   child.stdout?.on('error', () => {});
 
   const onAbort = () => {
     if (threadId && turnId && turnOpen) void call('turn/interrupt', { threadId, turnId }).catch(() => {});
-    setTimeout(() => child.kill(), 1500).unref?.();
+    setTimeout(close, 1500).unref?.();
     end();
   };
   options.signal.addEventListener('abort', onAbort, { once: true });
+
+  const close=()=>{
+    if(closed)return;closed=true;clearTimeout(idleTimer);retainedServers.delete(appSessionId);unregister();reader.close();failAll('Codex process closed.');
+    const removeRecord=()=>{if(registryFile)try{fs.unlinkSync(registryFile);}catch{/* already removed */}};
+    if(options.spawnServer || !child.pid){child.kill();removeRecord();}
+    else void killProcessTree(child.pid).catch(error=>console.warn('[Codex] Owned process cleanup failed',String(error))).finally(removeRecord);
+  };
+  const retainOrClose=()=>{
+    options.signal.removeEventListener('abort',onAbort);
+    if(!options.spawnServer && !options.signal.aborted && backgroundCommands.size && !closed){
+      retainedServers.set(appSessionId,server);
+      clearTimeout(idleTimer);idleTimer=setTimeout(close,30*60*1000);idleTimer.unref();
+    }else close();
+  };
+  const startTurn=()=>options.compactOnly?call('thread/compact/start',{threadId}):call('turn/start',{
+    threadId,input:toUserInput(options.input),...(options.effort?{effort:options.effort}:{}),
+    ...(options.model?{model:options.model,collaborationMode:{mode:options.planMode?'plan':'default',settings:{model:options.model,reasoning_effort:options.effort??null,developer_instructions:null}}}:{}),
+  });
+  const consume=async function*(){
+    while(true){if(queue.length){yield queue.shift()!;continue;}if(finished)break;await new Promise<void>(resolve=>{wake=resolve;});wake=null;}
+    if(failure)throw failure;
+  };
+  const server:RetainedServer={tasks:()=>[...backgroundCommands].map(([taskId,item])=>({taskId,toolUseId:taskId,taskType:'shell',startedAt:processStartedAt,description:String(item.command||'Codex后台任务')})),abort:()=>{close();return true;},
+    async *run(next){
+      if(turnOpen || !finished)throw new Error('Codex conversation already has an active turn.');
+      if(options.sandbox!==next.sandbox || options.approvalPolicy!==next.approvalPolicy)throw new Error('后台任务运行时请保留当前权限模式，完成后再更改。');
+      clearTimeout(idleTimer);options=next;finished=false;failure=null;queue.length=0;turnId=null;usage=null;
+      options.signal.addEventListener('abort',onAbort,{once:true});
+      try{const result=await startTurn();turnId=turnId??result.turn?.id??null;turnOpen=!finished;register();yield* consume();}
+      finally{turnOpen=false;retainOrClose();}
+    }};
 
   try {
     await call('initialize', { clientInfo: { name: 'claudex', title: 'Nexagent', version: '1' }, capabilities: { experimentalApi: true } });
@@ -297,31 +351,16 @@ export async function* runCodexAppServerTurn(options: CodexAppServerTurnOptions)
     register();
     yield { type: 'thread.started', thread_id: threadId };
     if (options.signal.aborted) return;
-    const started = await call('turn/start', {
-      threadId, input: toUserInput(options.input),
-      ...(options.effort ? { effort: options.effort } : {}),
-      ...(options.model ? { collaborationMode: { mode: options.planMode ? 'plan' : 'default',
-        settings: { model: options.model, reasoning_effort: options.effort ?? null, developer_instructions: null } } } : {}),
-    });
+    const started = await startTurn();
     turnId = turnId ?? started.turn?.id ?? null;
     turnOpen = !finished;
     if (turnOpen) register();
 
-    while (true) {
-      if (queue.length) { yield queue.shift()!; continue; }
-      if (finished) break;
-      await new Promise<void>((resolve) => { wake = resolve; });
-      wake = null;
-    }
-    if (failure) throw failure;
+    yield* consume();
   } finally {
     options.signal.removeEventListener('abort', onAbort);
     turnOpen = false;
-    unregister();
     settleSteered({ status: 'interrupted', error: 'Codex closed before this addition was confirmed. Review it before retrying.' });
-    reader.close();
-    failAll('Codex turn closed.');
-    child.kill();
-    if(registryFile)try{fs.unlinkSync(registryFile);}catch{/* already removed */}
+    retainOrClose();
   }
 }

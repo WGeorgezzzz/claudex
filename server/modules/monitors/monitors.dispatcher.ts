@@ -4,6 +4,7 @@ import { monitorsDb } from '@/modules/database/index.js';
 import { sessionsService } from '@/modules/providers/index.js';
 import { chatRunRegistry, runDetachedChatTurn } from '@/modules/websocket/index.js';
 import type { ProviderRuntimeGateway } from '@/modules/websocket/index.js';
+import { maintainMonitorContext } from './monitor-context.service.js';
 
 let timer: ReturnType<typeof setInterval>|null=null;
 
@@ -26,6 +27,7 @@ export async function dispatchMonitors(runtime: ProviderRuntimeGateway,now=new D
       try {
         const session=assertOwnedSession(row.user_id,row.session_id);
         if(!session || session.isArchived) {monitorsDb.pauseUnavailable(row.id);throw new Error('会话已删除或归档，监测已暂停。');}
+        const sessionId = await maintainMonitorContext(row, runId, row.session_id);
         let providerError: string|null=null;
         let completed=false;
         // SDK adapters can report failure as an event without throwing. Keep the
@@ -48,10 +50,13 @@ export async function dispatchMonitors(runtime: ProviderRuntimeGateway,now=new D
             writer.send(data);
           },
         });
-        const result=await runDetachedChatTurn({sessionId:row.session_id,userId:row.user_id,
+        const result=await runDetachedChatTurn({sessionId,userId:row.user_id,
           content:row.consecutive_failures>0?`上次监测失败或中断，结果未确认。请先核对实际状态，避免重复执行已有副作用的操作，再继续本轮检查。此前错误：${row.last_error??'未知'}\n\n${row.content}`:row.content,
           options:{...JSON.parse(row.options),cloudcliMonitorId:row.id},interruptActiveRun:false},{runtime:observedRuntime});
-        monitorsDb.finish(row.id,runId,providerError || result.error || (!result.started ? '本轮未能启动。' : !completed ? '模型未返回完成确认。' : null));
+        const failure = providerError || result.error || (!result.started ? '本轮未能启动。' : !completed ? '模型未返回完成确认。' : null);
+        const current = monitorsDb.get(row.user_id, row.id);
+        if (!failure && current?.status === 'active') await maintainMonitorContext(current, runId, sessionId);
+        monitorsDb.finish(row.id,runId,failure);
       } catch(error) {
         monitorsDb.finish(row.id,runId,(error instanceof Error?error.message:String(error)).slice(0,1000));
       }

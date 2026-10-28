@@ -5,3 +5,4 @@ export { createSessionBridgeQuery } from '@/modules/session-bridge/session-bridg
 export { executeSessionBridgeTool } from './session-bridge.tools.js';
 
 export { createCodexSessionTool } from './session-bridge.tools.js';
+export { sessionBridgeService } from './session-bridge.service.js';

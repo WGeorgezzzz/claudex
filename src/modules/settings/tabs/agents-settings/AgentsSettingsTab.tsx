@@ -44,11 +44,12 @@ export default function AgentsSettingsTab({
   ), [selectedAgent]);
 
   const visibleAgents = useMemo<AgentProvider[]>(() => {
-    return isMember ? ['claude', 'codex'] : ['claude', 'cursor', 'codex', 'opencode', 'workbuddy', 'deepseek-harness'];
+    return isMember ? ['claude', 'codex'] : ['claude', 'cursor', 'codex', 'opencode', 'workbuddy', 'deepseek-harness', 'gemini'];
   }, [isMember]);
 
   const harnessAuthStatus = providerAuthStatus['deepseek-harness'];
   const agentContextById = useMemo<AgentContextByProvider>(() => ({
+    gemini: {authStatus:providerAuthStatus.gemini,onLogin:()=>onProviderLogin('gemini')},
     claude: {
       authStatus: providerAuthStatus.claude,
       onLogin: () => onProviderLogin('claude'),
@@ -74,6 +75,7 @@ export default function AgentsSettingsTab({
     providerAuthStatus.cursor,
     providerAuthStatus.opencode,
     providerAuthStatus.workbuddy,
+    providerAuthStatus.gemini,
     harnessAuthStatus,
   ]);
 

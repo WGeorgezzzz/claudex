@@ -17,6 +17,7 @@ import MessageModelLabel from '@/modules/chat/transcript/MessageModelLabel';
 import MessageSpeakControl from '@/modules/chat/transcript/MessageSpeakControl';
 import { useIsExportingTranscript } from '@/modules/chat/context/TranscriptRenderContext';
 import { MemoryCitations } from '@/modules/chat/transcript/MemoryCitations';
+import { authenticatedFetch } from '@/shared/api';
 
 type MessageComponentProps = {
   message: ChatMessage;
@@ -435,6 +436,7 @@ const MessageComponent = memo(({ message, prevMessage, createDiff, onFileOpen, s
                     copy and speak it is not gated on the copy control, and an
                     exported transcript keeps it wherever the footer renders. */}
                 <MessageModelLabel model={message.model} />
+                {provider==='gemini'&&<button className="min-h-10 px-2 text-primary" onClick={()=>void authenticatedFetch('/api/providers/gemini/open',{method:'POST'})}>在 Gemini 桌面版中打开</button>}
                 {formattedTime && <span title={fullTimestamp}>{formattedTime}</span>}
                 {message.turnDurationMs !== undefined && message.turnDurationMs >= 0 && (
                   <span>{`用时 ${Math.floor(message.turnDurationMs / 60000)} 分 ${Math.floor((message.turnDurationMs % 60000) / 1000)} 秒`}</span>

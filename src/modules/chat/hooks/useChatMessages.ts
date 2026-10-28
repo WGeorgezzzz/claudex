@@ -601,5 +601,19 @@ export function normalizedToChatMessages(messages: NormalizedMessage[]): ChatMes
     });
   }
 
+  let started:number|null=null,finalIndex=-1;
+  const finish=()=>{
+    if(started===null || finalIndex<0)return;
+    const final=converted[finalIndex],ended=Date.parse(String(final.timestamp||''));
+    if(final.isStreaming || !Number.isFinite(ended) || ended<started)return;
+    const duration=ended-started;
+    if(final.turnDurationMs!==duration)converted[finalIndex]={...final,turnDurationMs:duration};
+  };
+  for(let i=0;i<converted.length;i++){
+    const message=converted[i];
+    if(message.type==='user'){finish();const time=Date.parse(String(message.timestamp||''));started=Number.isFinite(time)?time:null;finalIndex=-1;}
+    else if(message.type==='assistant'&&!message.isToolUse&&message.content?.trim())finalIndex=i;
+  }
+  finish();
   return converted;
 }

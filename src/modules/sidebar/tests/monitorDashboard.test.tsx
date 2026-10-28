@@ -1,13 +1,14 @@
 import assert from 'node:assert/strict';
 
 import { fireEvent, render, screen, waitFor, cleanup } from '@testing-library/react';
-import { afterEach, test, vi } from 'vitest';
+import { afterEach, beforeEach, test, vi } from 'vitest';
 
 import { api } from '@/shared/api';
 import { MonitorDashboard } from '@/modules/sidebar/MonitorDashboard';
 
 const task={id:'m1',session_id:'s1',name:'进度巡检',content:'查看日志',interval_minutes:30,status:'active',next_run_at:new Date().toISOString(),running_id:null,run_count:2,last_error:null,options:'{"permissionMode":"bypassPermissions"}'};
 const response=(data:unknown)=>({ok:true,json:async()=>({data})}) as Response;
+beforeEach(()=>{vi.spyOn(api.monitors,'contextSettings').mockResolvedValue(response({threshold:300000}));});
 afterEach(()=>{cleanup();vi.restoreAllMocks();});
 test('visible entry counts all enabled tasks and edits the selected one',async()=>{
   vi.spyOn(api.monitors,'list').mockResolvedValue(response([task]));

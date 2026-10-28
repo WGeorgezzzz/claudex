@@ -334,7 +334,7 @@ test('the model picker says which providers list only your models', () => {
         provider="claude"
         setProvider={() => {}}
         textareaRef={{ current: null }}
-        providerModels={{ claude: 'default', codex: 'gpt-5.6-sol', cursor: 'auto', opencode: '', workbuddy: 'fast-model', 'deepseek-harness': 'configured' }}
+        providerModels={{ claude: 'default', codex: 'gpt-5.6-sol', cursor: 'auto', opencode: '', workbuddy: 'fast-model', 'deepseek-harness': 'configured', gemini:'configured' }}
         setProviderModel={() => {}}
         providerModelCatalog={providerModelCatalog}
         providerModelActions={createActions(async () => {})}

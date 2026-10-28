@@ -72,7 +72,7 @@ export const sessionBridgeService = {
     if (!Number.isSafeInteger(offset) || offset < 0 || offset > 100000) throw new AppError('Invalid history offset.', { statusCode: 400 });
     const page = await withUserContext(userId, () => sessionsService.fetchHistory(session.session_id, { limit: 20, offset }));
     return { sessionId: session.session_id, providerSessionId: session.provider_session_id, archived: Boolean(session.isArchived), title: session.custom_name || 'New conversation', provider: session.provider,
-      projectPath: session.project_path, offset: page.offset, hasMore: page.hasMore, total: page.total,
+      projectPath: session.project_path, model:session.model, effort:session.effort, offset: page.offset, hasMore: page.hasMore, total: page.total,
       // Tool inputs/results and hidden reasoning are not copied into another model's context.
       messages: page.messages.filter(message => message.kind === 'text' && ['user', 'assistant'].includes(message.role ?? ''))
         .map(message => ({ role: message.role, content: String(message.content ?? '').slice(0, 4000), timestamp: message.timestamp })),
@@ -180,7 +180,7 @@ export const sessionBridgeService = {
   compact(userId: number, sourceSessionId: string, input: { sessionId?: string; requestId: string; instruction?: string }) {
     const source = requireSession(sourceSessionId, userId);
     const target = requireSession(input.sessionId || source.session_id, userId);
-    if (target.provider !== 'claude') throw new AppError('Compact is not supported by this provider runtime.', { statusCode: 400 });
+    if (!['claude', 'codex'].includes(target.provider)) throw new AppError('Compact is not supported by this provider runtime.', { statusCode: 400 });
     return enqueue(userId, source, target, '/compact' + (input.instruction?.trim() ? ' ' + input.instruction.trim() : ''), input.requestId, { bridgeCompact: true });
   },
   archive(userId: number, sessionId: string, archived: boolean) {

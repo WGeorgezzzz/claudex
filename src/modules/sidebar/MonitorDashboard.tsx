@@ -13,6 +13,10 @@ function permissionLabel(task:Task):string {
   try {const mode=JSON.parse(task.options??'{}').permissionMode??'default';return ({default:'Default · 按需审批',acceptEdits:'Accept edits · 自动允许编辑',plan:'Plan · 只规划',bypassPermissions:'Bypass · 全部允许'} as Record<string,string>)[mode]??'未知权限（请检查配置）';}
   catch{return '未知权限（请检查配置）';}
 }
+function contextRunDetail(error:string):string {
+  if(!error.startsWith('上下文维护：'))return error;
+  try{const detail=JSON.parse(error.slice('上下文维护：'.length));return `${detail.action==='compact'?'原生压缩':detail.action==='migrated'?'已交接新会话':'交接失败'} · ${detail.beforeTokens??'未知'} → ${detail.afterTokens??'待获取'} token · ${Math.round(Number(detail.durationMs||0)/1000)} 秒${detail.previousSessionId?' · 旧会话保留':''}${detail.reason?' · '+detail.reason:''}`;}catch{return error;}
+}
 
 /** SidebarHeader presents all persisted monitors and their controls outside any one chat. */
 export function MonitorDashboard(){
@@ -28,6 +32,9 @@ export function MonitorDashboard(){
   // Serialize user mutations and show any backend rejection in the manager.
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState('');
+  // Server-owned token threshold controls automatic context maintenance for this account.
+  const [contextThreshold,setContextThreshold]=useState(300000);
+  useEffect(()=>{if(open)void api.monitors.contextSettings().then(result).then(value=>setContextThreshold(value.threshold)).catch(e=>setError(e.message));},[open]);
   const load=async()=>setTasks(await result(await api.monitors.list()));
   useEffect(()=>{let live=true;const poll=()=>void api.monitors.list().then(result).then(data=>{if(live)setTasks(data);}).catch(e=>{if(live)setError(e.message);});poll();const timer=setInterval(poll,open?5000:15000);return()=>{live=false;clearInterval(timer);};},[open]);
   useEffect(()=>{if(!open)return;const key=(e:KeyboardEvent)=>{if(e.key==='Escape')setOpen(false);};window.addEventListener('keydown',key);return()=>window.removeEventListener('keydown',key);},[open]);
@@ -44,8 +51,9 @@ export function MonitorDashboard(){
       <section role="dialog" aria-modal="true" aria-label="自动监测管理" className="flex max-h-[90vh] w-full max-w-3xl flex-col rounded-xl border bg-background text-foreground shadow-xl">
         <header className="flex items-start justify-between border-b p-5"><div><h2 className="text-xl font-semibold">自动监测</h2><p className="mt-1 text-sm text-muted-foreground">{tasks.length} 个任务 · {active} 个已启用 · {running} 个运行中</p></div><button type="button" aria-label="关闭自动监测" onClick={()=>setOpen(false)}><X size={20}/></button></header>
         <div className="space-y-3 overflow-auto p-5">
-          <p className="text-sm text-muted-foreground">在聊天中让 Claude 创建，或从聊天输入框旁的「监测」添加。这里统一管理全部会话的任务。</p>
+          <p className="text-sm text-muted-foreground">在聊天中创建，或从 Claude / Codex 输入框旁的「监测」添加。这里统一管理全部会话的任务。</p>
           <div className="rounded-lg bg-muted p-3 text-sm">权限沿用每个任务创建时的设置，并显示在对应任务下方。电脑和本地服务需运行；关闭聊天页面不影响监测。</div>
+          <form className="flex flex-wrap items-center gap-2 rounded-lg border p-3 text-sm" onSubmit={e=>{e.preventDefault();void act(()=>api.monitors.saveContextSettings(contextThreshold).then(result));}}><label>自动压缩阈值（token）<input aria-label="自动压缩阈值" type="number" min={1000} max={2000000} value={contextThreshold} onChange={e=>setContextThreshold(Number(e.target.value))} className="ml-2 min-h-10 w-32 rounded border bg-background px-2"/></label><button type="submit" className={button} disabled={busy}>保存阈值</button><p className="text-xs text-muted-foreground">每轮前后检查；原生压缩失败时交接到同项目、模型和权限的新会话，旧会话保留。</p></form>
           {error&&<p role="alert" className="text-sm text-red-600">{error}</p>}
           {!tasks.length&&<p className="py-8 text-center text-muted-foreground">暂无自动监测。</p>}
           {[...tasks].sort((a,b)=>Number(a.status==='stopped')-Number(b.status==='stopped')).map(task=><article key={task.id} className="rounded-xl border p-4">
@@ -69,10 +77,10 @@ export function MonitorDashboard(){
               <button className={button} disabled={busy} onClick={()=>void act(async()=>setHistory({id:task.id,runs:await result(await api.monitors.runs(task.id))}))}>运行记录</button>
               <a href={`/session/${encodeURIComponent(task.session_id)}`} className={button}>打开会话</a>
             </div>
-            {history?.id===task.id&&<ul className="mt-3 space-y-1 text-xs">{history.runs.length?history.runs.map(run=><li key={run.id}>{new Date(run.started_at).toLocaleString('zh-CN')} · {statuses[run.status]??run.status}{run.error?`：${run.error}`:''}</li>):<li>尚无运行记录</li>}</ul>}
+            {history?.id===task.id&&<ul className="mt-3 space-y-1 text-xs">{history.runs.length?history.runs.map(run=><li key={run.id}>{new Date(run.started_at).toLocaleString('zh-CN')} · {statuses[run.status]??run.status}{run.error?`：${contextRunDetail(run.error)}`:''}</li>):<li>尚无运行记录</li>}</ul>}
           </article>)}
         </div>
-        <footer className="border-t px-5 py-3 text-xs text-muted-foreground">暂停或停止不强制终止当前一轮。日历按指定时区执行，间隔从每轮结束后计算；停机错过后最多补一次，失败暂停并保留记录。</footer>
+        <footer className="border-t px-5 py-3 text-xs text-muted-foreground">暂停或停止不强制终止当前一轮。日历按指定时区执行，间隔从每轮结束后计算；停机错过后最多补一次，失败后退避重试并保留记录。</footer>
       </section>
     </div>,document.body)}
   </>;

@@ -50,6 +50,7 @@ const MAX_SKILL_FOLDER_FILES = 500;
 const MAX_SKILL_FOLDER_BYTES = 30 * 1024 * 1024;
 
 const PROVIDER_NAMES: Record<SkillsProvider, string> = {
+  gemini: 'Gemini',
   claude: 'Claude',
   codex: 'Codex',
   cursor: 'Cursor',
@@ -59,6 +60,7 @@ const PROVIDER_NAMES: Record<SkillsProvider, string> = {
 };
 
 const PROVIDER_SKILL_PATHS: Record<Exclude<SkillsProvider, 'opencode'>, string> = {
+  gemini: '请在 Gemini 桌面版管理技能',
   'deepseek-harness': 'Manage skills in the local Harness configuration',
   workbuddy: 'Manage skills in the WorkBuddy desktop client',
   claude: '~/.claude/skills/<skill-name>/SKILL.md',

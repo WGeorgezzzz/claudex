@@ -270,6 +270,8 @@ app.use('/infohub', (req, res, next) => {
             ...(req.headers.cookie ? { cookie: req.headers.cookie.split(';').filter(value => !value.trim().startsWith('nexagent_infohub=')).join(';') } : {}),
             host: '127.0.0.1:8765',
             'x-forwarded-prefix': '/infohub',
+            'x-forwarded-host': req.headers.host || '127.0.0.1:3001',
+            'x-forwarded-proto': String(req.headers['x-forwarded-proto'] || (req.secure ? 'https' : 'http')),
             'accept-encoding': 'identity',
             ...(body ? { 'content-type': 'application/json', 'content-length': Buffer.byteLength(body).toString() } : {}),
         },
@@ -291,7 +293,10 @@ app.use('/infohub', (req, res, next) => {
     });
     proxy.setTimeout(15000, () => proxy.destroy(new Error('info-hub timeout')));
     proxy.on('error', error => {
-        if (!res.headersSent) res.status(503).json({ error: 'INFOHUB_UNAVAILABLE', message: '信息看板暂时不可用，请稍后重试。' });
+        if (!res.headersSent) {
+            if(req.accepts('html'))res.status(503).type('html').send('<!doctype html><html lang="zh-CN"><meta name="viewport" content="width=device-width,initial-scale=1"><title>信息看板暂不可用</title><body style="font:16px system-ui;margin:0;min-height:90vh;display:grid;place-content:center;padding:20px;color:#64748b"><h1 style="font-size:20px;color:#334155">信息看板暂时不可用</h1><p>请确认本机信息看板已启动，稍后重试。</p><button style="min-height:40px;padding:8px 20px" onclick="location.reload()">重新加载</button></body></html>');
+            else res.status(503).json({ error: 'INFOHUB_UNAVAILABLE', message: '信息看板暂时不可用，请稍后重试。' });
+        }
         else res.end();
         console.warn('[infohub proxy]', String(error));
     });

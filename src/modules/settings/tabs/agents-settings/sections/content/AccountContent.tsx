@@ -21,6 +21,7 @@ type AgentVisualConfig = {
 };
 
 const agentConfig: Record<AgentProvider, AgentVisualConfig> = {
+  gemini: {name:'Gemini',bgClass:'bg-blue-50 dark:bg-blue-950',borderClass:'border-blue-200 dark:border-blue-800',textClass:'text-blue-900 dark:text-blue-100',subtextClass:'text-blue-700 dark:text-blue-300',buttonClass:'bg-blue-600 hover:bg-blue-700'},
   claude: {
     name: 'Claude',
     bgClass: 'bg-blue-50 dark:bg-blue-900/20',

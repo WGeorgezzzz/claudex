@@ -26,6 +26,16 @@ test('preserves the inserted badge when projecting a user echo through the store
   assert.equal(normalizedToChatMessages([inserted])[0].insertedMidTurn,true);
 });
 
+test('final answer duration survives both live projection and reloaded history after a tool group',()=>{
+  const user=message('question',{role:'user',timestamp:'2026-10-28T08:00:00Z'});
+  const tool=message('tool',{kind:'tool_use',toolName:'Bash',timestamp:'2026-10-28T08:00:03Z'});
+  const answer=message('answer',{content:'完成',timestamp:'2026-10-28T08:03:12Z'});
+  const live=normalizedToChatMessages([user,tool,answer]);
+  const history=normalizedToChatMessages(JSON.parse(JSON.stringify([user,tool,answer])));
+  assert.equal(live.at(-1)?.turnDurationMs,192000);assert.equal(history.at(-1)?.turnDurationMs,192000);
+  assert.equal(live.at(-1)?.timestamp,'2026-10-28T08:03:12Z');
+});
+
 test('preserves historical UI message identity when only the stream record changes', () => {
   const first = message('first', { content: 'First answer' });
   const second = message('second', { content: 'Second answer' });

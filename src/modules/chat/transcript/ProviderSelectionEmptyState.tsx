@@ -29,6 +29,7 @@ import { writeSelectedProvider } from '@/shared/selectedProvider';
 import { useDiscoveredAgents } from '@/modules/agent-discovery';
 
 const PROVIDER_META: { id: LLMProvider; name: string }[] = [
+  {id:'gemini',name:'Gemini'},
   { id: "claude", name: "Claude Code" },
   { id: "codex", name: "Codex" },
   { id: "cursor", name: "Cursor" },
@@ -78,6 +79,7 @@ function getModelConfig(
 }
 
 function getProviderDisplayName(p: LLMProvider) {
+  if (p === 'gemini') return 'Gemini';
   if (p === "claude") return "Claude";
   if (p === "cursor") return "Cursor";
   if (p === "codex") return "Codex";
@@ -333,6 +335,7 @@ export default function ProviderSelectionEmptyState({
             {
               {
                 'deepseek-harness': 'DeepSeek Harness · 本机执行',
+                gemini: 'Gemini / Antigravity · 使用本机登录，地区限制可能影响调用',
                 workbuddy: t('providerSelection.readyPrompt.workbuddy', { defaultValue: 'WorkBuddy local login · conversations', model: providerModels.workbuddy }),
                 claude: t("providerSelection.readyPrompt.claude", {
                   model: providerModels.claude,

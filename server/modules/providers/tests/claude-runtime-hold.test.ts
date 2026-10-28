@@ -120,6 +120,15 @@ async function withRun(
 
 const settle = () => new Promise((resolve) => { setTimeout(resolve, 25); });
 
+test('a native error result cannot report a successful queue completion',async()=>{
+  await withRun(async({script,sent,done})=>{
+    script.emit({type:'result',subtype:'error_during_execution',is_error:true,errors:['No conversation found']});
+    await done;
+    assert.ok(sent.some(message=>message.kind==='error'));
+    assert.equal(sent.find(message=>message.kind==='complete')?.success,false);
+  });
+});
+
 // A fixed settle can be too short on a loaded machine; the supersede tests
 // wait for the run to have actually processed its turn instead.
 async function waitFor(condition: () => boolean): Promise<void> {

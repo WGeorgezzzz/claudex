@@ -382,6 +382,8 @@ export const api = {
     cancelTask: (id:string) => post('/api/dot/tasks/'+encodeURIComponent(id)+'/cancel',{}),
   },
   monitors: {
+    contextSettings: () => get('/api/monitors/context-settings'),
+    saveContextSettings: (threshold: number) => put('/api/monitors/context-settings', { threshold }),
     summaries: () => get('/api/monitors/summaries'),
     capabilities: (options: ApiRequestOptions = {}) => get('/api/monitors/capabilities',options),
     update: (id: string, input: {name:string;content:string;intervalMinutes:number;schedule?:MonitorCalendarSchedule|null}) => patch('/api/monitors/' + encodeURIComponent(id), input),

@@ -122,13 +122,7 @@ export function LocalFileLink({ fileReference, directories = [], onPreview, chil
     setError(null);
     setOpening(true);
     try {
-      const bridge = window as unknown as {
-        cloudcliDesktopNotifications?: { openLocalPath?: (path: string) => Promise<unknown> };
-        cloudcliDesktop?: { openLocalPath?: (path: string) => Promise<unknown> };
-      };
-      const open = bridge.cloudcliDesktopNotifications?.openLocalPath ?? bridge.cloudcliDesktop?.openLocalPath;
-      if (!open) throw new Error(t('fileLink.desktopOnly', 'Open this link in the Nexagent desktop app to use a local program.'));
-      await withResolvedPath(path => open(path));
+      await withResolvedPath(path => openLocalFile(path));
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : String(reason));
     } finally { setOpening(false); }

@@ -27,6 +27,7 @@ export type UserPreferences = {
   opencodePermissions: unknown;
   workbuddyPermissions: unknown;
   harnessPermissions: unknown;
+  geminiPermissions: unknown;
   codeEditorSettings: unknown;
   uiPreferences: unknown;
   selectedProvider: string;
@@ -56,6 +57,7 @@ const SERVER_WRITE_DEBOUNCE_MS = 400;
  * for every user who has not opened the app since the migration.
  */
 const LEGACY_STORAGE_KEYS: Record<UserPreferenceKey, string> = {
+  geminiPermissions: 'gemini-permissions',
   theme: 'theme',
   userLanguage: 'userLanguage',
   tasksEnabled: 'tasks-enabled',

@@ -21,6 +21,8 @@ function onDesktopStateUpdated(callback) {
 
 if (isCloudCliAppOrigin(window.location)) {
   contextBridge.exposeInMainWorld('cloudcliDesktopNotifications', {
+    getCapabilities: () => ipcRenderer.invoke('cloudcli-desktop:capabilities').catch(() => ({ version: 0, localPaths: false, restart: false, updated: true })),
+    restart: () => ipcRenderer.invoke('cloudcli-desktop:restart'),
     revealLocalPath: (filePath) => ipcRenderer.invoke('cloudcli-desktop:reveal-local-path', filePath),
     openLocalPath: (filePath) => ipcRenderer.invoke('cloudcli-desktop:open-local-path', filePath),
     getState: () => ipcRenderer.invoke('cloudcli-desktop:get-state'),
@@ -31,6 +33,8 @@ if (isCloudCliAppOrigin(window.location)) {
 
 if (window.location.protocol === 'file:') {
   contextBridge.exposeInMainWorld('cloudcliDesktop', {
+    getCapabilities: () => ipcRenderer.invoke('cloudcli-desktop:capabilities').catch(() => ({ version: 0, localPaths: false, restart: false, updated: true })),
+    restart: () => ipcRenderer.invoke('cloudcli-desktop:restart'),
     revealLocalPath: (filePath) => ipcRenderer.invoke('cloudcli-desktop:reveal-local-path', filePath),
     openLocalPath: (filePath) => ipcRenderer.invoke('cloudcli-desktop:open-local-path', filePath),
     connectCloud: () => ipcRenderer.invoke('cloudcli-desktop:connect-cloud'),

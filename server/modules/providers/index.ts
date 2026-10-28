@@ -8,6 +8,8 @@ export { initializeAgentDiscovery } from './services/agent-discovery.service.js'
 
 // providerModelsService: used by Commands to list models and resolve the active session model.
 export { providerModelsService } from './services/provider-models.service.js';
+// Monitor lifecycle uses the same provider transcript usage as the chat counter.
+export { providerTokenUsageService } from './services/provider-token-usage.service.js';
 
 // sessionsService: used by the websocket module's chat gateway to resolve an
 // edited message's resume point, which only the providers module can read.

@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { AlertCircle, Check, ChevronDown, ExternalLink, ListTodo, Menu, Play, RefreshCw, RotateCcw, Search, X } from 'lucide-react';
 
 import { inboxTasksApi } from '@/shared/api';
+import { LLMProviderLogo } from '@/shared/ui';
 import { TASK_WORKSTREAMS, taskWorkstream } from '@/modules/task-master/utils/taskWorkstreams';
 
 type Task = { id: string | number; title: string; description?: string; details?: string; source?: string; due?: string; status: string; priority?: string; recommended?: string; options?: { key: string; label: string; plan: string }[]; executionSessionId?: string; userInput?: string; tags?: string[]; topicId?: string };
@@ -120,7 +121,7 @@ export function GlobalTasksPage({ onMenuClick }: { onMenuClick: () => void }) {
           <select aria-label="新任务优先级" className={control} value={newPriority} onChange={e => setNewPriority(e.target.value)}><option value="high">高优先级</option><option value="medium">普通</option><option value="low">低优先级</option></select>
           <button type="submit" className="min-h-10 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-50" disabled={!newTitle.trim() || busy}>新建任务</button>
         </form>
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-4" aria-label="任务概览">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-5" aria-label="任务概览">
           {summary.map(item => <button key={item.id} type="button" aria-pressed={status === item.id} onClick={() => setStatus(item.id)} className={`rounded-xl border bg-card px-4 py-3 text-left transition-colors hover:border-primary/40 ${status === item.id ? 'border-primary/50 ring-1 ring-primary/10' : 'border-border'}`}>
             <span className="text-xs font-medium text-muted-foreground">{item.label}</span><span className={`mt-1 block text-2xl font-semibold tabular-nums ${item.tone}`}>{loading ? '—' : item.count}</span>
           </button>)}
@@ -149,12 +150,13 @@ export function GlobalTasksPage({ onMenuClick }: { onMenuClick: () => void }) {
             if (!rows.length) return null;
             const expanded = Boolean(!expandedGroups.includes(group.id));
             const visible = expanded ? rows : rows.slice(0, 3);
+            const pending = rows.filter(row => row.task.status === 'pending').length;
             const running = rows.filter(row => row.task.status === 'in-progress').length;
             const attention = rows.filter(row => ['blocked', 'review'].includes(row.task.status)).length;
             return <section key={group.id} data-testid="task-workstream" aria-label={group.name} className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
               <header className="flex flex-wrap items-center gap-3 border-b bg-muted/25 px-4 py-3">
                 <span className={`h-8 w-1 rounded-full ${group.accent}`}/><div className="min-w-0 flex-1"><h2 className="text-sm font-semibold">{group.name}<span className="ml-2 rounded-md bg-background px-1.5 py-0.5 text-xs font-normal text-muted-foreground">{rows.length} 项</span></h2><p className="mt-0.5 text-xs text-muted-foreground">{group.description}</p></div>
-                <div className="flex gap-3 text-xs">{running > 0 && <span className="text-blue-600 dark:text-blue-400">{running} 进行中</span>}{attention > 0 && <span className="flex items-center gap-1 text-amber-700 dark:text-amber-400"><AlertCircle size={13}/>{attention} 需关注</span>}</div>
+                <div className="flex flex-wrap gap-3 text-xs"><span className="text-muted-foreground">待处理 {pending} · 进行中 {running}</span>{running > 0 && <span className="text-blue-600 dark:text-blue-400">{running} 进行中</span>}{attention > 0 && <span className="flex items-center gap-1 text-amber-700 dark:text-amber-400"><AlertCircle size={13}/>{attention} 需关注</span>}</div>
               </header>
               {visible.map(({ project, task }) => <TaskRow key={project.projectId + ':' + task.id} project={project} task={task} busy={busy} act={act}/>)}
               {rows.length > 3 && !category && !search.trim() && <button type="button" className="flex w-full items-center justify-center gap-2 border-t bg-muted/15 py-2.5 text-xs font-medium text-muted-foreground hover:bg-muted/40 hover:text-foreground" onClick={() => setExpandedGroups(previous => previous.includes(group.id) ? previous.filter(id => id !== group.id) : [...previous, group.id])} aria-expanded={expanded}>
@@ -189,7 +191,7 @@ function TaskRow({ project, task, busy, act }: { project: ProjectTasks; task: Ta
       <div className="space-y-2"><label className="block text-xs font-semibold text-muted-foreground" htmlFor={`task-input-${project.projectId}-${task.id}`}>自己写做法/补充要求</label><textarea id={`task-input-${project.projectId}-${task.id}`} value={userInput} onChange={e => setUserInput(e.target.value)} placeholder="补充执行要求，也可以只保存为备注" className="min-h-20 w-full resize-y rounded-lg border border-border bg-background p-3 text-sm"/><div className="flex flex-wrap gap-2"><button type="button" className={control} disabled={busy} onClick={() => void act(() => inboxTasksApi.saveInput(project.projectId, String(task.id), userInput), project.projectId)}>保存备注</button></div></div>
       {!!task.options?.length && <div><h4 className="mb-2 text-xs font-semibold text-muted-foreground">选择做法</h4><div role="radiogroup" aria-label={`${task.title}的做法`} className="grid gap-2">{task.options.map(o => <label key={o.key} className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 text-sm ${option === o.key ? 'border-primary/50 bg-primary/5' : 'border-border bg-background'}`}><input type="radio" className="mt-1" name={'option-' + project.projectId + task.id} checked={option === o.key} onChange={() => setOption(o.key)}/><span className="min-w-0 break-words"><strong className="font-medium">{o.key} · {o.label}{o.key === task.recommended && <span className="ml-2 rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">推荐</span>}</strong><span className="mt-1 block text-xs leading-5 text-muted-foreground">{o.plan}</span></span></label>)}</div></div>}
       <div className="flex flex-wrap items-center gap-2"><button className="flex min-h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-40" disabled={busy || ['done', 'cancelled', 'in-progress'].includes(task.status)} onClick={() => void act(() => userInput.trim() ? inboxTasksApi.execute(project.projectId, String(task.id), option, userInput) : inboxTasksApi.execute(project.projectId, String(task.id), option), project.projectId)}><Play size={14}/>执行</button>
-        {task.executionSessionId && <button className={control + ' flex items-center gap-2'} onClick={() => navigate('/session/' + task.executionSessionId)}><ExternalLink size={14}/>查看执行会话</button>}
+        {['done','cancelled','in-progress'].includes(task.status)&&<span className="text-xs text-muted-foreground">{task.status==='in-progress'?'正在执行，可查看执行会话':'此任务已结束，撤销状态后可再次执行'}</span>}{task.executionSessionId && <button className={control + ' flex items-center gap-2'} onClick={() => navigate('/session/' + task.executionSessionId)}><LLMProviderLogo provider="codex" className="h-4 w-4"/><ExternalLink size={14}/>查看执行会话</button>}
         <button className={control + ' flex items-center gap-2'} disabled={busy || task.status === 'done'} onClick={() => void act(() => inboxTasksApi.action(project.projectId, String(task.id), 'done'), project.projectId)}><Check size={14}/>标记完成</button>
         <button className="flex min-h-10 items-center gap-1 px-2 text-xs text-muted-foreground hover:text-foreground disabled:opacity-40" disabled={busy || task.status === 'cancelled'} onClick={() => void act(() => inboxTasksApi.action(project.projectId, String(task.id), 'cancelled'), project.projectId)}><X size={14}/>忽略</button>
       </div>

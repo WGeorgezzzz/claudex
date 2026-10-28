@@ -4,6 +4,8 @@ import { X } from 'lucide-react';
 import { StandaloneShell } from '@/modules/standalone-shell';
 import { IS_PLATFORM } from '@/shared/utils';
 import type { LLMProvider } from '@/shared/types';
+import { authenticatedFetch } from '@/shared/api';
+const apiCallOpenGemini=()=>authenticatedFetch('/api/providers/gemini/open',{method:'POST'});
 
 /**
  * For empty shell instances where no project is provided,
@@ -84,6 +86,7 @@ export default function ProviderLoginModal({
     return null;
   }
 
+  if (provider === 'gemini') return <div role="dialog" className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-5"><div className="max-w-md rounded-xl bg-background p-5"><h2 className="text-lg font-semibold">Gemini / Antigravity</h2><p className="my-3 text-sm text-muted-foreground">使用本机 Gemini 登录。当前服务商可能限制地区，原生历史以只读摘要导入；完整会话请在桌面版查看。</p><button className="min-h-10 rounded border px-3" onClick={()=>void apiCallOpenGemini()}>在 Gemini 桌面版中打开</button><button className="ml-3 min-h-10 px-3" onClick={onClose}>关闭</button></div></div>;
   if (provider === 'deepseek-harness') return (
     <div data-escape-layer className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50">
       <div role="dialog" aria-label="DeepSeek Harness" className="m-4 w-full max-w-md rounded-lg bg-background p-6 shadow-xl">

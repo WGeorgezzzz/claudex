@@ -24,7 +24,7 @@ test('installed/authenticated auto-enables; logged-out/missing stays disabled; m
     const context = (userId: number, role: 'admin' | 'member') => ({ userId, role, workRoot: dir, allowedFolders: [], claudeConfigDir: path.join(dir, '.claude'), codexHome: path.join(dir, '.codex'), env: {} });
     const admin = await userContextStorage.run(context(1, 'admin'), () => agentDiscoveryService.scan(true)) as {agents: Array<Record<string, unknown>>};
     assert(admin.agents.some(a => a.id === 'claude' && a.enabled === true && String(a.version).includes('1.2.3')));
-    assert(admin.agents.some(a => a.id === 'gemini' && a.supported === false && a.enabled === false));
+    assert(admin.agents.some(a => a.id === 'gemini' && a.supported === true));
     loggedIn = false;
     const loggedOut = await userContextStorage.run(context(1, 'admin'), () => agentDiscoveryService.scan()) as typeof admin;
     assert.equal(loggedOut.agents.find(a => a.id === 'claude')!.enabled, false);

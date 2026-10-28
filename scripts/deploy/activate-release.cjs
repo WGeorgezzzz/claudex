@@ -128,7 +128,7 @@ function releaseGuard(){
  for(const marker of ['forceStop','providerSessionId','findResumedProviderProcesses','mcp__claudex_sessions__session'])assert(backend.includes(marker),'Backend marker missing: '+marker);
 }
 async function running(c){const token=await login(c);const r=await fetch('http://127.0.0.1:3001/api/providers/sessions/running',{headers:{Authorization:'Bearer '+token},signal:AbortSignal.timeout(60000)});assert(r.ok);return (await r.json()).data.sessions;}
-async function waitIdle(c){const started=Date.now();for(;;){const rows=await running(c);write(path.join(root,'running-sessions-before-activation.json'),rows);if(!rows.length||Date.now()-started>=30*60*1000)return;console.log('Waiting for idle:',rows.length);await pause(15000);}}
+async function waitIdle(c){const minutes=Number(arg('--idle-timeout-minutes')||30);assert(Number.isInteger(minutes)&&minutes>=1&&minutes<=30,'Idle timeout must be 1–30 minutes');const started=Date.now();for(;;){const rows=await running(c);write(path.join(root,'running-sessions-before-activation.json'),rows);if(!rows.length||Date.now()-started>=minutes*60*1000)return;console.log('Waiting for idle:',rows.length);await pause(15000);}}
 async function interruptManaged(c){
  const rows=await running(c),token=await login(c),WS=req('ws');
  // Only sessions reported by this production server are addressed; no host-wide process kill.

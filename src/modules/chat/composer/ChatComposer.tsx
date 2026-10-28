@@ -498,7 +498,7 @@ export default function ChatComposer({
               </PromptInputButton>
             )}
 
-            {!compact && providerLabel.toLowerCase().includes('claude') && <MonitorPanel sessionId={monitorSessionId ?? null} draft={input} options={{model,effort,permissionMode}} />}
+            {!compact && /claude|codex/i.test(providerLabel) && <MonitorPanel sessionId={monitorSessionId ?? null} draft={input} options={{model,effort,permissionMode}} />}
             {!compact && <ScheduleMessagePopover
               disabled={!input.trim()}
               onSchedule={onScheduleMessage}

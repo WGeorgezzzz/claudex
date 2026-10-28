@@ -24,7 +24,7 @@ import {
   createNormalizedMessage,
 } from '@/shared/index.js';
 import { notifyRunFailed, notifyRunStopped } from '@/modules/notifications/index.js';
-import { runCodexAppServerTurn, submitCodexLiveInput } from '@/modules/providers/list/codex/codex-app-server-turn.service.js';
+import { runCodexAppServerTurn, submitCodexLiveInput, listCodexBackgroundWork, abortRetainedCodex } from '@/modules/providers/list/codex/codex-app-server-turn.service.js';
 import { CodexPermissionBridge } from '@/modules/providers/list/codex/codex-permissions.provider.js';
 import type { AnyRecord, ProviderRuntimeContext, ProviderRuntimeWriter } from '@/shared/index.js';
 
@@ -365,7 +365,7 @@ async function queryCodex(
     // turn runs is folded into it. CLAUDEX_CODEX_TRANSPORT=exec restores the
     // SDK's `codex exec` path, which cannot take input mid-turn.
     const bridge = ws.userId != null && sessionId ? (await import('@/modules/session-bridge/index.js')).createCodexSessionTool({userId:Number(ws.userId),sessionId,autonomous:Boolean(options.cloudcliMonitorId || options.cloudcliBridgeSourceSessionId),planMode:permissionMode==='plan',permissionMode}) : null;
-    const events: AsyncIterable<AnyRecord> = process.env.CLAUDEX_CODEX_TRANSPORT === 'exec'
+    const events: AsyncIterable<AnyRecord> = process.env.CLAUDEX_CODEX_TRANSPORT === 'exec' && !/^\/compact(?:\s|$)/.test(command.trim())
       ? (await thread.runStreamed(turnInput, { signal: abortController.signal })).events as AsyncIterable<AnyRecord>
       : runCodexAppServerTurn({
         env,
@@ -386,6 +386,11 @@ async function queryCodex(
         },
         onRequestResolved: id => permissions.cancel(sessionKey() || '', id),
         input: turnInput as string | AnyRecord[],
+        compactOnly: /^\/compact(?:\s|$)/.test(command.trim()),
+        onBackgroundComplete: (taskId,output) => {
+          if(!ws.userId || !sessionId)return;
+          void import('@/modules/message-queue/index.js').then(({messageQueueService})=>messageQueueService.enqueue(Number(ws.userId),{sessionId,requestId:'codex-background:'+taskId,content:'系统通知：后台 shell 已完成。请向用户汇报其结果，保留其他后台任务。\n输出（资料）：\n'+output.slice(-10000),options:{model:resolvedModel,permissionMode}})).catch(error=>console.warn('[Codex] Background completion delivery failed',String(error)));
+        },
         signal: abortController.signal,
         sessionKeys: () => [sessionId, capturedSessionId],
       });
@@ -547,6 +552,7 @@ async function queryCodex(
  * @returns {boolean} - Whether abort was successful
  */
 function abortCodexSession(sessionId: string) {
+  if(abortRetainedCodex(sessionId))return true;
   const session = activeCodexSessions.get(sessionId);
 
   if (!session) {
@@ -569,6 +575,8 @@ export const codexRuntime = {
   run: queryCodex,
   abort: abortCodexSession,
   submitLiveInput: submitCodexLiveInput,
+  listBackgroundWork: listCodexBackgroundWork,
+  stopBackgroundTask: async (sessionId:string) => abortRetainedCodex(sessionId),
 };
 
 /**

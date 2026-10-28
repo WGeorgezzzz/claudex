@@ -14,6 +14,7 @@ export function LLMProviderLogo({
   provider = 'claude',
   className = 'w-5 h-5',
 }: LLMProviderLogoProps) {
+  if (provider === 'gemini') return <img src="/model-logos/gemini-color.svg" alt="Gemini" className={`${className} object-contain`} />;
   if (provider === 'deepseek-harness') return <img src="/model-logos/deepseek-color.svg" alt="DeepSeek Harness" className={`${className} object-contain`} />;
   if (provider === 'workbuddy') {
     // Use the official WorkBuddy brand asset, shared by every provider selector.

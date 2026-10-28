@@ -8,6 +8,7 @@ import { getCurrentUserContext, withUserContext } from '@/modules/auth/index.js'
 import { AppError, getCloudCliHomeDir } from '@/shared/index.js';
 import { providerRegistry } from '@/modules/providers/provider.registry.js';
 import { probeAgent, countAgentSessions } from './agent-probe.js';
+import { geminiInstallation } from '@/modules/providers/list/gemini/gemini.provider.js';
 
 const AGENTS = [
   { id: 'claude', name: 'Claude Code', commands: ['claude'], config: '.claude', sessions: 'projects', install: 'npm install -g @anthropic-ai/claude-code', supported: true },
@@ -16,7 +17,7 @@ const AGENTS = [
   { id: 'opencode', name: 'OpenCode', commands: ['opencode'], config: '.local/share/opencode', sessions: 'storage/session', install: 'npm install -g opencode-ai', supported: true },
   { id: 'deepseek-harness', name: 'DeepSeek Harness', commands: ['dsh'], config: '.dsh', sessions: 'sessions', install: 'https://deepseek.com/harness/', supported: true },
   { id: 'workbuddy', name: 'WorkBuddy', commands: ['workbuddy'], config: '.workbuddy', sessions: 'transcripts', install: 'https://www.codebuddy.cn/work/', supported: true },
-  { id: 'gemini', name: 'Gemini CLI', commands: ['gemini'], config: '.gemini', sessions: 'tmp', install: 'npm install -g @google/gemini-cli', supported: false },
+  { id: 'gemini', name: 'Gemini / Antigravity', commands: ['agy'], config: '.gemini', sessions: 'antigravity-cli/conversations', install: 'https://antigravity.google/download', supported: true },
   { id: 'qwen', name: 'Qwen Code', commands: ['qwen'], config: '.qwen', sessions: 'projects', install: 'npm install -g @qwen-code/qwen-code', supported: false },
   { id: 'aider', name: 'Aider', commands: ['aider'], config: '.aider', sessions: '', install: 'python -m pip install aider-install && aider-install', supported: false },
   { id: 'copilot', name: 'GitHub Copilot CLI', commands: ['copilot'], config: '.copilot', sessions: 'session-state', install: 'npm install -g @github/copilot', supported: false },
@@ -29,6 +30,7 @@ const userScans = new Map<number, Promise<unknown>>();
 async function scanHost() {
   if (!hostScan) hostScan = (async () => {
     const found = await Promise.all(AGENTS.map(async agent => {
+      if(agent.id==='gemini'){const install=geminiInstallation();return [agent.id,install?{executable:install.cli||install.desktop!,version:'desktop-local'}:null] as const;}
       if (agent.id === 'deepseek-harness') {
         const install = resolveDeepSeekHarnessInstallation();
         if (!install) return [agent.id, null] as const;
@@ -68,7 +70,7 @@ export const agentDiscoveryService = {
           : agent.id === 'deepseek-harness' ? path.join(resolveDeepSeekHarnessInstallation()?.directory || '', 'home') : path.join(os.homedir(), agent.config);
         const sessionCount = await countAgentSessions(path.join(configDirectory, agent.sessions),
           agent.id === 'opencode' ? path.join(configDirectory, 'opencode.db') : undefined,
-          agent.id === 'deepseek-harness' ? /\.jsonl\.zstd$/ : ['opencode', 'gemini'].includes(agent.id) ? /\.json$/ : undefined);
+          agent.id === 'deepseek-harness' ? /\.jsonl\.zstd$/ : agent.id==='gemini' ? /\.db$/ : agent.id==='opencode' ? /\.json$/ : undefined);
         return { id: agent.id, name: agent.name, installed: Boolean(program), version: program?.version ?? null,
           supported: agent.supported, authenticated, enabled: Boolean(program && authenticated && !disabled.includes(agent.id)),
           disabled: disabled.includes(agent.id), installCommand: agent.install,

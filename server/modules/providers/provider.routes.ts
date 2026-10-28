@@ -1,5 +1,6 @@
 import express, { type Request, type Response } from 'express';
 import { agentDiscoveryService } from './services/agent-discovery.service.js';
+import { openGeminiDesktop } from './list/gemini/gemini.provider.js';
 
 import { sessionTitlesService } from '@/modules/providers/services/session-titles.service.js';
 import { getSessionOwnerId, getOwnerUserId } from '@/modules/database/index.js';
@@ -29,6 +30,7 @@ import type {
 import { AppError, asyncHandler, createApiSuccessResponse } from '@/shared/utils.js';
 
 const router = express.Router();
+router.post('/gemini/open',requireSharedResourceAdministrator,asyncHandler(async(_req,res)=>res.json(createApiSuccessResponse(openGeminiDesktop()))));
 // Host subscriptions belong to the administrator, never to unrelated member accounts.
 router.get('/usage-snapshot', requireSharedResourceAdministrator, asyncHandler(async (_request, response) => {
   response.json(createApiSuccessResponse(await providerQuotaService.read()));
@@ -377,6 +379,7 @@ const parseProvider = (value: unknown): LLMProvider => {
     || normalized === 'opencode'
     || normalized === 'workbuddy'
     || normalized === 'deepseek-harness'
+    || normalized === 'gemini'
   ) {
     return normalized;
   }

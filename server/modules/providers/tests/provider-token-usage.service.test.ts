@@ -12,6 +12,11 @@ import {
 } from '@/modules/providers/services/provider-token-usage.service.js';
 import { AppError } from '@/shared/utils.js';
 
+test('a native compact boundary supersedes usage from before compaction',()=>{
+  const result=summarizeClaudeTokenUsage([{type:'assistant',message:{usage:{input_tokens:350000,output_tokens:100}}},{type:'system',subtype:'compact_boundary',compactMetadata:{preTokens:350100,postTokens:11000}}]);
+  assert.equal(result.used,11000);
+});
+
 function createSessionRow(overrides: Record<string, unknown> = {}) {
   return {
     owner_id: 1,

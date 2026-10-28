@@ -35,6 +35,21 @@ const retryAt = (failures: number, now: Date) => new Date(now.getTime() + Math.m
 
 /** Used by the monitors module to atomically reserve runs and retain their outcomes. */
 export const monitorsDb = {
+  /** Monitor lifecycle records compaction receipts alongside the normal run history. */
+  recordContext(userId: number, id: string, detail: Record<string, unknown>): void {
+    if (!this.get(userId, id)) throw new Error('Monitor not found');
+    const now = new Date().toISOString();
+    getConnection().prepare("INSERT INTO monitor_runs(id,monitor_id,started_at,finished_at,status,error) VALUES(?,?,?,?,?,?)")
+      .run(randomUUID(), id, now, now, detail.action === 'migration-failed' ? 'failed' : 'succeeded', '上下文维护：' + JSON.stringify(detail));
+  },
+  /** Compare the claimed run before moving its monitor; preserve all previous session IDs in options. */
+  migrateSession(userId: number, id: string, runId: string, previousSessionId: string, sessionId: string): void {
+    const row = this.get(userId, id);
+    if (!row || row.running_id !== runId || row.session_id !== previousSessionId) throw new Error('Monitor changed during context maintenance');
+    const options = JSON.parse(row.options);
+    getConnection().prepare('UPDATE monitors SET session_id=?,options=? WHERE id=? AND user_id=? AND running_id=? AND session_id=?')
+      .run(sessionId, JSON.stringify({ ...options, previousSessionId, previousSessionIds: [...(options.previousSessionIds || []), previousSessionId] }), id, userId, runId, previousSessionId);
+  },
   create(input: { userId: number; sessionId: string; name: string; content: string; options: unknown; intervalMinutes: number; schedule?:MonitorCalendarSchedule|null }): MonitorRecord {
     const id = randomUUID();
     const now = new Date();
@@ -54,7 +69,7 @@ export const monitorsDb = {
   },
   summaries(userId: number) {
     return getConnection().prepare(`SELECT m.id,m.session_id,m.name,m.status,m.interval_minutes,m.schedule_json,m.next_run_at,m.running_id,m.last_error,m.consecutive_failures,
-      (SELECT r.status FROM monitor_runs r WHERE r.monitor_id=m.id ORDER BY r.started_at DESC,r.rowid DESC LIMIT 1) AS last_result
+      (SELECT r.status FROM monitor_runs r WHERE r.monitor_id=m.id AND (r.error IS NULL OR r.error NOT LIKE '上下文维护：%') ORDER BY r.started_at DESC,r.rowid DESC LIMIT 1) AS last_result
       FROM monitors m JOIN sessions s ON s.session_id=m.session_id
       WHERE m.user_id=? AND s.owner_id=? AND s.isArchived=0 AND m.status<>'stopped' ORDER BY m.created_at DESC`).all(userId,userId) as {
         id:string;session_id:string;name:string;status:string;interval_minutes:number;schedule_json:string|null;next_run_at:string;running_id:string|null;last_error:string|null;consecutive_failures:number;last_result:string|null;
