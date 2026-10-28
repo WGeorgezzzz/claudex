@@ -1,8 +1,33 @@
-import { render, screen, cleanup } from '@testing-library/react';
+import { render, screen, cleanup, fireEvent } from '@testing-library/react';
 import { afterEach, expect, test, vi } from 'vitest';
+import type { QuotaOverview } from '@/shared/types';
 import { QuotaIndicator } from '@/modules/usage/QuotaIndicator';
-const fixture=vi.hoisted(()=>({error:'',status:'ok',stale:false}));
-vi.mock('@/modules/usage/hooks/useQuota',()=>({useQuota:()=>({data:{local:[{provider:'claude',status:'unavailable',windows:[],note:'页面未连接'},{provider:'codex',status:fixture.status,windows:fixture.status==='ok'?[{label:'7 天',usedPercent:3,remainingPercent:97}]:[],checkedAt:'2026-10-28T00:00:00Z',lastSuccess:{checkedAt:'2026-10-28T00:00:00Z',windows:[{label:'7 天',usedPercent:3,remainingPercent:97}]}}]},error:fixture.error,now:Date.parse('2026-10-28T01:00:00Z')})}));
-afterEach(()=>{cleanup();fixture.error='';fixture.status='ok';});
-test('a disconnected source cannot hide the other source or its stale value',()=>{render(<QuotaIndicator onOpen={()=>{}}/>);expect(screen.getByText('未连接')).toBeTruthy();expect(screen.getByText('7 天 已用 3%')).toBeTruthy();expect(screen.getByText('60 分钟前')).toBeTruthy();});
-test('failed refresh retains last success and explains its age',()=>{fixture.status='error';fixture.error='offline';render(<QuotaIndicator onOpen={()=>{}}/>);expect(screen.getByText('7 天 已用 3%')).toBeTruthy();expect(screen.getByText('读取失败（上次 60 分钟前）')).toBeTruthy();expect(screen.getByTestId('quota-indicator')).toBeTruthy();});
+const fixture = vi.hoisted(() => ({ data: null as QuotaOverview | null, error: '' }));
+vi.mock('@/modules/usage/hooks/useQuota', () => ({ useQuota: () => ({ ...fixture, now: Date.parse('2026-10-28T01:00:00Z') }) }));
+afterEach(() => { cleanup(); fixture.data = null; fixture.error = ''; });
+const cache = (data: unknown) => ({ data, updatedAt: '2026-10-28T00:59:00Z', stale: false, error: null });
+function setup() {
+  fixture.data = { claude: cache({ windows: [{ label: '5h', percent: 18 }] }), pool: cache({ warnings: [], accounts: [{ windows: [{ label: '5h', percent: 2 }] }, { windows: [{ label: '5h', percent: 30 }] }] }), local: [{ provider: 'claude', status: 'unavailable', windows: [] }, { provider: 'codex', status: 'ok', windows: [{ label: '7 天', usedPercent: 6 }] }] } as unknown as QuotaOverview;
+}
+test('relay Claude survives unavailable local collector and Codex takes the maximum across the pool', () => {
+  setup(); render(<QuotaIndicator onOpen={() => {}}/>);
+  expect(screen.getByTestId('quota-indicator').textContent).toBe('Claude 5h 18% · Codex 5h 30%');
+  expect(screen.queryByText('未连接')).toBeNull();
+});
+test('only a stale or failed segment dims and its reason stays in the tooltip', () => {
+  setup(); fixture.data!.claude.stale = true; fixture.data!.claude.error = 'offline';
+  render(<QuotaIndicator onOpen={() => {}}/>);
+  expect(screen.getByTitle('读取失败（上次 1 分钟前）').className).toContain('opacity-60');
+  expect(screen.getByTitle('1 分钟前').className).not.toContain('opacity-60');
+  expect(screen.getByTestId('quota-indicator').textContent).toBe('Claude 5h 18% · Codex 5h 30%');
+});
+test('both missing sources give one settings link', () => {
+  const open = vi.fn(); render(<QuotaIndicator onOpen={open}/>);
+  fireEvent.click(screen.getByRole('button', { name: '用量未连接 · 点击设置' })); expect(open).toHaveBeenCalledOnce();
+});
+test('empty pool falls back to retained local Codex and preserves red pool warnings', () => {
+  setup(); fixture.data!.pool!.data!.accounts = []; fixture.data!.pool!.data!.warnings = ['号池告警'];
+  render(<QuotaIndicator onOpen={() => {}}/>);
+  expect(screen.getByTestId('quota-indicator').textContent).toContain('Claude 5h 18% · Codex 7天 6%');
+  expect(screen.getByText('号池告警').className).toContain('text-red');
+});
