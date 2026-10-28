@@ -2,6 +2,7 @@ param(
     [Parameter(Mandatory = $true)][string]$Launcher,
     [Parameter(Mandatory = $true)][string]$TaskFile,
     [Parameter(Mandatory = $true)][string]$Workspace,
+    [string]$Model,
     [string]$SessionId
 )
 $ErrorActionPreference = 'Stop'
@@ -12,7 +13,8 @@ Import-Module (Join-Path $PSHOME 'Modules/Microsoft.PowerShell.Security/Microsof
 $OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 [Console]::InputEncoding = [System.Text.UTF8Encoding]::new($false)
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
-$launchArgs = @{ Provider = 'rp'; TaskFile = $TaskFile; Workspace = $Workspace }
+$launchArgs = @{ Provider = 'tokenhub'; TaskFile = $TaskFile; Workspace = $Workspace }
+if ($Model) { $launchArgs.Model = $Model }
 if ($SessionId) { $launchArgs.SessionId = $SessionId }
 & $Launcher @launchArgs
 exit $LASTEXITCODE

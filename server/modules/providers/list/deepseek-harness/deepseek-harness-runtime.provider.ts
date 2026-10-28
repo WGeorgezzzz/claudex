@@ -22,7 +22,7 @@ export const deepSeekHarnessRuntime: IProviderRuntime = {
     if (!install?.configured) throw new Error('Configure the local DeepSeek Harness launcher and RP credential first.');
     if (options.images?.length) throw new Error('This Harness integration does not support image attachments.');
     const model = await context.resolveResumeModel(options.sessionId, options.model) || 'configured';
-    if (model !== 'configured' && model !== readDeepSeekHarnessModels().DEFAULT) throw new Error('所选模型不在本机 Harness 当前配置中，请刷新模型列表。');
+    if (model !== 'configured' && !readDeepSeekHarnessModels().OPTIONS.some(option => option.value === model)) throw new Error('所选模型不在本机 TokenHub Harness 配置中，请刷新模型列表。');
     const permission = modes[options.permissionMode || 'bypassPermissions'];
     if (!permission) throw new Error('Unsupported Harness permission mode.');
     const previous = context.resolveProviderSessionId(options.sessionId);
@@ -55,7 +55,7 @@ export const deepSeekHarnessRuntime: IProviderRuntime = {
         let announced = false;
         let lastToolFailure = '';
         const child = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', install.bridge,
-          '-Launcher', install.launcher, '-TaskFile', taskFile, '-Workspace', options.cwd || options.projectPath || process.cwd(),
+          '-Launcher', install.launcher, '-TaskFile', taskFile, '-Workspace', options.cwd || options.projectPath || process.cwd(), '-Model', model,
           ...(previous ? ['-SessionId', previous] : [])], {
           cwd: options.cwd || options.projectPath || process.cwd(), windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'],
           env: { ...process.env, DSH_PERMISSION_MODE: permission },
