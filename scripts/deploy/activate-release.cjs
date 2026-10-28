@@ -128,7 +128,7 @@ function releaseGuard(){
  for(const marker of ['/tasks','任务','打开所在文件夹'])assert(client.includes(marker),'Client marker missing: '+marker);
  for(const marker of ['forceStop','providerSessionId','findResumedProviderProcesses','mcp__claudex_sessions__session'])assert(backend.includes(marker),'Backend marker missing: '+marker);
 }
-async function running(c){const token=await login(c);const r=await fetch('http://127.0.0.1:3001/api/providers/sessions/running',{headers:{Authorization:'Bearer '+token},signal:AbortSignal.timeout(60000)});assert(r.ok);const ownership=partitionDeploymentSessions((await r.json()).data.sessions);write(path.join(root,'independent-sessions-before-activation.json'),ownership.independent);return ownership.managed;}
+async function running(c){const token=await login(c);const r=await fetch('http://127.0.0.1:3001/api/providers/sessions/running',{headers:{Authorization:'Bearer '+token},signal:AbortSignal.timeout(600000)});assert(r.ok);const ownership=partitionDeploymentSessions((await r.json()).data.sessions);write(path.join(root,'independent-sessions-before-activation.json'),ownership.independent);return ownership.managed;}
 async function waitIdle(c){const minutes=Number(arg('--idle-timeout-minutes')||30);assert(Number.isInteger(minutes)&&minutes>=1&&minutes<=30,'Idle timeout must be 1–30 minutes');const started=Date.now();for(;;){const rows=await running(c);write(path.join(root,'running-sessions-before-activation.json'),rows);if(!rows.length||Date.now()-started>=minutes*60*1000)return;console.log('Waiting for idle:',rows.length);await pause(15000);}}
 async function interruptManaged(c){
  const rows=await running(c),token=await login(c),WS=req('ws');
@@ -136,11 +136,11 @@ async function interruptManaged(c){
  for(const row of rows)await new Promise((resolve,reject)=>{
   const ws=new WS('ws://127.0.0.1:3001/ws?token='+encodeURIComponent(token));
   let poll;const finish=error=>{clearTimeout(timer);clearInterval(poll);ws.close();error?reject(error):resolve();};
-  const timer=setTimeout(()=>finish(Error('Session interruption timed out: '+row.sessionId)),60000);
+  const timer=setTimeout(()=>finish(Error('Session interruption timed out: '+row.sessionId)),600000);
   ws.on('open',()=>{
    if(row.tasks?.length)for(const task of row.tasks)ws.send(JSON.stringify({type:'chat.stop-task',sessionId:row.sessionId,taskId:task.taskId}));
    else ws.send(JSON.stringify({type:'chat.abort',sessionId:row.sessionId,force:false}));
-   poll=setInterval(()=>void running(c).then(current=>{if(!current.some(item=>item.sessionId===row.sessionId))finish();},finish),1000);
+   let checking=false;poll=setInterval(()=>{if(checking)return;checking=true;void running(c).then(current=>{if(!current.some(item=>item.sessionId===row.sessionId))finish();},finish).finally(()=>{checking=false;});},1000);
   });
   ws.on('error',finish);
  });
