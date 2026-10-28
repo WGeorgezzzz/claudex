@@ -30,6 +30,7 @@ export async function dispatchMonitors(runtime: ProviderRuntimeGateway,now=new D
         if(!session || session.isArchived) {monitorsDb.pauseUnavailable(row.id);throw new Error('会话已删除或归档，监测已暂停。');}
         const isolated=JSON.parse(row.options).runMode!=='original';
         const round=isolated?await prepareIsolatedRound(row,runId):null;
+        if(round?.skip){monitorsDb.finishNoChange(row.id,runId);return;}
         const sessionId=round?.sessionId||await maintainMonitorContext(row,runId,row.session_id);
         if(!isolated)monitorsDb.attachSession(row.id,runId,sessionId);
         let finalText='';

@@ -29,6 +29,7 @@ export function initializeMonitorTables(db: Database.Database): void {
   if(!columns.some(column=>column.name==='consecutive_failures')) db.exec('ALTER TABLE monitors ADD COLUMN consecutive_failures INTEGER NOT NULL DEFAULT 0');
   if(!columns.some(column=>column.name==='pause_reason')) db.exec('ALTER TABLE monitors ADD COLUMN pause_reason TEXT');
   if(!columns.some(column=>column.name==='state_record')) db.exec("ALTER TABLE monitors ADD COLUMN state_record TEXT NOT NULL DEFAULT ''");
+  if(!columns.some(column=>column.name==='no_change_count')) db.exec("ALTER TABLE monitors ADD COLUMN no_change_count INTEGER NOT NULL DEFAULT 0");
   const runColumns=db.prepare('PRAGMA table_info(monitor_runs)').all() as {name:string}[];
   for(const [name,type] of Object.entries({session_id:'TEXT',report:'TEXT',input_tokens:'INTEGER',context_tokens:'INTEGER',round_number:'INTEGER'})) if(!runColumns.some(c=>c.name===name)) db.exec(`ALTER TABLE monitor_runs ADD COLUMN ${name} ${type}`);
 }
@@ -139,8 +140,18 @@ export const monitorsDb = {
         .run(error ? 'failed' : 'succeeded',error,now.toISOString(),runId);
       const failures = error ? row.consecutive_failures + 1 : 0;
       const next = error ? retryAt(failures, now, error) : (row.schedule_json ? nextMonitorCalendarRun(JSON.parse(row.schedule_json),now) : new Date(now.getTime()+row.interval_minutes*60_000)).toISOString();
-      db.prepare(`UPDATE monitors SET running_id=NULL,run_count=run_count+1,last_error=?,next_run_at=?,consecutive_failures=?
+      db.prepare(`UPDATE monitors SET running_id=NULL,run_count=run_count+1,last_error=?,next_run_at=?,consecutive_failures=?,no_change_count=0
         WHERE id=? AND running_id=?`).run(error,next,failures,id,runId);
+    })();
+  },
+  finishNoChange(id:string,runId:string,now=new Date()): void {
+    const db=getConnection();db.transaction(()=>{
+      const row=db.prepare('SELECT * FROM monitors WHERE id=? AND running_id=?').get(id,runId) as (MonitorRecord&{no_change_count?:number})|undefined;
+      if(!row)return;
+      const count=(row.no_change_count??0)+1;
+      const minutes=count>=2?60:30;
+      db.prepare("UPDATE monitor_runs SET status='succeeded',error=?,finished_at=? WHERE id=? AND status='running'").run('无变化，未调用模型。',now.toISOString(),runId);
+      db.prepare('UPDATE monitors SET running_id=NULL,run_count=run_count+1,last_error=?,next_run_at=?,consecutive_failures=0,no_change_count=? WHERE id=? AND running_id=?').run('无变化，未调用模型。',new Date(now.getTime()+minutes*60000).toISOString(),count,id,runId);
     })();
   },
   action(userId: number,id: string,action: 'pause'|'resume'|'stop'|'run-now'): void {
