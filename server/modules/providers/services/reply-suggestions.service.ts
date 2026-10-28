@@ -55,7 +55,7 @@ function validateReplies(value: unknown): string[] {
 }
 
 /** Providers' suggestion service uses a tool-free, non-persisted Claude call; live tests verify contextual output. */
-export async function generateContextualReplies(context: ReplyContext, model?: string | null): Promise<string[]> {
+export async function generateContextualReplies(context: ReplyContext): Promise<string[]> {
   const user = getCurrentUserContext();
   const cwd = path.join(getCloudCliHomeDir(), 'auxiliary', 'reply-suggestions', String(user?.userId ?? 'local'));
   await mkdir(cwd, { recursive: true });
@@ -63,7 +63,7 @@ export async function generateContextualReplies(context: ReplyContext, model?: s
   const timer = setTimeout(() => controller.abort(), 45000);
   const connection = query({ prompt: JSON.stringify({ recentConversation: context }), options: {
     cwd, persistSession: false, abortController: controller, maxTurns: 2,
-    ...(model && model !== 'default' ? { model } : {}),
+    model: 'sonnet',
     systemPrompt: INSTRUCTIONS, tools: [], mcpServers: {}, settingSources: [],
     canUseTool: async () => ({ behavior: 'deny', message: 'Reply suggestions cannot use tools.' }),
     thinking: { type: 'disabled' }, effort: 'low',
@@ -77,6 +77,7 @@ export async function generateContextualReplies(context: ReplyContext, model?: s
     for await (const message of connection) {
       if (message.type !== 'result') continue;
       if (message.subtype !== 'success') throw new AppError('Reply suggestion generation failed.', { statusCode: 502 });
+      console.info('[ReplySuggestions] generation', { requestedModel: 'sonnet', modelUsage: message.modelUsage });
       return validateReplies(message.structured_output ?? JSON.parse(message.result));
     }
     throw new AppError('No reply suggestions returned.', { statusCode: 502 });

@@ -4,11 +4,12 @@ import { z } from 'zod';
 import { assertOwnedSession, assertContextPath, requireContextUserId } from '@/modules/access-control/index.js';
 import { withUserContext, getCurrentUserContext } from '@/modules/auth/index.js';
 import { projectsDb, projectOrganizationDb, userPreferencesDb } from '@/modules/database/index.js';
-import { sessionsService } from '@/modules/providers/index.js';
+import { sessionsService, providerRuntimeService } from '@/modules/providers/index.js';
 import { chatRunRegistry, connectedClients, clientUserIds, WS_OPEN_STATE } from '@/modules/websocket/index.js';
 import { AppError } from '@/shared/index.js';
 import { createTaskmasterWorkspaceService } from './taskmaster-workspace.service.js';
 import { generateTaskmasterExtraction } from './taskmaster-model.service.js';
+import { recordTaskmasterMetric } from './taskmaster-metrics.service.js';
 
 const settingsSchema = z.object({ enabled: z.boolean().default(true), suggestOnly: z.boolean().default(false), disabledProjects: z.array(z.string().max(200)).max(1000).default([]) });
 const timers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -43,16 +44,22 @@ export const taskmasterAutoService = {
     return { ...(root ? await taskmasterWorkspace.snapshot(root, userId, sessionId) : { tasks: [], suggestions: [], audits: [] }),
       settings: this.settings(userId), root, error: errors.get(`${userId}:${sessionId}`) ?? null, skipped: root ? null : '无项目对话不写入任务集。' };
   },
-  async extract(sessionId: string, confirm = false) {
+  async extract(sessionId: string, confirm = false, automatic = false) {
     const { userId, root } = resolveSession(sessionId), settings = this.settings(userId);
-    if (!root) return { status: 'projectless' };
-    if (!settings.enabled || settings.disabledProjects.includes(root)) return { status: 'disabled' };
-    if (chatRunRegistry.isProcessing(sessionId)) throw new AppError('请等本轮回复结束再整理。', { statusCode: 409 });
+    const skip = async (reason: string) => {
+      await recordTaskmasterMetric({ sessionId, userId, model: null, inputChars: 0, inputTokens: 0, outputTokens: 0, durationMs: 0, skipped: true, reason });
+      return { status: reason };
+    };
+    if (!root) return skip('projectless');
+    if (!settings.enabled || settings.disabledProjects.includes(root)) return skip('disabled');
+    const running = chatRunRegistry.isProcessing(sessionId) || providerRuntimeService.hasBackgroundWork(sessionId);
+    if (automatic && running) return skip('running');
+    if (running) throw new AppError('请等本轮回复结束再整理。', { statusCode: 409 });
     const history = await sessionsService.fetchHistory(sessionId, { limit: null, offset: 0 });
     const messages = history.messages.filter(m => !m.parentToolUseId && ((m.kind === 'text' && ['user', 'assistant'].includes(m.role ?? '')) || (m.kind === 'tool_use' && m.toolResult)))
       .map(m => ({ id: m.id, role: m.kind === 'tool_use' ? 'tool' : m.role!, content: m.kind === 'tool_use'
-        ? JSON.stringify({ tool: m.toolName, input: m.toolInput, result: m.toolResult }) : m.content ?? '' }));
-    const result = await taskmasterWorkspace.extract(root, userId, sessionId, messages, settings.suggestOnly, confirm);
+        ? JSON.stringify({ tool: m.toolName, outcome: m.toolResult?.isError ? 'failed' : undefined, input: JSON.stringify(m.toolInput ?? '').slice(0, 600), result: (() => { const result = JSON.stringify(m.toolResult); return result.length > 1200 ? result.slice(0, 600) + '\n…\n' + result.slice(-600) : result; })() }) : m.content ?? '' }));
+    const result = await taskmasterWorkspace.extract(root, userId, sessionId, messages, settings.suggestOnly, confirm, automatic);
     if (result.created || result.updated) await taskmasterWorkspace.initialize(root);
     errors.delete(`${userId}:${sessionId}`); return result;
   },
@@ -65,13 +72,13 @@ export const taskmasterAutoService = {
     const key = `${userId}:${sessionId}`; clearTimeout(timers.get(key));
     const timer = setTimeout(() => {
       timers.delete(key);
-      void Promise.resolve().then(() => withUserContext(userId, () => this.extract(sessionId))).catch(error => {
+      void Promise.resolve().then(() => withUserContext(userId, () => this.extract(sessionId, false, true))).catch(error => {
         const retry = error instanceof AppError && error.code === 'TASKMASTER_MODEL_BUSY' && attempt < 2 && !timers.has(key);
         errors.set(key, (error instanceof Error ? error.message : '自动整理暂不可用') + (retry ? ' 一分钟后自动重试。' : ''));
         if (retry) this.schedule(sessionId, userId, attempt + 1);
         console.warn('[TaskMaster] automatic extraction failed', { sessionId, error: String(error) });
       });
-    }, attempt ? 60000 : 90000);
+    }, attempt ? 60000 : 180000);
     timer.unref(); timers.set(key, timer);
   },
   async parsePrd(root: string, fileName: string, userId: number) {

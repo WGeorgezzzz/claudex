@@ -3,6 +3,7 @@ import { randomUUID, createHash } from 'node:crypto';
 import * as fs from 'node:fs/promises';
 import { z } from 'zod';
 import { AppError } from '@/shared/index.js';
+import { recordTaskmasterMetric } from './taskmaster-metrics.service.js';
 
 const status = z.enum(['pending', 'in-progress', 'done', 'blocked', 'cancelled', 'review', 'deferred']);
 const proposal = z.object({
@@ -18,7 +19,7 @@ type Proposal = z.infer<typeof proposal>;
 type Task = Record<string, unknown> & { id: number | string; title: string; status: string; subtasks?: Task[] };
 type Message = { id: string; role: string; content: string };
 type Audit = { id: string; userId: number; sessionId: string; at: string; changes: { id: Task['id']; before: Task | null; after: Task }[]; undone?: boolean };
-type State = { cursors: Record<string, string[]>; suggestions: Record<string, Proposal[]>; audits: Audit[] };
+type State = { watermarks?: Record<string, { id: string; hash: string }>; cursors: Record<string, string[]>; suggestions: Record<string, Proposal[]>; audits: Audit[] };
 type Document = Record<string, unknown>;
 const locks = new Map<string, Promise<unknown>>();
 function keyOf(text: string) { return text.toLowerCase().replace(/[\p{P}\p{Z}\s]/gu, ''); }
@@ -162,24 +163,56 @@ export function createTaskmasterWorkspaceService(generate: (input: unknown) => P
       return { tasks: data.tasks.filter(task => (task.sources as { userId: number; sessionId: string }[] | undefined)?.some(s => s.userId === userId && s.sessionId === sessionId)).map(t => ({ ...t, sources: (t.sources as { userId: number }[]).filter(s => s.userId === userId), autoUpdate: (t.autoUpdate as { userId: number } | undefined)?.userId === userId ? t.autoUpdate : undefined })),
         suggestions: data.state.suggestions[key] ?? [], audits: data.state.audits.filter(a => a.userId === userId && a.sessionId === sessionId).slice(-30).map(a => ({ id: a.id, at: a.at, undone: a.undone, changes: a.changes.map(c => ({ id: c.id, beforeStatus: c.before?.status, afterStatus: c.after.status })) })) };
     },
-    async extract(root: string, userId: number, sessionId: string, messages: Message[], suggestOnly: boolean, confirm = false) {
+    async extract(root: string, userId: number, sessionId: string, messages: Message[], suggestOnly: boolean, confirm = false, automatic = false) {
       return exclusive(root, async () => {
         const data = await load(root), key = `${userId}:${sessionId}`;
         const hashes = messages.map(fingerprint), cursor = data.state.cursors[key] ?? [];
         let common = 0; while (common < cursor.length && common < hashes.length && cursor[common] === hashes[common]) common++;
-        const fresh = messages.slice(common, common + 60);
-        if (!confirm && fresh.length === 0) return { status: 'unchanged', created: 0, updated: 0 };
-        const proposals = confirm ? data.state.suggestions[key] ?? [] : resultSchema.parse(await generate({
-          messages: fresh.map(m => ({ ...m, content: m.content.slice(0, 5000) })),
-          existingTasks: data.tasks.map(t => ({ id: t.id, title: t.title, description: t.description, status: t.status, subtasks: t.subtasks })),
-        })).tasks;
-        const validIds = new Set(messages.map(m => m.id));
+        const watermark = data.state.watermarks?.[key];
+        const position = watermark ? messages.findIndex(m => m.id === watermark.id) : -1;
+        const start = position >= 0 ? position + (hashes[position] === watermark!.hash ? 1 : 0) : Math.max(0, messages.length - 40);
+        const candidates = automatic ? messages.slice(start) : messages.slice(common);
+        const checkpoint = async () => {
+          const last = messages.at(-1);
+          if (last) (data.state.watermarks ??= {})[key] = { id: last.id, hash: hashes.at(-1)! };
+          data.state.cursors[key] = hashes;
+          await atomic(data.file, data.document);
+        };
+        const skip = async (reason: string) => {
+          await recordTaskmasterMetric({ sessionId, userId, model: null, inputChars: 0, inputTokens: 0, outputTokens: 0, durationMs: 0, skipped: true, reason });
+          if (automatic) await checkpoint();
+          return { status: reason, created: 0, updated: 0, auditId: null };
+        };
+        if (!confirm && candidates.length === 0) return skip('unchanged');
+        if (!confirm && automatic && !candidates.some(m => m.role === 'user' || (m.role === 'tool' && /完成|通过|失败|成功|错误|\b(pass(?:ed)?|fail(?:ed|ure)?|success|error|completed?|exit(?: code)?["\s:]*[0-9])\b/i.test(m.content)))) return skip('no-actionable-messages');
+        // Keep task matching context small and reserve most of the budget for the newest evidence.
+        const existingTasks: { id: Task['id']; title: string; status: string; acceptance: string }[] = [];
+        for (const t of data.tasks.filter(t => !['done', 'cancelled'].includes(t.status)).reverse()) {
+          const compact = { id: t.id, title: t.title.slice(0, 300), status: t.status, acceptance: String(t.testStrategy ?? '').slice(0, 500) };
+          if (JSON.stringify([...existingTasks, compact]).length > 7000) break;
+          existingTasks.push(compact);
+        }
+        const fresh: Message[] = [];
+        const input = { sessionId, messages: fresh, existingTasks };
+        for (let i = candidates.length - 1; i >= 0; i--) {
+          const m = { ...candidates[i], content: candidates[i].content.slice(0, 5000) };
+          fresh.unshift(m);
+          if (JSON.stringify(input).length > 22000) {
+            if (fresh.length === 1) {
+              while (m.content.length && JSON.stringify(input).length > 22000) m.content = m.content.slice(Math.ceil(m.content.length / 2));
+            } else fresh.shift();
+            break;
+          }
+        }
+        const proposals = confirm ? data.state.suggestions[key] ?? [] : resultSchema.parse(await generate(input)).tasks;
+        const evidenceMessages = confirm ? messages : fresh;
+        const validIds = new Set(evidenceMessages.map(m => m.id));
         const audit: Audit = { id: randomUUID(), userId, sessionId, at: new Date().toISOString(), changes: [] };
         const suggestions: Proposal[] = [];
         const references = new Map<string, Task['id']>(); const dependencies: { task: Task; refs: (string | number)[] }[] = [];
         let created = 0, updated = 0;
         for (const item of proposals) {
-          const evidenceMessage = messages.find(m => m.id === item.messageId);
+          const evidenceMessage = evidenceMessages.find(m => m.id === item.messageId);
           if (!validIds.has(item.messageId) || !evidenceMessage?.content.includes(item.evidence)) continue;
           if (!confirm && (suggestOnly || item.confidence < 0.85)) { suggestions.push(item); continue; }
           // Model-selected ids provide semantic matching; lexical matching also catches repeated proposals.
@@ -210,7 +243,11 @@ export function createTaskmasterWorkspaceService(generate: (input: unknown) => P
         // Receipts describe the final dependency-resolved state, which undo compares before restoring.
         for (const change of audit.changes) change.after = structuredClone(data.tasks.find(t => t.id === change.id)!);
         data.state.suggestions[key] = confirm ? [] : [...(data.state.suggestions[key] ?? []).filter(old => !proposals.some(p => similar(p.title, old.title))), ...suggestions];
-        if (!confirm) data.state.cursors[key] = hashes.slice(0, common + fresh.length);
+        if (!confirm) {
+          data.state.cursors[key] = hashes;
+          const last = messages.at(-1);
+          if (last) (data.state.watermarks ??= {})[key] = { id: last.id, hash: hashes.at(-1)! };
+        }
         if (audit.changes.length) data.state.audits.push(audit);
         await atomic(data.file, data.document);
         if (audit.changes.length) changed(root, 'tasks');
