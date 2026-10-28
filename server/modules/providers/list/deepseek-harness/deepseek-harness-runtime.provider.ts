@@ -94,7 +94,10 @@ export const deepSeekHarnessRuntime: IProviderRuntime = {
         child.once('close', code => {
           if (active.get(appId) === entry) active.delete(appId);
           if (entry.aborted) { resolve(); return; }
-          const succeeded = code === 0 && announced && final && completed && !errorMessage && !lastToolFailure;
+          // A tool error is already visible in its correlated result. The native
+          // turn can still finish with an explanation or recovery; only native
+          // completion and process/transport failures determine run completion.
+          const succeeded = code === 0 && announced && final && completed && !errorMessage;
           if (!succeeded) {
             const message = errorMessage || lastToolFailure || stderr.trim() || 'Harness exited without a completed turn and final result.';
             try { persist({ type: 'nexagent_error', text: message }); } catch { /* Keep the original error when storage failed. */ }
