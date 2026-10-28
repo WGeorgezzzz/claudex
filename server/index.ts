@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { requireSharedResourceAdministrator } from '@/modules/auth/index.js';
-import { initializeInfohubTaskSync,closeInfohubTaskSync,taskmasterInboxService,infohubEmbedScript } from '@/modules/taskmaster/index.js';
+import { initializeTaskIntelligence,closeTaskIntelligence,initializeInfohubTaskSync,closeInfohubTaskSync,taskmasterInboxService,infohubEmbedScript } from '@/modules/taskmaster/index.js';
 // Load environment variables before other imports execute.
 import './load-env.js';
 
@@ -497,6 +497,7 @@ async function startServer() {
                 initializeMonitors(providerRuntimeService);
                 initializeDot();
                 initializeInfohubTaskSync();
+                initializeTaskIntelligence();
                 sideChatsDb.recover();
                 initializeMessageQueue(providerRuntimeService);
             }
@@ -511,7 +512,7 @@ async function startServer() {
         closeScheduledMessageDispatcher();
         closeMonitors();
         closeDot();
-        closeInfohubTaskSync();
+        closeInfohubTaskSync();closeTaskIntelligence();
         closeMessageQueue();
         // Clean up plugin processes on shutdown
         const shutdownRuntimeServices = async () => {

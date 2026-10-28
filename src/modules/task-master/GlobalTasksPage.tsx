@@ -1,3 +1,4 @@
+import { IntelligentTasksPanel } from '@/modules/task-master/IntelligentTasksPanel';
 import { TaskExecutionPanel } from '@/modules/task-master/TaskExecutionPanel';
 import type { LLMProvider } from '@/shared/types';
 import { useCallback, useEffect, useState } from 'react';
@@ -89,6 +90,9 @@ export function GlobalTasksPage({ onMenuClick }: { onMenuClick: () => void }) {
   const [newPriority, setNewPriority] = useState('medium');
   // Info-hub views are deterministic client filters over namespaced task tags.
   const [view, setView] = useState<'all' | 'today' | 'mine' | 'explore'>('all');
+  // Semantic view is default once a persisted result exists; legacy remains an explicit fallback.
+  const [semantic,setSemantic]=useState(true);
+  const [intelligenceReady,setIntelligenceReady]=useState(false);
   const [layout,setLayout]=useState<'tree'|'groups'|'list'|'board'>('tree');
   const [tags,setTags]=useState<string[]>([]);
   const [viewName,setViewName]=useState('');
@@ -134,6 +138,9 @@ export function GlobalTasksPage({ onMenuClick }: { onMenuClick: () => void }) {
           <select aria-label="新任务优先级" className={control} value={newPriority} onChange={e => setNewPriority(e.target.value)}><option value="high">高优先级</option><option value="medium">普通</option><option value="low">低优先级</option></select>
           <button type="submit" className="min-h-10 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-50" disabled={!newTitle.trim() || busy}>新建任务</button>
         </form>
+        <div className="flex flex-wrap gap-2"><button className={control} aria-pressed={semantic} onClick={()=>setSemantic(true)}>智能分组（按项目）</button><button className={control} aria-pressed={!semantic} onClick={()=>setSemantic(false)}>旧分组（按来源标签）</button></div>
+        <div hidden={!semantic}><IntelligentTasksPanel onReady={setIntelligenceReady}/></div>
+        <div hidden={semantic&&intelligenceReady} className="space-y-5">
         <div className="grid grid-cols-2 gap-3 md:grid-cols-5" aria-label="任务概览">
           {summary.map(item => <button key={item.id} type="button" aria-pressed={status === item.id} onClick={() => setStatus(item.id)} className={`rounded-xl border bg-card px-4 py-3 text-left transition-colors hover:border-primary/40 ${status === item.id ? 'border-primary/50 ring-1 ring-primary/10' : 'border-border'}`}>
             <span className="text-xs font-medium text-muted-foreground">{item.label}</span><span className={`mt-1 block text-2xl font-semibold tabular-nums ${item.tone}`}>{loading ? '—' : item.count}</span>
@@ -188,6 +195,7 @@ export function GlobalTasksPage({ onMenuClick }: { onMenuClick: () => void }) {
         </div>
         {!loading && <p className="text-xs text-muted-foreground">当前筛选共 {tasks.length} 项</p>}
         <details className="border-t pt-3"><summary className="cursor-pointer text-xs text-muted-foreground">改动记录</summary>{projects.flatMap(p => p.audits.filter(a => !a.undone).slice(-5).reverse().map(a => <div key={p.projectId + a.id} className="flex flex-wrap items-center gap-2 border-b py-2 text-sm"><span className="min-w-0 flex-1 break-words">{p.name} · {new Date(a.at).toLocaleString()} · {a.changes.map(c => c.title).join('、')}</span><button className={control} disabled={busy} onClick={() => void act(() => inboxTasksApi.undo(p.projectId, a.id), p.projectId)}><RotateCcw size={16} aria-label="撤销此改动"/></button></div>))}</details>
+        </div>
       </div>
     </div>
   </section>;

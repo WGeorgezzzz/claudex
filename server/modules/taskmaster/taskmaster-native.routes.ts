@@ -6,6 +6,7 @@ import { projectsDb } from '@/modules/database/index.js';
 import { requireSharedResourceAdministrator } from '@/modules/auth/index.js';
 import { inboxBatchSchema, taskmasterInboxService } from './taskmaster-inbox.service.js';
 import { taskmasterAutoService, taskmasterWorkspace } from './taskmaster-auto.service.js';
+import { taskIntelligenceService } from './taskmaster-intelligence.service.js';
 
 /** TaskMaster composition mounts these native endpoints ahead of legacy document routes. */
 export function createTaskmasterNativeRouter() {
@@ -35,6 +36,10 @@ export function createTaskmasterNativeRouter() {
   router.get('/inbox/execution-settings',action(()=>taskmasterInboxService.executionSettings()));
   router.get('/inbox/session-source/:sessionId',action(req=>taskmasterInboxService.sessionSource(String(req.params.sessionId))));
   router.get('/inbox/global', action(() => taskmasterInboxService.global()));
+  router.post('/inbox/intelligence/execute',action(req=>taskIntelligenceService.executeWithContext(z.object({id:z.string().min(1),parent:z.boolean().default(false),settings:executionSettings.optional()}).parse(req.body))));
+  router.get('/inbox/intelligence',action(()=>taskIntelligenceService.snapshot()));
+  router.post('/inbox/intelligence/refresh',action(req=>taskIntelligenceService.refresh(req.body?.force===true)));
+  router.post('/inbox/intelligence/correct',action(req=>taskIntelligenceService.correct(req.body)));
   router.post('/inbox/organize', action(req=>taskmasterInboxService.organize(z.string().min(1).parse(req.body.projectId))));
   router.post('/inbox/unit', action(req=>{const p=z.object({projectId:z.string().min(1),id:z.string().min(1).max(200),title:z.string().min(1).max(300).optional(),parentIds:z.array(z.string().min(1).max(200)).max(30),tags:z.array(z.string().regex(/^[a-z]+:.+/).max(150)).max(50).optional()}).parse(req.body);return taskmasterInboxService.linkUnit(p.projectId,p);}));
   router.get('/inbox/views',action(()=>taskmasterInboxService.views()));
