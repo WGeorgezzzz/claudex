@@ -8,3 +8,5 @@ export { ConversationTasksPanel } from '@/modules/task-master/ConversationTasksP
 export { TaskAutomationSettings } from '@/modules/task-master/TaskAutomationSettings';
 export { GlobalTasksPage, TasksNavigation } from '@/modules/task-master/GlobalTasksPage';
 export { InfoHubNavigation } from '@/modules/task-master/GlobalTasksPage';
+
+export { TaskSourceBanner } from '@/modules/task-master/TaskSourceBanner';

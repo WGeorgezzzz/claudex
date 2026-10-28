@@ -165,6 +165,8 @@ function ComposerModelMenu({
                     <ComposerMenuItem
                       key={option.value}
                       label={option.label || option.value}
+                      disabled={option.disabled}
+                      description={option.unavailableReason||option.description}
                       icon={<LLMProviderLogo provider={harness} />}
                       isSelected={option.value === model}
                       onSelect={() => {

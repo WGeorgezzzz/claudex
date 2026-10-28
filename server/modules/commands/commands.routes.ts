@@ -49,9 +49,10 @@ const router = express.Router();
   router.use(userContextMiddleware);
   router.use(authorizePaths(req => [req.body?.projectPath, req.body?.context?.projectPath].filter(value => typeof value === 'string')));
 
-const MODEL_PROVIDERS = ["claude", "cursor", "codex", "opencode", "workbuddy", "deepseek-harness"];
+const MODEL_PROVIDERS = ["claude", "cursor", "codex", "opencode", "workbuddy", "deepseek-harness", "gemini"];
 
 const MODEL_PROVIDER_LABELS = {
+  gemini: "Gemini",
   claude: "Claude",
   cursor: "Cursor",
   codex: "Codex",
@@ -469,10 +470,12 @@ Custom commands can be created in:
 router.post("/list", async (req, res) => {
   try {
     const { projectPath } = req.body;
-    const allCommands = [...builtInCommands];
+    const provider=readModelProvider(req.body.provider);
+    const native=provider==='codex'?[...builtInCommands.filter(c=>['/help','/models','/status','/config'].includes(c.name)).map(c=>({...c,description:c.name==='/help'?'查看 Codex / Nexagent 命令':c.description})),{name:'/compact',description:'原生压缩 Codex 线程上下文',namespace:'builtin',type:'skill',metadata:{type:'skill',native:true}}, {name:'/model',description:'选择 Codex 模型',namespace:'builtin',metadata:{type:'builtin'}}]:builtInCommands;
+    const allCommands = [...native];
 
     // Scan project-level commands (.claude/commands/)
-    if (projectPath) {
+    if (projectPath&&provider==='claude') {
       const projectCommandsDir = path.join(projectPath, ".claude", "commands");
       const projectCommands = await scanCommandsDirectory(
         projectCommandsDir,
@@ -485,11 +488,11 @@ router.post("/list", async (req, res) => {
     // Scan user-level commands (~/.claude/commands/)
     const homeDir = os.homedir();
     const userCommandsDir = path.join(getCurrentUserContext()?.claudeConfigDir || path.join(homeDir, ".claude"), "commands");
-    const userCommands = await scanCommandsDirectory(
+    const userCommands = provider==='claude'?await scanCommandsDirectory(
       userCommandsDir,
       userCommandsDir,
       "user",
-    );
+    ):[];
     allCommands.push(...userCommands);
 
     // Separate built-in and custom commands
@@ -501,7 +504,7 @@ router.post("/list", async (req, res) => {
     customCommands.sort((a, b) => a.name.localeCompare(b.name));
 
     res.json({
-      builtIn: builtInCommands,
+      builtIn: native,
       custom: customCommands,
       count: allCommands.length,
     });
@@ -537,7 +540,7 @@ router.post("/execute", async (req, res) => {
     }
 
     // Handle built-in commands
-    const handler = builtInHandlers[commandName];
+    const handler = builtInHandlers[commandName==='/model'?'/models':commandName];
     if (handler) {
       try {
         const result = await handler(args, context);

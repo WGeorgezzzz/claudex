@@ -105,6 +105,7 @@ export type LLMProvider = 'claude' | 'codex' | 'cursor' | 'opencode' | 'workbudd
  * One selectable model row in a provider model catalog.
  */
 export type ProviderModelOption = {
+  disabled?:boolean;unavailableReason?:string;
   value: string;
   /** Aliases reported by the connected provider, resolving to this wire ID. */
   aliases?: string[];
@@ -820,6 +821,7 @@ export type ProviderSkillRemoveInput = {
  * callers can distinguish duplicate skill names across scopes.
  */
 export type ProviderSkill = {
+  argumentHint?:string;
   provider: LLMProvider;
   name: string;
   description: string;
@@ -1490,7 +1492,7 @@ export type FileTreeServices = {
   }>;
   listProjectFiles(
     projectId: string,
-    options?: { respectGitignore: boolean },
+    options?: { respectGitignore: boolean; workspacePath?:string },
   ): Promise<FileTreeNode[]>;
   createEntry(input: {
     projectId: string;

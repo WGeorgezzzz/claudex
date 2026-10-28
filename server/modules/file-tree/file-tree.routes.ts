@@ -119,7 +119,7 @@ export function createFileTreeRouter(
   const router = express.Router();
   router.use(userContextMiddleware);
   router.param('projectId', authorizeProjectParameter(id => projectsDb.getProjectPathById(id)));
-  router.use(authorizePaths(req => [req.query.path, req.body?.path].filter((value): value is string => typeof value === 'string' && path.isAbsolute(value))));
+  router.use(authorizePaths(req => [req.query.path,req.query.workspacePath, req.body?.path].filter((value): value is string => typeof value === 'string' && path.isAbsolute(value))));
 
   router.get('/browse-filesystem', createRouteHandler(async (request, response) => {
     response.json(await services.browseWorkspace(readOptionalString(request.query.path)));
@@ -196,6 +196,7 @@ export function createFileTreeRouter(
   router.get('/projects/:projectId/files', createRouteHandler(async (request, response) => {
     response.json(await services.listProjectFiles(readProjectId(request), {
       respectGitignore: request.query.respectGitignore === 'true',
+      ...(typeof request.query.workspacePath==='string'&&request.query.workspacePath?{workspacePath:request.query.workspacePath}:{}),
     }));
   }, logger));
 

@@ -19,10 +19,11 @@ test('inbox imports preserve options, deduplicate concurrent batches, retain com
   assert.equal((await service.list(root, 1)).tasks.length, 1);
   const receipt = await service.changeInboxTask(root, 1, '1', async () => ({ status: 'done' }));
   const before = await readFile(path.join(root, '.taskmaster/tasks/tasks.json'), 'utf8');
-  await service.importInbox(root, 1, 'batch-3', [{ ...item(), detail: '不能改完成事项' }]);
+  const extraEvidence=await service.importInbox(root, 1, 'batch-3', [{ ...item(), detail: '不能改完成事项' }]);
   assert.equal(((await service.list(root, 1)).tasks[0] as Record<string, unknown>).description, '追加验收标准');
   assert(before.includes('done'));
   await assert.rejects(service.undo(root, 2, 'global', receipt.auditId!), /找不到/);
+  await service.undo(root,1,'global',extraEvidence.auditId!);
   await service.undo(root, 1, 'global', receipt.auditId!);
   assert.equal((await service.list(root, 1)).tasks[0].status, 'pending');
 });

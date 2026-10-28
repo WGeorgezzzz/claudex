@@ -1,4 +1,5 @@
-import { memo, useMemo, useRef } from 'react';
+import { InvocationCatalogContext,renderInvocationTokens } from '@/modules/chat/utils/invocationTokens';
+import { memo, useMemo, useRef,useContext,Children } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GitBranchIcon, PencilIcon } from 'lucide-react';
 
@@ -50,6 +51,7 @@ const COPY_HIDDEN_TOOL_NAMES = new Set(['Bash', 'Edit', 'Write', 'ApplyPatch']);
  * transcript entry — user turn, assistant turn, or a tool call and its result.
  */
 const MessageComponent = memo(({ message, prevMessage, createDiff, onFileOpen, showRawParameters, showThinking, selectedProject, provider, onEditMessage, onForkFromMessage }: MessageComponentProps) => {
+  const invocations=useContext(InvocationCatalogContext);
   const { t } = useTranslation('chat');
   const isGrouped = prevMessage && prevMessage.type === message.type &&
     ((prevMessage.type === 'assistant') ||
@@ -129,6 +131,7 @@ const MessageComponent = memo(({ message, prevMessage, createDiff, onFileOpen, s
               <div className="group max-w-full rounded-2xl bg-muted px-4 py-3 text-foreground">
                 <div dir="auto" className="break-words font-sans text-sm">
                   <Markdown
+                    components={{p:({children})=><p>{Children.map(children,child=>typeof child==='string'?renderInvocationTokens(child,invocations.commands,invocations.files):child)}</p>,li:({children})=><li>{Children.map(children,child=>typeof child==='string'?renderInvocationTokens(child,invocations.commands,invocations.files):child)}</li>}}
                     breaks
                     className="prose prose-sm max-w-none font-sans dark:prose-invert"
                   >

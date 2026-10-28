@@ -1,8 +1,9 @@
+import { InvocationCatalogContext } from '@/modules/chat/utils/invocationTokens';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ArrowDownIcon } from 'lucide-react';
 
-import { useTasksSettings, ConversationTasksPanel } from '@/modules/task-master';
+import { useTasksSettings, ConversationTasksPanel,TaskSourceBanner } from '@/modules/task-master';
 import { usePaletteOpsRegister } from '@/modules/command-palette';
 import { useWebSocket } from '@/shared/context/WebSocketContext';
 import PermissionContext from '@/modules/chat/context/PermissionContext';
@@ -224,6 +225,7 @@ function ChatInterface({
     inputHighlightRef,
     isTextareaExpanded,
     slashCommandsCount,
+    commandsForHighlight,fileNamesForHighlight,invocationWarning,
     filteredCommands,
     frequentCommands,
     commandQuery,
@@ -460,7 +462,9 @@ function ChatInterface({
   }), [pendingPermissionRequests, handlePermissionDecision, provider, selectPermissionMode]);
 
   const [resolvedCwd,setResolvedCwd]=useState<{id:string;path:string}|null>(null);
+  const invocationCatalog=useMemo(()=>({commands:commandsForHighlight||[],files:fileNamesForHighlight||[]}),[commandsForHighlight,fileNamesForHighlight]);
   const pathSessionId=currentSessionId || selectedSession?.id;
+  useEffect(()=>{if(!pathSessionId||isSideChat)return;localStorage.setItem('nexagent.currentSession',pathSessionId);const key='nexagent.taskDraft:'+pathSessionId;const draft=sessionStorage.getItem(key);if(draft){sessionStorage.removeItem(key);setInput(old=>old?old+'\n\n'+draft:draft);textareaRef.current?.focus();}},[pathSessionId,isSideChat,setInput]);
   useEffect(()=>{
     let active=true;
     if(pathSessionId) void api.sessionWorkspace.get(pathSessionId).then(response=>response.ok?response.json():null).then(result=>{
@@ -527,8 +531,9 @@ function ChatInterface({
 
 
   return (
-    <PermissionContext.Provider value={permissionContextValue}>
+    <PermissionContext.Provider value={permissionContextValue}><InvocationCatalogContext.Provider value={invocationCatalog}>
       <div className="flex h-full min-h-0 flex-col">
+          <TaskSourceBanner sessionId={currentSessionId||selectedSession?.id}/>
         <MarkdownWorkspaceContext.Provider value={markdownWorkspaceValue}>
           <TranscriptSessionContext.Provider value={transcriptSessionValue}>
             {isSideChat && contextCutoff && <button type="button"
@@ -671,7 +676,7 @@ function ChatInterface({
           onClearInput={handleClearInput}
           onSubmit={handleSubmit}
           isDragActive={isDragActive}
-          submissionNotice={messageQueue.notice}
+          submissionNotice={[messageQueue.notice,invocationWarning?'未找到该技能：'+invocationWarning:''].filter(Boolean).join(' · ')}
           pendingTray={<MessageQueuePanel key={currentSessionId||selectedSession?.id||'new'} items={messageQueue.items}
             error={messageQueue.error} update={messageQueue.update} attempts={messageQueue.attempts}
             paused={messageQueue.paused} setPaused={messageQueue.setPaused} retryLive={async item => {
@@ -731,7 +736,7 @@ function ChatInterface({
         currentSessionId={currentSessionId || selectedSession?.id || null}
         onSelectProviderModel={selectProviderModel}
       />
-    </PermissionContext.Provider>
+    </InvocationCatalogContext.Provider></PermissionContext.Provider>
   );
 }
 

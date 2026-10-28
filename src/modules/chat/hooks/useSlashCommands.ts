@@ -50,29 +50,11 @@ const filterSlashCommands = (
     return commands;
   }
 
-  const commandPrefix = normalizedQuery.startsWith('/')
-    ? normalizedQuery
-    : `/${normalizedQuery}`;
-  const namePrefixMatches = commands.filter((command) =>
-    command.name.toLowerCase().startsWith(commandPrefix),
-  );
-
-  // Namespaced commands should behave like path completion. Once a provider
-  // namespace is typed, only exact command-prefix matches should stay visible.
-  if (normalizedQuery.includes(':') || namePrefixMatches.length > 0) {
-    return namePrefixMatches;
-  }
-
-  const nameSubstringMatches = commands.filter((command) =>
-    command.name.toLowerCase().includes(normalizedQuery),
-  );
-  if (nameSubstringMatches.length > 0) {
-    return nameSubstringMatches;
-  }
-
-  return commands.filter((command) =>
-    command.description?.toLowerCase().includes(normalizedQuery),
-  );
+  const prefix=normalizedQuery[0]==='$'?'$':'/';
+  const needle=normalizedQuery.replace(/^[$/]/,'');
+  const pool=commands.filter(command=>command.name.startsWith(prefix));
+  const score=(command:SlashCommand)=>{const name=command.name.slice(1).toLowerCase();if(name.startsWith(needle))return 100;if(name.includes(needle))return 80;let at=0;for(const c of name)if(c===needle[at])at++;if(at===needle.length)return 50;return command.description?.toLowerCase().includes(needle)?20:0;};
+  return pool.map(command=>({command,rank:score(command)})).filter(row=>row.rank>0).sort((a,b)=>b.rank-a.rank).map(row=>row.command);
 };
 
 export function useSlashCommands({
@@ -120,7 +102,7 @@ export function useSlashCommands({
       const commandBUsage = parsedHistory[commandB.name] || 0;
       return commandBUsage - commandAUsage;
     });
-  }, [projectCommands, selectedProject]);
+  }, [projectCommands, selectedProject?.projectId]);
 
   useEffect(() => {
     if (!showCommandMenu) {
@@ -147,7 +129,7 @@ export function useSlashCommands({
       .filter((command) => command.usageCount > 0)
       .sort((commandA, commandB) => commandB.usageCount - commandA.usageCount)
       .slice(0, 5);
-  }, [selectedProject, slashCommands]);
+  }, [selectedProject?.projectId, slashCommands]);
 
   const trackCommandUsage = useCallback(
     (command: SlashCommand) => {
@@ -273,7 +255,7 @@ export function useSlashCommands({
       }
 
       // Match / at start of input OR after whitespace, capturing the /word up to cursor.
-      const slashPattern = /(?:^|\s)(\/\S*)$/;
+      const slashPattern = provider==='codex'?/(?:^|\s)([$/]\S*)$/:/(?:^|\s)(\/\S*)$/;
       const match = textBeforeCursor.match(slashPattern);
 
       if (!match) {
@@ -283,18 +265,20 @@ export function useSlashCommands({
 
       // Compute actual position of / in the full input string.
       const slashPos = match.index! + (match[0].length - match[1].length);
-      const query = match[1].slice(1); // strip leading /
+      const query = match[1]; // Keep the native / or $ prefix when filtering.
 
       setSlashPosition(slashPos);
       setShowCommandMenu(true);
       setSelectedCommandIndex(-1);
 
       clearCommandQueryTimer();
+      setCommandQuery(query);
+      setFilteredCommands(filterSlashCommands(slashCommands,query));
       commandQueryTimerRef.current = window.setTimeout(() => {
         setCommandQuery(query);
       }, COMMAND_QUERY_DEBOUNCE_MS);
     },
-    [resetCommandMenuState, clearCommandQueryTimer],
+    [resetCommandMenuState, clearCommandQueryTimer,provider,slashCommands],
   );
 
   const handleCommandMenuKeyDown = useCallback(

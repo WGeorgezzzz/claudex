@@ -1,3 +1,5 @@
+import { readFile } from 'node:fs/promises';
+import { parseFrontMatter } from '@/shared/frontmatter.js';
 import { providerRegistry } from '@/modules/providers/provider.registry.js';
 import type {
   ProviderSkill,
@@ -15,7 +17,8 @@ export const providerSkillsService = {
     options?: ProviderSkillListOptions,
   ): Promise<ProviderSkill[]> {
     const provider = providerRegistry.resolveProvider(providerName);
-    return provider.skills.listSkills(options);
+    const skills=await provider.skills.listSkills(options);
+    return Promise.all(skills.map(async skill=>{try{const metadata=parseFrontMatter(await readFile(skill.sourcePath,'utf8')).data;return {...skill,...(typeof metadata['argument-hint']==='string'?{argumentHint:metadata['argument-hint']}: {})};}catch{return skill;}}));
   },
 
   /**

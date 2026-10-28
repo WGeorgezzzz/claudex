@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 
 import { api } from '@/shared/api';
 import type { LLMProvider, Project, SlashCommand } from '@/shared/types';
@@ -11,6 +11,7 @@ type ProviderSkill = {
   sourcePath?: string;
   pluginName?: string;
   pluginId?: string;
+  argumentHint?:string;
 };
 
 type ProviderSkillsResponse = {
@@ -61,6 +62,7 @@ const mapSkillToSlashCommand = (skill: ProviderSkill): SlashCommand => ({
     pluginName: skill.pluginName,
     pluginId: skill.pluginId,
     skillName: skill.name,
+    ...(skill.argumentHint?{argumentHint:skill.argumentHint}:{}),
   },
 });
 
@@ -87,6 +89,9 @@ export function useProjectSlashCommands(
   // Set when the request failed so a list can explain the emptiness; cleared
   // on the next successful fetch.
   const [error, setError] = useState(false);
+  const commandCache=useRef(new Map<string,{at:number;commands:SlashCommand[]}>());
+  const [refresh,setRefresh]=useState(0);
+  useEffect(()=>{const reload=()=>{commandCache.current.clear();setRefresh(n=>n+1);};window.addEventListener('nexagent:skills-refresh',reload);return()=>window.removeEventListener('nexagent:skills-refresh',reload);},[]);
 
   useEffect(() => {
     if (!enabled) {
@@ -108,7 +113,11 @@ export function useProjectSlashCommands(
 
       try {
         const workspacePath = selectedProject.fullPath || selectedProject.path || '';
-        const response = await api.commands.list(workspacePath || selectedProject.path);
+        const cacheKey=provider+':'+workspacePath;
+        const cached=commandCache.current.get(cacheKey);
+        if(cached&&Date.now()-cached.at<60000){if(!cancelled){setCommands(cached.commands);setIsLoading(false);}return;}
+        setCommands([]);
+        const response = await api.commands.list(workspacePath || selectedProject.path,provider);
 
         if (!response.ok) {
           throw new Error('Failed to fetch commands');
@@ -124,7 +133,7 @@ export function useProjectSlashCommands(
         const allCommands: SlashCommand[] = [
           ...((data.builtIn || []) as SlashCommand[]).map((command) => ({
             ...command,
-            type: 'built-in',
+            type: command.type || 'built-in',
           })),
           ...skillCommands,
           ...((data.custom || []) as SlashCommand[]).map((command) => ({
@@ -133,6 +142,7 @@ export function useProjectSlashCommands(
           })),
         ];
 
+        commandCache.current.set(cacheKey,{at:Date.now(),commands:allCommands});
         if (!cancelled) {
           setCommands(allCommands);
           setIsLoading(false);
@@ -151,7 +161,7 @@ export function useProjectSlashCommands(
     return () => {
       cancelled = true;
     };
-  }, [enabled, selectedProject, provider]);
+  }, [enabled, selectedProject?.projectId,selectedProject?.fullPath,selectedProject?.path, provider,refresh]);
 
   return { commands, isLoading, error };
 }

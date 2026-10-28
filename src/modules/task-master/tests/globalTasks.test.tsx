@@ -5,8 +5,8 @@ import assert from 'node:assert/strict';
 import { GlobalTasksPage, TasksNavigation } from '@/modules/task-master/GlobalTasksPage';
 import { taskWorkstream } from '@/modules/task-master/utils/taskWorkstreams';
 
-const mocks = vi.hoisted(() => ({ list: vi.fn(), execute: vi.fn(), action: vi.fn(), undo: vi.fn() }));
-vi.mock('@/shared/api', () => ({ inboxTasksApi: mocks }));
+const mocks = vi.hoisted(() => ({ list: vi.fn(), execute: vi.fn(), action: vi.fn(), undo: vi.fn(),views:vi.fn(async()=>({ok:true,json:async()=>[]})) }));
+vi.mock('@/shared/api', () => ({ inboxTasksApi: {...mocks,executionSettings:async()=>({ok:true,json:async()=>({provider:'codex',model:'gpt-test',cwd:'/tmp/inbox'})})},api:{providers:{discovery:async()=>({ok:true,json:async()=>({agents:[{id:'codex',installed:true,enabled:true}]})}),capabilities:async()=>({ok:true,json:async()=>({providers:[{provider:'codex',permissionModes:['default'],defaultPermissionMode:'default'}]})}),models:async()=>({ok:true,json:async()=>({models:{OPTIONS:[{value:'gpt-test',label:'Test'}],DEFAULT:'gpt-test'}})})}} }));
 const reply = (value: unknown) => ({ ok: true, json: async () => value });
 const project = { projectId: 'inbox', name: '收件箱待办', audits: [], tasks: [
   { id: 1, title: '核对规格书', description: '核对参数和截止时间', source: '客户会议', due: '2026-10-28', priority: 'high', status: 'pending', recommended: 'B', options: [{ key: 'A', label: '写报告', plan: '输出报告' }, { key: 'B', label: '准备问题', plan: '本人发送' }, { key: 'C', label: '暂缓', plan: '记录原因' }] },
@@ -21,7 +21,8 @@ test('global tasks default to open, preserve all options and explicitly dispatch
   fireEvent.click(screen.getByText('核对规格书'));
   assert(screen.getByText('C · 暂缓')); assert((screen.getAllByRole('radio')[1] as HTMLInputElement).checked);
   fireEvent.click(screen.getAllByRole('radio')[0]); fireEvent.click(screen.getByText('执行', { exact: true }));
-  await waitFor(() => assert.deepEqual(mocks.execute.mock.calls[0], ['inbox', '1', 'A']));
+  fireEvent.click(await screen.findByRole('button',{name:'确认执行并打开对话'}));
+  await waitFor(() => assert.deepEqual(mocks.execute.mock.calls[0], ['inbox', '1', 'A', '',{provider:'codex',model:'gpt-test',cwd:'/tmp/inbox',effort:'',permissionMode:'default'}]));
   assert.equal(mocks.action.mock.calls.length, 0);
 });
 test('completion returns an undo receipt, and status filter includes completed tasks', async () => {
@@ -58,6 +59,7 @@ test('all tasks and options are visible by default; explicit collapse and search
   render(<MemoryRouter><GlobalTasksPage onMenuClick={() => {}}/></MemoryRouter>);
   await screen.findByText('Nexagent 任务 1');
   assert.equal(screen.getAllByTestId('global-task-row').length,5);
+  fireEvent.click(screen.getByRole('button',{name:'按大类'}));
   fireEvent.click(screen.getByRole('button',{name:'收起为重点概览'}));
   assert.equal(screen.getAllByTestId('global-task-row').length,3);
   fireEvent.click(screen.getByRole('button',{name:'展开其余 2 项'}));

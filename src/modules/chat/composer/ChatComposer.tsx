@@ -10,7 +10,7 @@ import type {
   RefObject,
   TouchEvent,
 } from 'react';
-import { ListPlus, OctagonX, PaperclipIcon, MessageSquareIcon, XIcon, Loader2, CornerDownRight, PencilIcon, Monitor } from 'lucide-react';
+import { ListPlus, OctagonX, PaperclipIcon, MessageSquareIcon, XIcon, Loader2, CornerDownRight, PencilIcon, Monitor,RefreshCw } from 'lucide-react';
 
 import { useVoiceInput } from '@/modules/chat/hooks/useVoiceInput';
 import { useVoiceAvailable } from '@/modules/chat/hooks/useVoiceAvailable';
@@ -390,7 +390,7 @@ export default function ChatComposer({
         />
 
         <PromptInput
-          onSubmit={onSubmit as (event: FormEvent<HTMLFormElement>) => void}
+          onSubmit={event=>{if(availableModelOptions.find(option=>option.value===model)?.disabled){event.preventDefault();return;}onSubmit(event);}}
           status={isLoading ? 'streaming' : 'ready'}
           className={[
             isTextareaExpanded ? 'chat-input-expanded' : '',
@@ -434,7 +434,7 @@ export default function ChatComposer({
 
           <PromptInputBody>
             <div ref={inputHighlightRef} aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-xl">
-              <div className="chat-input-placeholder block w-full whitespace-pre-wrap break-words px-4 py-2 text-sm leading-6 text-transparent">
+              <div className="chat-input-placeholder block w-full whitespace-pre-wrap break-words px-4 py-3 text-sm leading-6 text-transparent">
                 {renderInputWithMentions(input)}
               </div>
             </div>
@@ -488,6 +488,7 @@ export default function ChatComposer({
               <MessageSquareIcon /><span>{t('input.showAllCommands')}</span>
             </PromptInputButton>
 
+            <PromptInputButton tooltip={{content:'刷新技能与命令'}} aria-label="刷新技能与命令" onClick={()=>{window.dispatchEvent(new Event('nexagent:skills-refresh'));if(!isCommandMenuOpen)onToggleCommandMenu();}}><RefreshCw size={14}/><span>刷新技能</span></PromptInputButton>
             {hasInput && (
               <PromptInputButton
                 tooltip={{ content: t('input.clearInput', { defaultValue: 'Clear input' }) }}
@@ -561,7 +562,7 @@ export default function ChatComposer({
                     ? false
                     : isTranscribing
                       ? true
-                      : !input.trim() && attachedFiles.length === 0
+                      : Boolean(availableModelOptions.find(option=>option.value===model)?.disabled) || (!input.trim() && attachedFiles.length === 0)
               }
               aria-label={submitAriaLabel}
               title={insertsLive ? t('liveInput.insertHint') : submitAriaLabel}

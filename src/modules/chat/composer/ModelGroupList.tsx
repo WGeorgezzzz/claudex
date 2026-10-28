@@ -129,6 +129,7 @@ export default function ModelGroupList({
               return (
                 <CommandItem
                   key={`${group.key}-${model.value}`}
+                  disabled={model.disabled}
                   value={`${group.name} ${model.label} ${model.description || ""}`}
                   onSelect={() => onSelect(group.provider, model.value)}
                   className="ml-4 border-l border-border/40 pl-4"
@@ -141,6 +142,7 @@ export default function ModelGroupList({
                         <Badge className="h-4 shrink-0 rounded-full px-1.5 text-[8px]">Custom</Badge>
                       )}
                     </div>
+                    {model.unavailableReason&&<p className="break-words text-xs text-muted-foreground">{model.unavailableReason}</p>}
                     {model.label !== model.value && (
                       <div className="truncate font-mono text-[10px] text-muted-foreground">
                         {model.value}

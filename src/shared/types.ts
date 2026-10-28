@@ -9,6 +9,7 @@ export type LLMProvider = 'claude' | 'cursor' | 'codex' | 'opencode' | 'workbudd
 
 /** One selectable model in a provider's model menu, including its optional reasoning-effort choices. */
 export type ProviderModelOption = {
+  disabled?:boolean;unavailableReason?:string;
   value: string;
   /** Provider-reported aliases resolving to this exact model ID. */
   aliases?: string[];

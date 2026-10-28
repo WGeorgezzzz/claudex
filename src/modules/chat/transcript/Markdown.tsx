@@ -1,3 +1,4 @@
+import type { Components } from 'react-markdown';
 import React, { createContext, memo, useContext, useMemo, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkBreaks from 'remark-breaks';
@@ -21,6 +22,7 @@ import { buildSyntaxTheme } from '@/modules/chat/utils/syntaxHighlightTheme';
 import type { PrismStyleSheet } from '@/modules/chat/utils/syntaxHighlightTheme';
 
 type MarkdownProps = {
+  components?: Components;
   children: React.ReactNode;
   className?: string;
   /** Render single newlines as hard line breaks (for user-typed messages). */
@@ -267,7 +269,7 @@ const markdownComponents = {
  * render model-authored markdown with this module's shared prose styling,
  * code highlighting and table rules.
  */
-function MarkdownBodyRenderer({ children, breaks = false }: Omit<MarkdownProps, 'className'>) {
+function MarkdownBodyRenderer({ children, breaks = false, components: overrides }: Omit<MarkdownProps, 'className'>) {
   const content = useMemo(
     // The LaTeX pass runs second because it reads the code spans the fence pass
     // normalizes, and must leave the LaTeX inside them literal.
@@ -346,7 +348,7 @@ function MarkdownBodyRenderer({ children, breaks = false }: Omit<MarkdownProps, 
   );
 
   return (
-    <ReactMarkdown urlTransform={localFileUrlTransform} remarkPlugins={remarkPlugins} rehypePlugins={rehypePlugins} components={components as any}>
+    <ReactMarkdown urlTransform={localFileUrlTransform} remarkPlugins={remarkPlugins} rehypePlugins={rehypePlugins} components={{ ...components, ...overrides } as any}>
       {content}
     </ReactMarkdown>
   );
@@ -365,10 +367,10 @@ function MarkdownBodyRenderer({ children, breaks = false }: Omit<MarkdownProps, 
 export const MarkdownBody = memo(MarkdownBodyRenderer);
 
 /** Markdown in its own prose container. The form every non-streaming caller uses. */
-export const Markdown = memo(function Markdown({ children, className, breaks }: MarkdownProps) {
+export const Markdown = memo(function Markdown({ children, className, breaks, components }: MarkdownProps) {
   return (
     <div className={className}>
-      <MarkdownBody breaks={breaks}>{children}</MarkdownBody>
+      <MarkdownBody breaks={breaks} components={components}>{children}</MarkdownBody>
     </div>
   );
 });

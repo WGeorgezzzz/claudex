@@ -77,7 +77,7 @@ export function useFileMentions({ selectedProject, input, setInput, textareaRef 
       // the project's path before reading.
       const response = await api.getFiles(targetProjectId, {
         signal: abortController.signal,
-      });
+      }, selectedProject?.fullPath||selectedProject?.path);
       if (!response.ok) {
         return;
       }
@@ -99,7 +99,7 @@ export function useFileMentions({ selectedProject, input, setInput, textareaRef 
       }
       console.error('Error fetching files:', error);
     }
-  }, []);
+  }, [selectedProject?.fullPath,selectedProject?.path]);
 
   useEffect(() => {
     const fetchProjectFiles = async () => {
@@ -225,8 +225,9 @@ export function useFileMentions({ selectedProject, input, setInput, textareaRef 
       const spaceIndex = textAfterAtQuery.indexOf(' ');
       const textAfterQuery = spaceIndex !== -1 ? textAfterAtQuery.slice(spaceIndex) : '';
 
-      const newInput = `${textBeforeAt}${file.path} ${textAfterQuery}`;
-      const newCursorPosition = textBeforeAt.length + file.path.length + 1;
+      const mention=/\s/.test(file.path)?'@\"'+file.path+'\"':'@'+file.path;
+      const newInput = `${textBeforeAt}${mention} ${textAfterQuery}`;
+      const newCursorPosition = textBeforeAt.length + mention.length + 1;
 
       if (textareaRef.current && !textareaRef.current.matches(':focus')) {
         textareaRef.current.focus();
@@ -235,7 +236,7 @@ export function useFileMentions({ selectedProject, input, setInput, textareaRef 
       setInput(newInput);
       setCursorPosition(newCursorPosition);
       setFileMentions((previousMentions) =>
-        previousMentions.includes(file.path) ? previousMentions : [...previousMentions, file.path],
+        previousMentions.includes(mention) ? previousMentions : [...previousMentions, mention],
       );
 
       setShowFileDropdown(false);
@@ -310,7 +311,9 @@ export function useFileMentions({ selectedProject, input, setInput, textareaRef 
     [showFileDropdown, filteredFiles, selectedFileIndex, selectFile],
   );
 
+  const fileNames=useMemo(()=>fileList.map(file=>file.path),[fileList]);
   return {
+    fileNames,
     showFileDropdown,
     filteredFiles,
     selectedFileIndex,

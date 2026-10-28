@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { renderInvocationTokens,removeInvocationAtCaret,unknownInvocation } from '@/modules/chat/utils/invocationTokens';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type {
   ChangeEvent,
   ClipboardEvent,
@@ -537,6 +538,9 @@ export function useChatComposerState({
     );
   }, [executeCommand]);
 
+  const [completionCwd,setCompletionCwd]=useState('');
+  useEffect(()=>{let live=true;const id=currentSessionId||selectedSession?.id;if(!id){setCompletionCwd('');return;}void api.sessionWorkspace.get(id).then(r=>r.ok?r.json():null).then(data=>{if(live)setCompletionCwd(data?.data?.projectPath||'');}).catch(()=>{});return()=>{live=false;};},[currentSessionId,selectedSession?.id]);
+  const completionProject=useMemo(()=>selectedProject&&completionCwd?{...selectedProject,fullPath:completionCwd,path:completionCwd}:selectedProject,[selectedProject,completionCwd]);
   const {
     slashCommands,
     slashCommandsCount,
@@ -551,7 +555,7 @@ export function useChatComposerState({
     handleCommandInputChange,
     handleCommandMenuKeyDown,
   } = useSlashCommands({
-    selectedProject,
+    selectedProject:completionProject,
     provider,
     input,
     setInput,
@@ -563,17 +567,19 @@ export function useChatComposerState({
     showFileDropdown,
     filteredFiles,
     selectedFileIndex,
-    renderInputWithMentions,
+    fileNames,
     selectFile,
     setCursorPosition,
     handleFileMentionsKeyDown,
   } = useFileMentions({
-    selectedProject,
+    selectedProject:completionProject,
     input,
     setInput,
     textareaRef,
   });
 
+  const renderInputWithMentions=useCallback((text:string)=>renderInvocationTokens(text,slashCommands,fileNames,true),[slashCommands,fileNames]);
+  const invocationWarning=slashCommands.length?unknownInvocation(input,slashCommands,provider):'';
   const syncInputOverlayScroll = useCallback((target: HTMLTextAreaElement) => {
     if (!inputHighlightRef.current || !target) {
       return;
@@ -1300,6 +1306,7 @@ export function useChatComposerState({
 
   const handleKeyDown = useCallback(
     (event: KeyboardEvent<HTMLTextAreaElement>) => {
+      const target=event.currentTarget||textareaRef.current; if(target && target.selectionStart===target.selectionEnd){const removed=removeInvocationAtCaret(input,target.selectionStart,event.key,slashCommands,fileNames);if(removed){event.preventDefault();setInput(removed.text);resetCommandMenuState();requestAnimationFrame(()=>textareaRef.current?.setSelectionRange(removed.caret,removed.caret));return;}}
       if (handleCommandMenuKeyDown(event)) {
         return;
       }
@@ -1344,6 +1351,7 @@ export function useChatComposerState({
     },
     [
       cyclePermissionMode,
+      input,slashCommands,fileNames,setInput,resetCommandMenuState,textareaRef,
       handleCommandMenuKeyDown,
       handleFileMentionsKeyDown,
       handleHistoryKeyDown,
@@ -1515,6 +1523,7 @@ export function useChatComposerState({
     inputHighlightRef,
     isTextareaExpanded,
     slashCommandsCount,
+    commandsForHighlight:slashCommands,fileNamesForHighlight:fileNames,invocationWarning,
     filteredCommands,
     frequentCommands,
     commandQuery,

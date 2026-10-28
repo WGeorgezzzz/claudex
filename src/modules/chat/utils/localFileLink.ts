@@ -13,6 +13,8 @@ export function isInlineFileReference(value:string): boolean {
 
 /** Chat Markdown and its tests use this transform to preserve local paths without admitting executable URL schemes. */
 export function localFileUrlTransform(url: string): string {
+  // CommonMark percent-encodes backslashes in Windows drive destinations.
+  if (/^[a-z]:(?:%5c|%2f)/i.test(url)) return url.replace(/%5c|%2f/gi, '/');
   if (/^[a-z]:[\\/]/i.test(url) || /^\/[a-z]:\//i.test(url)) return url;
   if (/^file:\/\//i.test(url)) {
     try { const parsed=new URL(url); return !parsed.hostname || parsed.hostname==='localhost' ? url : ''; }

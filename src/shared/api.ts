@@ -72,10 +72,17 @@ export const infoHubApi = { authorize: () => authenticatedFetch('/api/infohub/se
 
 /** Global tasks and the sidebar share the authenticated TaskMaster transport. */
 export const inboxTasksApi = {
+  executionSettings:()=>authenticatedFetch('/api/taskmaster/inbox/execution-settings'),
+  sessionSource:(id:string)=>authenticatedFetch('/api/taskmaster/inbox/session-source/'+encodeURIComponent(id)),
+  syncInfohub:()=>authenticatedFetch('/api/taskmaster/inbox/sync',{method:'POST',body:'{}'}),
+  organize: (projectId:string) => authenticatedFetch('/api/taskmaster/inbox/organize',{method:'POST',body:JSON.stringify({projectId})}),
+  linkUnit: (projectId:string,body:{id:string;title?:string;parentIds:string[];tags?:string[]})=>authenticatedFetch('/api/taskmaster/inbox/unit',{method:'POST',body:JSON.stringify({projectId,...body})}),
+  views:()=>authenticatedFetch('/api/taskmaster/inbox/views'),
+  saveViews:(views:unknown[])=>authenticatedFetch('/api/taskmaster/inbox/views',{method:'PUT',body:JSON.stringify(views)}),
   list: () => authenticatedFetch('/api/taskmaster/inbox/global'),
   create: (projectId: string, body: { title: string; priority?: string }) => authenticatedFetch('/api/taskmaster/inbox/create', { method: 'POST', body: JSON.stringify({ projectId, ...body }) }),
   saveInput: (projectId: string, taskId: string, userInput: string) => authenticatedFetch('/api/taskmaster/inbox/input', { method: 'POST', body: JSON.stringify({ projectId, taskId, userInput }) }),
-  execute: (projectId: string, taskId: string, option: string, userInput?: string) => authenticatedFetch('/api/taskmaster/inbox/execute', { method: 'POST', body: JSON.stringify({ projectId, taskId, option, userInput }) }),
+  execute: (projectId: string, taskId: string, option: string, userInput?: string,settings?:unknown) => authenticatedFetch('/api/taskmaster/inbox/execute', { method: 'POST', body: JSON.stringify({ projectId, taskId, option, userInput,...(settings?{settings}:{}) }) }),
   action: (projectId: string, taskId: string, action: 'done' | 'cancelled') => authenticatedFetch('/api/taskmaster/inbox/action', { method: 'POST', body: JSON.stringify({ projectId, taskId, action }) }),
   undo: (projectId: string, auditId: string) => authenticatedFetch('/api/taskmaster/inbox/undo', { method: 'POST', body: JSON.stringify({ projectId, auditId }) }),
 };
@@ -411,8 +418,8 @@ export const api = {
     get(`/api/file-tree/projects/${projectId}/files/resolve-pattern${query({ path: patternPath })}`, options),
   saveFile: (projectId: string, filePath: string, content: string, expectedContent?: string) =>
     put(`/api/file-tree/projects/${projectId}/file`, { filePath, content, ...(expectedContent !== undefined ? {expectedContent} : {}) }),
-  getFiles: (projectId: string, options: ApiRequestOptions = {}) =>
-    get(`/api/file-tree/projects/${projectId}/files${query({ respectGitignore: true })}`, options),
+  getFiles: (projectId: string, options: ApiRequestOptions = {}, workspacePath?:string) =>
+    get(`/api/file-tree/projects/${projectId}/files${query({ respectGitignore: true,workspacePath })}`, options),
 
   // File operations
   createFile: (
@@ -587,7 +594,7 @@ export const api = {
   commands: {
     // `projectPath` stays optional: a workspace without a resolved path omits
     // the field entirely, which is what the server expects.
-    list: (projectPath: string | undefined) => post('/api/commands/list', { projectPath }),
+    list: (projectPath: string | undefined, provider?: string) => post('/api/commands/list', { projectPath, provider }),
     execute: (payload: unknown) => post('/api/commands/execute', payload),
   },
 

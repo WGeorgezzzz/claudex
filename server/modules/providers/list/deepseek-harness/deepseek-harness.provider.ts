@@ -1,3 +1,4 @@
+import { readDeepSeekHarnessModels } from './deepseek-harness-models.js';
 import { AbstractProvider } from '@/modules/providers/shared/base/abstract.provider.js';
 import { buildDefaultProviderCurrentActiveModel } from '@/shared/index.js';
 import type { IProviderAuth, IProviderModels, IProviderSkills, IProviderMcp } from '@/shared/index.js';
@@ -19,7 +20,7 @@ export class DeepSeekHarnessProvider extends AbstractProvider {
   } };
   readonly models: IProviderModels = {
     async getSupportedModels() {
-      return { CUSTOM_MODELS_SUPPORTED: false, OPTIONS: [{ value: 'configured', label: 'Harness 默认模型', description: '使用本机 DeepSeek Harness 已配置的模型与凭证。' }], DEFAULT: 'configured' };
+      return readDeepSeekHarnessModels();
     },
     async getCurrentActiveModel() { return buildDefaultProviderCurrentActiveModel(await this.getSupportedModels()); },
   };

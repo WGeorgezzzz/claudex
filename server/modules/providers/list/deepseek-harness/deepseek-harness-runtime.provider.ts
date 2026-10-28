@@ -1,3 +1,4 @@
+import { readDeepSeekHarnessModels } from './deepseek-harness-models.js';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { appendFileSync, mkdirSync, mkdtempSync, writeFileSync, rmSync } from 'node:fs';
@@ -21,7 +22,7 @@ export const deepSeekHarnessRuntime: IProviderRuntime = {
     if (!install?.configured) throw new Error('Configure the local DeepSeek Harness launcher and RP credential first.');
     if (options.images?.length) throw new Error('This Harness integration does not support image attachments.');
     const model = await context.resolveResumeModel(options.sessionId, options.model) || 'configured';
-    if (model !== 'configured') throw new Error('Select Harness default model; model configuration is owned by the local Harness launcher.');
+    if (model !== 'configured' && model !== readDeepSeekHarnessModels().DEFAULT) throw new Error('所选模型不在本机 Harness 当前配置中，请刷新模型列表。');
     const permission = modes[options.permissionMode || 'default'];
     if (!permission) throw new Error('Unsupported Harness permission mode.');
     const previous = context.resolveProviderSessionId(options.sessionId);

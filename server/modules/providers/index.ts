@@ -25,3 +25,6 @@ export { createSessionHistoryCache } from './services/session-history-cache.serv
 
 // Server composition wires asynchronous titles without coupling websocket internals to providers.
 export { sessionTitlesService } from './services/session-titles.service.js';
+
+export { providerAuthService } from './services/provider-auth.service.js';
+export { providerCapabilitiesService } from './services/provider-capabilities.service.js';

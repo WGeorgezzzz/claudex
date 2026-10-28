@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+import { requireSharedResourceAdministrator } from '@/modules/auth/index.js';
+import { initializeInfohubTaskSync,closeInfohubTaskSync,taskmasterInboxService,infohubEmbedScript } from '@/modules/taskmaster/index.js';
 // Load environment variables before other imports execute.
 import './load-env.js';
 
@@ -244,7 +246,7 @@ app.use('/api/voice', authenticateToken, voiceRoutes);
 
 // The local info-hub has no account system. Keep it behind Nexagent auth and
 // forward both reads and writes so remote/mobile clients use the same boundary.
-app.post('/api/infohub/session', authenticateToken, (req, res) => {
+app.post('/api/infohub/session', authenticateToken, requireSharedResourceAdministrator, (req, res) => {
     const token = req.headers.authorization?.replace(/^Bearer /i, '');
     if (!token) return res.status(401).json({ error: 'Login required' });
     res.cookie('nexagent_infohub', token, { httpOnly: true, sameSite: 'strict', secure: req.secure || req.headers['x-forwarded-proto'] === 'https', path: '/infohub', maxAge: 15 * 60 * 1000 });
@@ -252,14 +254,23 @@ app.post('/api/infohub/session', authenticateToken, (req, res) => {
     res.json({ ready: true });
 });
 app.use('/infohub', (req, res, next) => {
-    if (req.path === '/' && req.originalUrl === '/infohub') return res.redirect('/information');
+    if (req.path === '/' && !req.originalUrl.startsWith('/infohub/')) return res.redirect('/information'+(req.originalUrl.includes('?')?req.originalUrl.slice(req.originalUrl.indexOf('?')):''));
     const cookie = req.headers.cookie?.split(';').map(value => value.trim()).find(value => value.startsWith('nexagent_infohub='));
     if (!req.headers.authorization && cookie) {
         try { req.headers.authorization = `Bearer ${decodeURIComponent(cookie.slice('nexagent_infohub='.length))}`; } catch { /* Invalid cookies remain unauthenticated. */ }
     }
     if (!['GET', 'HEAD'].includes(req.method) && req.headers.origin && req.headers.origin !== `${req.headers['x-forwarded-proto'] || req.protocol}://${req.headers.host}`) return res.status(403).json({ error: 'Cross-origin write denied' });
     next();
-}, authenticateToken, (req, res) => {
+}, authenticateToken, requireSharedResourceAdministrator, async (req, res) => {
+    if(req.path==='/nexagent/embed.js')return res.type('application/javascript').set('Cache-Control','no-store').send(infohubEmbedScript);
+    const taskLink=req.path.match(/^\/nexagent\/task\/(\d+)$/);
+    if(taskLink){
+      try{let snapshot=await taskmasterInboxService.global();let found=snapshot.projects.flatMap(p=>p.tasks.map(t=>({projectId:p.projectId,task:t}))).find(r=>r.task.source==='infohub'&&String(r.task.sourceId)===taskLink[1]);
+        if(!found){await taskmasterInboxService.syncInfohub();snapshot=await taskmasterInboxService.global();found=snapshot.projects.flatMap(p=>p.tasks.map(t=>({projectId:p.projectId,task:t}))).find(r=>r.task.source==='infohub'&&String(r.task.sourceId)===taskLink[1]);}
+        if(found)return res.redirect('/tasks?project='+encodeURIComponent(found.projectId)+'&task='+encodeURIComponent(String(found.task.id)));
+        return res.status(404).type('html').send('<p>该待办尚未同步到任务，请在任务页点击同步信息看板后重试。</p><a href="/tasks">打开任务</a>');
+      }catch{return res.status(503).type('html').send('<p>信息看板离线，任务数据仍可使用。</p><a href="/tasks">打开任务</a>');}
+    }
     const target = new URL(`http://127.0.0.1:8765${req.path || '/'}`);
     target.search = req.originalUrl.includes('?') ? req.originalUrl.slice(req.originalUrl.indexOf('?')) : '';
     const body = ['GET', 'HEAD'].includes(req.method) ? undefined : JSON.stringify(req.body ?? {});
@@ -287,7 +298,7 @@ app.use('/infohub', (req, res, next) => {
             upstream.on('end', () => {
                 // Compatibility for info-hub builds predating X-Forwarded-Prefix support.
                 const bridge = '<script>const infohubFetch=window.fetch.bind(window);window.fetch=(url,options)=>infohubFetch(typeof url==="string"&&url.startsWith("/api/")?"/infohub"+url:url,options);</script>';
-                res.send(Buffer.concat(chunks).toString('utf8').replace('</head>', `${bridge}</head>`));
+                res.send(Buffer.concat(chunks).toString('utf8').replace('</head>', `${bridge}</head>`).replace('</body>','<script src="/infohub/nexagent/embed.js"></script></body>'));
             });
         } else upstream.pipe(res);
     });
@@ -485,6 +496,7 @@ async function startServer() {
                 initializeScheduledMessageDispatcher(providerRuntimeService);
                 initializeMonitors(providerRuntimeService);
                 initializeDot();
+                initializeInfohubTaskSync();
                 sideChatsDb.recover();
                 initializeMessageQueue(providerRuntimeService);
             }
@@ -499,6 +511,7 @@ async function startServer() {
         closeScheduledMessageDispatcher();
         closeMonitors();
         closeDot();
+        closeInfohubTaskSync();
         closeMessageQueue();
         // Clean up plugin processes on shutdown
         const shutdownRuntimeServices = async () => {

@@ -4,6 +4,9 @@ import * as fs from 'node:fs/promises';
 import { z } from 'zod';
 import { AppError } from '@/shared/index.js';
 import { recordTaskmasterMetric } from './taskmaster-metrics.service.js';
+import { labelInfoTask, organizeInfoUnits, assertTopicGraph } from './taskmaster-units.service.js';
+import type { TopicUnit } from './taskmaster-units.service.js';
+import type { InfohubRecord } from './taskmaster-infohub.model.js';
 
 const status = z.enum(['pending', 'in-progress', 'done', 'blocked', 'cancelled', 'review', 'deferred']);
 const proposal = z.object({
@@ -18,8 +21,8 @@ const resultSchema = z.object({ tasks: z.array(proposal).max(30) });
 type Proposal = z.infer<typeof proposal>;
 type Task = Record<string, unknown> & { id: number | string; title: string; status: string; subtasks?: Task[] };
 type Message = { id: string; role: string; content: string };
-type Audit = { id: string; userId: number; sessionId: string; at: string; changes: { id: Task['id']; before: Task | null; after: Task }[]; undone?: boolean };
-type State = { watermarks?: Record<string, { id: string; hash: string }>; cursors: Record<string, string[]>; suggestions: Record<string, Proposal[]>; audits: Audit[] };
+type Audit = { id: string; userId: number; sessionId: string; at: string; changes: { id: Task['id']; before: Task | null; after: Task }[]; undone?: boolean; beforeTopics?: TopicUnit[]; afterTopics?: TopicUnit[] };
+type State = { watermarks?: Record<string, { id: string; hash: string }>; cursors: Record<string, string[]>; suggestions: Record<string, Proposal[]>; audits: Audit[]; topics?: TopicUnit[] };
 type Document = Record<string, unknown>;
 const locks = new Map<string, Promise<unknown>>();
 function keyOf(text: string) { return text.toLowerCase().replace(/[\p{P}\p{Z}\s]/gu, ''); }
@@ -32,13 +35,6 @@ function similar(a: string, b: string) {
   return 2 * [...x].filter(g => y.has(g)).length / (x.size + y.size) >= 0.78;
 }
 function fingerprint(message: Message) { return createHash('sha256').update(JSON.stringify(message)).digest('hex'); }
-/** Deterministic info-hub style labels keep task grouping useful without an AI call. */
-function deriveInfoTags(task: Task): string[] {
-  const text = `${task.title} ${String(task.description ?? '')}`.toLowerCase();
-  const topic = /机器人|真机|电机|硬件/.test(text) ? '机器人与现场' : /实验|仿真|训练|模型|数据/.test(text) ? '仿真与研究' : /客户|会议|交付|宣发/.test(text) ? '合作与交付' : /nexagent|会话|部署|服务器|git/.test(text) ? '工作台与基础设施' : '跟进与整理';
-  const type = /决定|决策/.test(text) ? '决策' : /问题|报错|故障/.test(text) ? '问题' : /跟进|确认/.test(text) ? '跟进' : '待办';
-  return [...new Set([...(Array.isArray((task as any).tags) ? (task as any).tags : []), `topic:${topic}`, `type:${type}`, 'source:taskmaster'])];
-}
 async function exclusive<T>(root: string, run: () => Promise<T>): Promise<T> {
   const previous = locks.get(root) ?? Promise.resolve();
   const current = previous.catch(() => {}).then(run); locks.set(root, current);
@@ -76,6 +72,74 @@ async function load(root: string) {
 /** TaskMaster module routes and completion hooks share atomic native writes; no subprocesses are created. */
 export function createTaskmasterWorkspaceService(generate: (input: unknown) => Promise<unknown>, changed: (root: string, kind: 'project' | 'tasks') => void = () => {}) {
   return {
+    async reconcileInfohub(root:string,userId:number,records:InfohubRecord[],sourceTopics:TopicUnit[]) {
+      return exclusive(root,async()=>{
+        const data=await load(root),now=new Date().toISOString();
+        const audit:Audit={id:randomUUID(),userId,sessionId:'global',at:now,changes:[]};
+        const writes:{unitId:string;status:string;expectedUpdatedAt:number;taskId:string|number}[]=[],merges:{unitId:string;taskId:string|number;title:string}[]=[];
+        const syncState=(data.state as State&{infohubRecords?:Record<string,{taskId:string|number;fingerprint:string}>}).infohubRecords??={};
+        let backup:string|null=null;
+        for(const record of records){
+          let task=data.tasks.find(t=>t.source==='infohub'&&String(t.sourceId)===record.id);
+          if(!task&&syncState[record.id]?.fingerprint===record.fingerprint)continue; // An undone import stays undone until its source changes.
+          if(!task)task=data.tasks.find(t=>t.source!=='infohub'&&t.mergedInto===undefined&&!t.executionSessionId&&keyOf(t.title)===keyOf(String(record.fields.title))&&(!t.due||!record.fields.due||String(t.due).slice(0,10)===String(record.fields.due).slice(0,10)));
+          const before=task?structuredClone(task):null;
+          if(!task){task={id:Math.max(0,...data.tasks.map(t=>Number(t.id)||0))+1,title:String(record.fields.title),status:record.status,createdAt:now};data.tasks.push(task);}
+          else if(task.source!=='infohub')merges.push({unitId:record.id,taskId:task.id,title:task.title});
+          const meta=(task.infohub||{}) as {fingerprint?:string;lastSyncedStatus?:string;updatedAt?:number;fieldsFingerprint?:string;ignoredFieldsFingerprint?:string};
+          const changedLocally=meta.lastSyncedStatus!==undefined?task.status!==meta.lastSyncedStatus:!!before&&before.status!==record.status;
+          const localTime=Date.parse(String(task.infohubLocalChangedAt||task.updatedAt||task.createdAt||''))||0;
+          const localWins=changedLocally&&localTime>=record.updatedAt&&(meta.fingerprint===record.fingerprint||localTime>=record.updatedAt+1000);
+          const desiredStatus=localWins?task.status:record.status;
+          if(localWins&&(['done','cancelled'].includes(desiredStatus)||['done','cancelled'].includes(record.status))&&desiredStatus!==record.status)writes.push({unitId:record.id,status:desiredStatus,expectedUpdatedAt:record.updatedAt,taskId:task.id});
+          const evidence=[...(Array.isArray(task.originEvidence)?task.originEvidence:[]),...(before&&before.source!=='infohub'?[{source:before.source,taskId:before.id,evidence:before.description}]:[]),...(record.fields.infohubEvidence as unknown[])];
+          Object.assign(task,meta.ignoredFieldsFingerprint===record.fieldsFingerprint?{}:record.fields,{status:desiredStatus,originEvidence:[...new Map(evidence.map(e=>[JSON.stringify(e),e])).values()],infohub:{fingerprint:record.fingerprint,fieldsFingerprint:record.fieldsFingerprint,...(meta.ignoredFieldsFingerprint===record.fieldsFingerprint?{ignoredFieldsFingerprint:meta.ignoredFieldsFingerprint}:{}),updatedAt:record.updatedAt,lastSyncedStatus:localWins?meta.lastSyncedStatus:record.status}});
+          if(!before||JSON.stringify(before)!==JSON.stringify(task)){task.updatedAt=now;audit.changes.push({id:task.id,before,after:structuredClone(task)});}
+          syncState[record.id]={taskId:task.id,fingerprint:record.fingerprint};
+        }
+        const topics=[...(data.state.topics||[]), ...sourceTopics];
+        const dedup=[...new Map(topics.map(t=>[t.id,t])).values()];assertTopicGraph(dedup);
+        if(JSON.stringify(data.state.topics||[])!==JSON.stringify(dedup)){audit.beforeTopics=structuredClone(data.state.topics||[]);audit.afterTopics=dedup;data.state.topics=dedup;}
+        if(audit.changes.length||audit.afterTopics){
+          backup=path.join(root,'.taskmaster','backups','infohub-'+audit.id+'.json');await fs.mkdir(path.dirname(backup),{recursive:true});try{await fs.copyFile(data.file,backup);}catch(e){if((e as NodeJS.ErrnoException).code!=='ENOENT')throw e;}
+          data.state.audits.push(audit);await atomic(data.file,data.document);changed(root,'tasks');
+        }
+        return {writes,merges,backup,auditId:audit.changes.length||audit.afterTopics?audit.id:null,imported:audit.changes.length,unmatchedLegacy:data.tasks.filter(t=>t.source&&t.source!=='infohub'&&!t.mergedInto).map(t=>({id:t.id,title:t.title,source:t.source}))};
+      });
+    },
+    async organize(root: string, userId: number) {
+      return exclusive(root, async () => {
+        const data = await load(root), before = structuredClone(data.tasks);
+        const backup = path.join(root, '.taskmaster', 'backups', 'info-units-' + randomUUID() + '.json');
+        await fs.mkdir(path.dirname(backup), {recursive:true}); await fs.copyFile(data.file, backup);
+        const result = organizeInfoUnits(data.tasks, root, data.state.topics);
+        const audit: Audit = {id:randomUUID(),userId,sessionId:'global',at:new Date().toISOString(),beforeTopics:structuredClone(data.state.topics || []),afterTopics:result.topics,
+          changes:result.tasks.filter((task,i)=>JSON.stringify(task)!==JSON.stringify(before[i])).map(task=>({id:task.id,before:before.find(t=>t.id===task.id)!,after:structuredClone(task as Task)}))};
+        data.tasks.splice(0,data.tasks.length,...result.tasks as Task[]); data.state.topics=result.topics;
+        data.state.audits.push(audit); await atomic(data.file,data.document); changed(root,'tasks');
+        return {auditId:audit.id,backup,merges:result.merges,taskCount:data.tasks.length,topics:result.topics};
+      });
+    },
+    async linkUnit(root: string, userId: number, input: {id:string;title?:string;parentIds:string[];tags?:string[]}) {
+      return exclusive(root, async () => {
+        const data=await load(root), beforeTopics=structuredClone(data.state.topics || []), topics=structuredClone(beforeTopics);
+        if(input.id.startsWith('infohub-unit:'))throw new AppError('请在信息看板修改来源主题',{statusCode:400});
+        const audit:Audit={id:randomUUID(),userId,sessionId:'global',at:new Date().toISOString(),changes:[]};
+        if (input.id.startsWith('task:')) {
+          const task=data.tasks.find(t=>String(t.id)===input.id.slice(5)); if(!task)throw new AppError('任务不存在',{statusCode:404});
+          if(task.source==='infohub')throw new AppError('请在信息看板修改来源标签和主题',{statusCode:400});
+          if(input.parentIds.some(id=>!topics.some(t=>t.id===id)))throw new AppError('父主题不存在',{statusCode:400});
+          const old=structuredClone(task); Object.assign(task,{parentIds:[...new Set(input.parentIds)],...(input.tags?{tags:input.tags}:{})});
+          audit.changes.push({id:task.id,before:old,after:structuredClone(task)});
+        } else {
+          const item=topics.find(t=>t.id===input.id); if(item)Object.assign(item,{title:input.title || item.title,parentIds:input.parentIds});
+          else topics.push({id:input.id,title:input.title || input.id,parentIds:input.parentIds});
+          try{assertTopicGraph(topics);}catch(e){throw new AppError(String(e),{statusCode:400});}
+          audit.beforeTopics=beforeTopics; audit.afterTopics=topics; data.state.topics=topics;
+        }
+        data.state.audits.push(audit);await atomic(data.file,data.document);changed(root,'tasks');return {auditId:audit.id};
+      });
+    },
     async removeCompletedTest(root: string, userId: number, taskId: string, expectedTitle: string) {
       return exclusive(root, async () => {
         const data = await load(root), index = data.tasks.findIndex(t => String(t.id) === taskId), task = data.tasks[index];
@@ -101,7 +165,11 @@ export function createTaskmasterWorkspaceService(generate: (input: unknown) => P
         for (const item of items) {
           let task = data.tasks.find(t => !['done', 'cancelled'].includes(t.status) && similar(t.title, item.title));
           const completed = !task && data.tasks.find(t => t.status === 'done' && similar(t.title, item.title));
-          if (completed) { mappings.push({ inputId: item.id, taskId: completed.id }); continue; }
+          if (completed) {
+            const before=structuredClone(completed);
+            completed.originEvidence=[...new Map([...(Array.isArray(completed.originEvidence)?completed.originEvidence:[]),{source:item.source,batchId,inputId:item.id,detail:item.detail}].map(e=>[JSON.stringify(e),e])).values()];
+            audit.changes.push({id:completed.id,before,after:structuredClone(completed)});mappings.push({inputId:item.id,taskId:completed.id});continue;
+          }
           const before = task ? structuredClone(task) : null;
           if (!task) {
             task = { id: Math.max(0, ...data.tasks.map(t => Number(t.id) || 0)) + 1, title: item.title, status: 'pending', dependencies: [], subtasks: [], createdAt: audit.at };
@@ -111,6 +179,8 @@ export function createTaskmasterWorkspaceService(generate: (input: unknown) => P
             priority: ({ '高': 'high', '中': 'medium', '低': 'low' } as Record<string, string>)[item.urgency] ?? 'medium',
             due: item.due, source: item.source, options: item.options, recommended: item.recommended,
             batchId, batchIds: [...new Set([...(task.batchIds as string[] ?? []), batchId])], updatedAt: audit.at });
+          task.originEvidence = [...new Map([...(Array.isArray(task.originEvidence)?task.originEvidence:[]), {source:item.source,batchId,inputId:item.id,detail:item.detail}].map(e=>[JSON.stringify(e),e])).values()];
+          Object.assign(task,labelInfoTask(task,root));
           audit.changes.push({ id: task.id, before, after: structuredClone(task) });
           mappings.push({ inputId: item.id, taskId: task.id });
         }
@@ -123,7 +193,7 @@ export function createTaskmasterWorkspaceService(generate: (input: unknown) => P
     },
     async globalSnapshot(root: string, userId: number) {
       const data = await load(root);
-      return { audits: data.state.audits.filter(a => a.userId === userId && a.sessionId === 'global').slice(-30).map(a => ({ id: a.id, at: a.at, undone: a.undone, changes: a.changes.map(c => ({ id: c.id, title: c.after.title, status: c.after.status })) })) };
+      return { topics:data.state.topics || [], audits: data.state.audits.filter(a => a.userId === userId && a.sessionId === 'global').slice(-30).map(a => ({ id: a.id, at: a.at, undone: a.undone, changes: a.changes.map(c => ({ id: c.id, title: c.after.title, status: c.after.status })) })) };
     },
     async changeInboxTask(root: string, userId: number, taskId: string, mutate: (task: Task) => Promise<Record<string, unknown>>) {
       return exclusive(root, async () => {
@@ -131,6 +201,7 @@ export function createTaskmasterWorkspaceService(generate: (input: unknown) => P
         if (!task) throw new AppError('任务不存在。', { statusCode: 404 });
         const before = structuredClone(task), changes = await mutate(structuredClone(task));
         Object.assign(task, changes, { updatedAt: new Date().toISOString() });
+        if(task.source==='infohub'&&changes.status!==undefined&&changes.status!==before.status)task.infohubLocalChangedAt=task.updatedAt;
         const execution = changes.executionSessionId !== undefined;
         const audit: Audit = { id: randomUUID(), userId, sessionId: execution ? 'execution' : 'global', at: new Date().toISOString(), changes: [{ id: task.id, before, after: structuredClone(task) }] };
         data.state.audits.push(audit); await atomic(data.file, data.document); changed(root, 'tasks');
@@ -163,7 +234,7 @@ export function createTaskmasterWorkspaceService(generate: (input: unknown) => P
     },
     async list(root: string, userId: number) {
       const data = await load(root);
-      return { currentTag: data.tag, tasks: data.tasks.map(t => ({ ...t, tags: deriveInfoTags(t), sources: (t.sources as { userId: number }[] | undefined)?.filter(source => source.userId === userId), autoUpdate: (t.autoUpdate as { userId: number } | undefined)?.userId === userId ? t.autoUpdate : undefined })) };
+      return { currentTag: data.tag, tasks: data.tasks.map(t => ({ ...labelInfoTask(t,root), sources: (t.sources as { userId: number }[] | undefined)?.filter(source => source.userId === userId), autoUpdate: (t.autoUpdate as { userId: number } | undefined)?.userId === userId ? t.autoUpdate : undefined } as Task)) };
     },
     async snapshot(root: string, userId: number, sessionId: string) {
       const data = await load(root), key = `${userId}:${sessionId}`;
@@ -233,11 +304,13 @@ export function createTaskmasterWorkspaceService(generate: (input: unknown) => P
           } else updated++;
           // Completion/blocked/cancelled must be evidenced explicitly, never inferred from an intention.
           task.status = item.status; task.updatedAt = audit.at;
+          if(task.source==='infohub'&&before?.status!==task.status)task.infohubLocalChangedAt=audit.at;
           references.set(item.title, task.id); if (item.taskId !== undefined) references.set(String(item.taskId), task.id);
           dependencies.push({ task, refs: item.dependencies });
           const sources = (task.sources ?? []) as { userId: number; sessionId: string; messageId: string; evidence: string }[];
           if (!sources.some(s => s.userId === userId && s.sessionId === sessionId && s.messageId === item.messageId)) sources.push({ userId, sessionId, messageId: item.messageId, evidence: item.evidence });
           task.sources = sources; task.autoUpdate = { userId, evidence: item.evidence, at: audit.at };
+          Object.assign(task,labelInfoTask(task,root));
           task.subtasks ??= [];
           for (const sub of item.subtasks) if (!task.subtasks.some(t => similar(t.title, sub.title))) task.subtasks.push({ id: `${task.id}.${task.subtasks.length + 1}`, title: sub.title, description: sub.description, status: 'pending' });
           audit.changes.push({ id: task.id, before, after: structuredClone(task) });
@@ -267,8 +340,10 @@ export function createTaskmasterWorkspaceService(generate: (input: unknown) => P
         if (!audit) throw new AppError('找不到可撤销的记录。', { statusCode: 404 });
         // Refuse to erase subsequent manual edits or another extraction's work.
         const expected = new Map<string, Task>(); for (const c of audit.changes) expected.set(String(c.id), c.after);
-        for (const [id, after] of expected) if (JSON.stringify(data.tasks.find(t => String(t.id) === id)) !== JSON.stringify(after)) throw new AppError('任务后来有新改动，请先撤销最近的更新。', { statusCode: 409 });
-        for (const change of [...audit.changes].reverse()) { const index = data.tasks.findIndex(t => String(t.id) === String(change.id)); if (change.before) data.tasks[index] = change.before; else data.tasks.splice(index, 1); }
+        for (const [id, after] of expected) {const current=data.tasks.find(t => String(t.id) === id);const comparable=(t:Task|undefined)=>{if(!t||t.source!=='infohub')return JSON.stringify(t);const {infohub,updatedAt,infohubLocalChangedAt,...fields}=t;return JSON.stringify(fields);};if(comparable(current)!==comparable(after))throw new AppError('任务后来有新改动，请先撤销最近的更新。',{statusCode:409});}
+        if(audit.afterTopics && JSON.stringify(data.state.topics || [])!==JSON.stringify(audit.afterTopics))throw new AppError('主题后来有新改动，请先撤销最近的更新。',{statusCode:409});
+        for (const change of [...audit.changes].reverse()) { const index = data.tasks.findIndex(t => String(t.id) === String(change.id)); const currentInfohub=data.tasks[index]?.infohub; if (change.before) {data.tasks[index] = structuredClone(change.before);if(data.tasks[index].source==='infohub'){data.tasks[index].updatedAt=new Date().toISOString();data.tasks[index].infohubLocalChangedAt=data.tasks[index].updatedAt;const meta:Record<string,unknown>={...((currentInfohub||change.after.infohub||data.tasks[index].infohub||{}) as Record<string,unknown>),lastSyncedStatus:change.after.status};if(typeof meta.fieldsFingerprint==='string')Object.assign(meta,{ignoredFieldsFingerprint:meta.fieldsFingerprint});data.tasks[index].infohub=meta;}}  else data.tasks.splice(index, 1); }
+        if(audit.beforeTopics)data.state.topics=structuredClone(audit.beforeTopics);
         audit.undone = true;
         await atomic(data.file, data.document); changed(root, 'tasks'); return { status: 'undone' };
       });
@@ -279,15 +354,18 @@ export function createTaskmasterWorkspaceService(generate: (input: unknown) => P
         if (!task) throw new AppError('任务不存在。', { statusCode: 404 });
         const parsed = z.object({ title: z.string().min(1).max(300).optional(), description: z.string().max(5000).optional(), status: status.optional(), priority: z.enum(['high', 'medium', 'low']).optional(), details: z.string().max(10000).optional() }).strict().parse(changes);
         Object.assign(task, parsed, { updatedAt: new Date().toISOString() });
+        if(task.source==='infohub'&&parsed.status)task.infohubLocalChangedAt=task.updatedAt;
         await atomic(data.file, data.document); changed(root, 'tasks'); return { task };
       });
     },
-    async add(root: string, input: Record<string, unknown>) {
+    async add(root: string, input: Record<string, unknown>, userId = 0) {
       if (input.prompt) return this.extract(root, 0, 'manual', [{ id: 'manual', role: 'user', content: String(input.prompt) }], false);
       return exclusive(root, async () => {
         const parsed = z.object({ title: z.string().min(1).max(300), description: z.string().max(5000).default(''), priority: z.enum(['high', 'medium', 'low']).default('medium'), tags: z.array(z.string().max(120)).max(30).default([]) }).parse(input);
         const data = await load(root), task = { ...parsed, id: Math.max(0, ...data.tasks.map(t => Number(t.id) || 0)) + 1, status: 'pending', createdAt: new Date().toISOString() };
-        data.tasks.push(task); await atomic(data.file, data.document); changed(root, 'tasks'); return { task };
+        Object.assign(task,labelInfoTask(task,root));
+        const audit:Audit={id:randomUUID(),userId,sessionId:'global',at:new Date().toISOString(),changes:[{id:task.id,before:null,after:structuredClone(task)}]};
+        data.tasks.push(task);data.state.audits.push(audit); await atomic(data.file, data.document); changed(root, 'tasks'); return { task, auditId:audit.id };
       });
     },
   };

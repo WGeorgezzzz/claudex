@@ -55,3 +55,9 @@ test('inline code inside an existing link does not create nested links',()=>{
   assert.equal(container.querySelectorAll('a').length,1);
   fireEvent.click(screen.getByRole('link'));assert.deepEqual(open.mock.calls[0],['D:/reports/FINAL-REPORT.md',null]);
 });
+
+test('Windows backslashes encoded by the Markdown parser remain local links',()=>{
+  render(<Markdown>{'[本机报告](D:\\work\\reports/final.md)'}</Markdown>);
+  fireEvent.click(screen.getByRole('link',{name:'本机报告'}));
+  assert.deepEqual(open.mock.calls[0],['D:/work/reports/final.md',null]);
+});

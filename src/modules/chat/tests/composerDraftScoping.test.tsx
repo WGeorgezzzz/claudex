@@ -30,6 +30,9 @@ vi.mock('@/shared/api', () => {
   const okJson = (data: unknown) => Promise.resolve({ ok: true, json: async () => data });
   return {
     api: {
+      getFiles:()=>okJson([]),
+      sessionWorkspace: {get:()=>okJson({data:{projectPath:PROJECT.fullPath}})},
+      providers:{skills:()=>okJson({data:{skills:[]}})},
       user: {
         drafts: () => okJson({ success: true, drafts: [] }),
         saveDraft: () => okJson({ success: true }),

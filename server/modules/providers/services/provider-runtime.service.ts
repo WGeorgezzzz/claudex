@@ -1,3 +1,4 @@
+import { recordModelRejection } from './provider-model-health.js';
 import path from 'node:path';
 import os from 'node:os';
 import { getSessionOwnerId, userPreferencesDb } from '@/modules/database/index.js';
@@ -103,10 +104,15 @@ export function createProviderRuntimeService(
     }
     // Durable queue records store explicit allow/deny lists at the top level.
     // Claude's SDK adapter consumes toolsSettings; preserve those choices on queued turns.
+    const nativeOptions=providerName==='codex'&&/^\/compact(?:\s|$)/.test(command.trim())?{...options,bridgeCompact:true}:options;
     const runtimeOptions=providerName==='claude'&&!options.toolsSettings&&(Array.isArray(options.allowedTools)||Array.isArray(options.disallowedTools))
       ? {...options,toolsSettings:{allowedTools:options.allowedTools??[],disallowedTools:options.disallowedTools??[],skipPermissions:false}}
-      : options;
-    const execute = () => {
+      : nativeOptions;
+    const healthWriter=providerName==='codex'?new Proxy(writer,{get(target,property){
+      if(property==='send')return (data:unknown)=>{if(data&&typeof data==='object'&&(data as AnyRecord).kind==='error')recordModelRejection(providerName,String(options.model||''),String((data as AnyRecord).content||''));target.send(data as AnyRecord);};
+      const value=Reflect.get(target,property,target);return typeof value==='function'?value.bind(target):value;
+    }}):writer;
+    const execute = async () => {
       agentDiscoveryService.assertEnabled(providerName);
       if (writer.userId != null) {
         for (const candidate of [runtimeOptions.cwd, runtimeOptions.projectPath]) {
@@ -128,15 +134,15 @@ export function createProviderRuntimeService(
         const codexHome = process.env.TASKMASTER_CODEX_HOME || path.join(os.homedir(), '.codex-qz');
         return userContextStorage.run({ ...user, codexHome, env: { ...user.env, CODEX_HOME: codexHome } }, async () => {
           const startedAt = new Date(Date.now() - 1000);
-          const result = await provider.runtime.run(command, runtimeOptions, writer, context);
+          const result = await provider.runtime.run(command, runtimeOptions, healthWriter, context);
           // The ordinary watcher follows the account home; index this relay turn before completion extraction reads it.
           await provider.sessionSynchronizer.synchronize(startedAt);
           return result;
         });
       }
-      return provider.runtime.run(command, runtimeOptions, writer, context);
+      return provider.runtime.run(command, runtimeOptions, healthWriter, context);
     };
-    return writer.userId == null ? execute() : withUserContext(userId, execute);
+    return (writer.userId == null ? execute() : withUserContext(userId, execute)).catch(error=>{recordModelRejection(providerName,String(options.model||''),String(error instanceof Error?error.message:error));throw error;});
   };
 
   return {

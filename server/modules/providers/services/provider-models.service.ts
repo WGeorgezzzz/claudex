@@ -1,3 +1,4 @@
+import { modelHealth } from './provider-model-health.js';
 import { appConfigDb, providerModelsDb, sessionsDb } from '@/modules/database/index.js';
 import { providerRegistry } from '@/modules/providers/provider.registry.js';
 import { providerCapabilitiesService } from '@/modules/providers/services/provider-capabilities.service.js';
@@ -203,7 +204,7 @@ export const createProviderModelsService = (dependencies: ProviderModelsServiceD
 
   const getProviderModels = async (provider: LLMProvider): Promise<ProviderModelsDefinition> => {
     const predefined = await resolveProvider(provider).models.getSupportedModels();
-    return readMergedCatalog(provider, predefined);
+    return modelHealth(provider,readMergedCatalog(provider, predefined));
   };
 
   /**

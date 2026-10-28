@@ -137,7 +137,7 @@ export default function ProviderSelectionEmptyState({
 
   /** One collapsible branch per provider, in the order the picker lists them. */
   const visibleProviderGroups = useMemo<ModelGroup[]>(
-    () => PROVIDER_META.filter(meta => !discovery || discovery.agents.some(a => a.id === meta.id && a.enabled)).map((meta) => ({
+    () => PROVIDER_META.filter(meta => !discovery || discovery.agents.some(a => a.id === meta.id && (a.enabled||(['gemini','deepseek-harness','claude','codex'].includes(a.id)&&a.installed)))).map((meta) => ({
       key: meta.id,
       provider: meta.id,
       name: meta.name,

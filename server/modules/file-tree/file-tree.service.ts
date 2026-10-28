@@ -1,3 +1,4 @@
+import { assertContextPath } from '@/modules/access-control/index.js';
 import path from 'node:path';
 
 import ignore from 'ignore';
@@ -588,7 +589,10 @@ export function createFileTreeService(dependencies: FileTreeServiceDependencies)
     },
 
     async listProjectFiles(projectId, options) {
-      const projectRoot = await resolveProjectRoot(projectId);
+      const registeredRoot = await resolveProjectRoot(projectId);
+      const projectRoot=options?.workspacePath?path.resolve(options.workspacePath):registeredRoot;
+      if(options?.workspacePath&&!path.isAbsolute(options.workspacePath))throw createFileTreeError('Workspace path must be absolute',400,'INVALID_WORKSPACE_PATH');
+      if(options?.workspacePath)assertContextPath(projectRoot);
       try {
         await fileSystem.access(projectRoot);
       } catch {
