@@ -21,7 +21,7 @@ test('luna and explicit model fallback on 404,429,all 5xx and timeout, without m
     t.after(() => { delete process.env.TASKMASTER_AUTO_MODEL; });
     const mock = t.mock.method(globalThis, 'fetch', async (_url: unknown, options: RequestInit) => {
       const body = JSON.parse(String(options.body)); models.push(body.model);
-      assert.equal(body.max_output_tokens, 2000); assert.equal(body.reasoning.effort, 'low');
+      assert.match(body.input, /json/i, 'JSON object mode requires json in input messages'); assert.equal(body.max_output_tokens, 2000); assert.equal(body.reasoning.effort, 'low');
       if (models.length === 1) { if (failure === 'timeout') throw new DOMException('timeout', 'TimeoutError'); if (failure === 'connect-timeout') throw new TypeError('fetch failed', { cause: { code: 'UND_ERR_CONNECT_TIMEOUT' } }); return new Response('', { status: failure === 'explicit-model' ? 404 : Number(failure) }); }
       return Response.json({ status: 'completed', usage: { input_tokens: 10, output_tokens: 5 }, output: [{ content: [{ type: 'output_text', text: '{"tasks":[]}' }] }] });
     });

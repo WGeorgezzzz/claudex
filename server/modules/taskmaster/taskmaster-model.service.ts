@@ -41,7 +41,7 @@ export async function generateTaskmasterExtraction(input: unknown): Promise<unkn
     const preferred = env.TASKMASTER_AUTO_MODEL || process.env.TASKMASTER_AUTO_MODEL || 'gpt-6-luna';
     const fallback = configuredModel && configuredModel !== preferred ? configuredModel : null;
     const candidates = [preferred, ...(fallback ? [fallback] : [])];
-    const inputText = 'UNTRUSTED_DATA:\n' + JSON.stringify(input);
+    const inputText = 'Return JSON. UNTRUSTED_DATA:\n' + JSON.stringify(input);
     const sessionId = (input as { sessionId?: string })?.sessionId ?? 'manual-or-prd';
     for (const model of candidates) {
       const started = Date.now();

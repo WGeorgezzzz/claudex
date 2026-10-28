@@ -7,7 +7,7 @@ import { projectsDb, sessionsDb, userPreferencesDb } from '@/modules/database/in
 import { getCurrentUserContext } from '@/modules/auth/index.js';
 import { broadcastSessionUpserted, chatRunRegistry } from '@/modules/websocket/index.js';
 import { providerRegistry } from '@/modules/providers/provider.registry.js';
-import { listBusyClaudeCliSessions } from '@/modules/providers/services/claude-cli-liveness.service.js';
+import { findResumedProviderProcesses, listBusyClaudeCliSessions } from '@/modules/providers/services/claude-cli-liveness.service.js';
 import { assertSessionOwnerAvailable } from '@/modules/providers/services/session-owner.service.js';
 import { sessionHistoryCache } from '@/modules/providers/services/session-history-cache.service.js';
 import type {
@@ -207,6 +207,12 @@ export const sessionsService = {
       runningById.set(session.session_id, entries[entries.length - 1]);
     }
 
+    // Recovered processes remain stoppable across service restarts; do not kill user work at startup.
+    for (const session of sessionsDb.getAllSessions()) {
+      if (!session.provider_session_id || runningById.has(session.session_id) || !['claude','codex'].includes(session.provider)) continue;
+      const recovered = await findResumedProviderProcesses(session.provider_session_id, session.provider);
+      if (recovered.length) entries.push({sessionId:session.session_id,provider:session.provider as LLMProvider,startedAt:Date.now(),lastSeq:0,canInterrupt:false,statusText:'Recovered CLI process; force stop is available'});
+    }
     return entries.filter(entry => sessionsDb.getSessionById(entry.sessionId) !== null);
   },
 

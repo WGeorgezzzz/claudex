@@ -1,3 +1,6 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { getCloudCliHomeDir } from '@/shared/index.js';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { createRequire } from 'node:module';
 import readline from 'node:readline';
@@ -42,6 +45,7 @@ export type CodexAppServerTurnOptions = {
   approvalPolicy: string;
   effort?: string | null;
   planMode?: boolean;
+  dynamicTools?: AnyRecord[];
   /** The runtime owns approval UI and clears it when native requests end. */
   onRequest?: (message: AnyRecord, reply: (result: AnyRecord) => void) => boolean;
   onRequestResolved?: (id: string | number) => void;
@@ -114,6 +118,8 @@ export async function* runCodexAppServerTurn(options: CodexAppServerTurnOptions)
     env: options.env,
     stdio: ['pipe', 'pipe', 'pipe'],
   });
+  const processStartedAt=Date.now();
+  const registryFile=child.pid ? path.join(getCloudCliHomeDir(),'provider-processes',String(child.pid)+'.json') : null;
   let stderr = '';
   child.stderr?.on('data', (chunk) => { stderr = (stderr + String(chunk)).slice(-2000); });
   child.stderr?.on('error', () => {});
@@ -167,6 +173,7 @@ export async function* runCodexAppServerTurn(options: CodexAppServerTurnOptions)
   };
   const registered: string[] = [];
   const register = () => {
+    if(registryFile){fs.mkdirSync(path.dirname(registryFile),{recursive:true});fs.writeFileSync(registryFile,JSON.stringify({provider:'codex',pid:child.pid,parentPid:process.pid,startedAt:processStartedAt,sessionIds:[...options.sessionKeys(),threadId].filter(Boolean)}));}
     for (const key of options.sessionKeys()) {
       if (key && !registered.includes(key)) { registered.push(key); channels.set(key, channel); }
     }
@@ -281,6 +288,7 @@ export async function* runCodexAppServerTurn(options: CodexAppServerTurnOptions)
     const threadParams = {
       cwd: options.cwd, model: options.model ?? null,
       sandbox: options.sandbox, approvalPolicy: options.approvalPolicy,
+      ...(options.dynamicTools?.length ? { dynamicTools: options.dynamicTools } : {}),
     };
     const opened = options.resumeThreadId
       ? await call('thread/resume', { threadId: options.resumeThreadId, ...threadParams, excludeTurns: true })
@@ -314,5 +322,6 @@ export async function* runCodexAppServerTurn(options: CodexAppServerTurnOptions)
     reader.close();
     failAll('Codex turn closed.');
     child.kill();
+    if(registryFile)try{fs.unlinkSync(registryFile);}catch{/* already removed */}
   }
 }

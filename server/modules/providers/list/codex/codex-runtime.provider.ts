@@ -1,3 +1,4 @@
+import { createCodexSessionTool } from '@/modules/session-bridge/index.js';
 /**
  * OpenAI Codex SDK Integration
  * =============================
@@ -363,6 +364,7 @@ async function queryCodex(
     // The app-server transport accepts `turn/steer`, so text typed while the
     // turn runs is folded into it. CLAUDEX_CODEX_TRANSPORT=exec restores the
     // SDK's `codex exec` path, which cannot take input mid-turn.
+    const bridge = ws.userId != null && sessionId ? (await import('@/modules/session-bridge/index.js')).createCodexSessionTool({userId:Number(ws.userId),sessionId,autonomous:Boolean(options.cloudcliMonitorId || options.cloudcliBridgeSourceSessionId),planMode:permissionMode==='plan',permissionMode}) : null;
     const events: AsyncIterable<AnyRecord> = process.env.CLAUDEX_CODEX_TRANSPORT === 'exec'
       ? (await thread.runStreamed(turnInput, { signal: abortController.signal })).events as AsyncIterable<AnyRecord>
       : runCodexAppServerTurn({
@@ -374,7 +376,14 @@ async function queryCodex(
         approvalPolicy: approvalPolicy || 'on-request',
         effort: resolvedEffort,
         planMode: permissionMode === 'plan',
-        onRequest: (message, reply) => permissions.request(sessionKey() || '', message, ws, reply),
+        dynamicTools: bridge ? [bridge.specification] : undefined,
+        onRequest: (message, reply) => {
+          if (bridge && message.method === 'item/tool/call' && message.params?.tool === 'claudex_sessions') {
+            void bridge.execute(message.params.arguments).then(result => reply({success:true,contentItems:[{type:'inputText',text:JSON.stringify(result)}]}), error => reply({success:false,contentItems:[{type:'inputText',text:String(error.message || error)}]}));
+            return true;
+          }
+          return permissions.request(sessionKey() || '', message, ws, reply);
+        },
         onRequestResolved: id => permissions.cancel(sessionKey() || '', id),
         input: turnInput as string | AnyRecord[],
         signal: abortController.signal,

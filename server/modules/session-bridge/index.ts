@@ -3,3 +3,5 @@ export { createSessionBridgeQuery } from '@/modules/session-bridge/session-bridg
 
 // Authorization integration tests exercise bound MCP source identity through the public adapter.
 export { executeSessionBridgeTool } from './session-bridge.tools.js';
+
+export { createCodexSessionTool } from './session-bridge.tools.js';

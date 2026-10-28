@@ -1,7 +1,8 @@
+import { execFile } from 'node:child_process';
 import fsp from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { getClaudeConfigDir } from '@/shared/index.js';
+import { getCloudCliHomeDir, getClaudeConfigDir } from '@/shared/index.js';
 
 /**
  * One Claude CLI process that is currently producing a response.
@@ -128,34 +129,45 @@ export async function listBusyClaudeCliSessions(): Promise<LiveClaudeCliSession[
  * terminal, which Nexagent can otherwise only report, not stop.
  */
 export async function findClaudeCliProcessIds(providerSessionId: string): Promise<number[]> {
-  if (!providerSessionId) {
-    return [];
+  const pids = new Set<number>();
+  for (const directory of new Set([registryDirectory(), path.join(os.homedir(), '.claude', 'sessions'), process.env.CLAUDE_CONFIG_DIR && path.join(process.env.CLAUDE_CONFIG_DIR, 'sessions')].filter(Boolean) as string[])) {
+    for (const entry of (await fsp.readdir(directory).catch(() => [] )).filter(name => name.endsWith('.json')).slice(0, MAX_REGISTRY_FILES)) {
+      try {
+        const record = JSON.parse(await fsp.readFile(path.join(directory, entry), 'utf8'));
+        if (providerSessionId && record.sessionId === providerSessionId && Number.isInteger(record.pid) && record.pid > 0 && await isRecordedProcessAlive(record.pid, record.procStart)) pids.add(record.pid);
+      } catch { /* stale registry */ }
+    }
   }
+  for (const row of await findResumedProviderProcesses(providerSessionId, 'claude')) pids.add(row.pid);
+  return [...pids];
+}
 
-  let entries: string[];
+let processTableCache: { at: number; pending: Promise<string> } | undefined;
+
+type ProcessRow = { pid: number; ppid: number; name: string; command: string; startedAt?: number };
+/** Providers uses exact native IDs and executable names to find recoverable CLI orphans without touching unrelated agents. */
+export async function findResumedProviderProcesses(id: string, provider: string): Promise<ProcessRow[]> {
+  if (!id || !/^[a-zA-Z0-9_-]+$/.test(id)) return [];
+  if (!processTableCache || Date.now() - processTableCache.at > 3000) processTableCache = { at: Date.now(), pending: new Promise<string>(resolve => execFile(process.platform === 'win32' ? 'powershell.exe' : 'ps', process.platform === 'win32' ? [
+    '-NoProfile', '-NonInteractive', '-Command',
+    "@(Get-CimInstance Win32_Process | Where-Object { $_.Name -match 'claude|codex|node' } | ForEach-Object { @{pid=$_.ProcessId;ppid=$_.ParentProcessId;name=$_.Name;command=$_.CommandLine;startedAt=([DateTimeOffset]$_.CreationDate).ToUnixTimeMilliseconds()} }) | ConvertTo-Json -Compress"
+  ] : ['-A', '-o', 'pid=,ppid=,comm=,args='], {windowsHide:true,timeout:15000,maxBuffer:4*1024*1024}, (_error, stdout) => resolve(String(stdout || '')))) };
+  const table = await processTableCache.pending;
+  let rows: ProcessRow[] = [];
   try {
-    entries = await fsp.readdir(registryDirectory());
-  } catch {
-    return [];
+    const parsed = process.platform === 'win32' ? JSON.parse(table || '[]') : table.trim().split('\n').map(line => { const m=line.trim().match(/^(\d+)\s+(\d+)\s+(\S+)\s+(.*)$/); return m ? {pid:Number(m[1]),ppid:Number(m[2]),name:m[3],command:m[4]} : null; }).filter(Boolean);
+    rows = Array.isArray(parsed) ? parsed : [parsed];
+  } catch { return []; }
+  const escaped = id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const resume = new RegExp('(?:--resume(?:=|\\s+)|resume\\s+)["\\s]*' + escaped + '(?=["\\s]|$)', 'i');
+  const registered = new Set<number>();
+  const directory = path.join(getCloudCliHomeDir(), 'provider-processes');
+  for (const file of (await fsp.readdir(directory).catch(() => [])).slice(0, MAX_REGISTRY_FILES)) {
+    try {
+      const record = JSON.parse(await fsp.readFile(path.join(directory,file),'utf8'));
+      const row = rows.find(item => item.pid === record.pid);
+      if (record.provider === provider && record.sessionIds?.includes(id) && row && row.startedAt && Math.abs(row.startedAt - record.startedAt) < 10000) registered.add(row.pid);
+    } catch { /* stale record is never enough to kill a reused pid */ }
   }
-
-  const pids = await Promise.all(
-    entries
-      .filter((entry) => entry.endsWith('.json'))
-      .slice(0, MAX_REGISTRY_FILES)
-      .map(async (entry) => {
-        try {
-          const record = JSON.parse(await fsp.readFile(path.join(registryDirectory(), entry), 'utf8')) as Record<string, unknown>;
-          const pid = typeof record?.pid === 'number' ? record.pid : NaN;
-          if (record?.sessionId !== providerSessionId || !Number.isInteger(pid) || pid <= 0) {
-            return null;
-          }
-          return (await isRecordedProcessAlive(pid, record.procStart)) ? pid : null;
-        } catch {
-          return null;
-        }
-      }),
-  );
-
-  return pids.filter((pid): pid is number => pid !== null);
+  return rows.filter(row => row.pid !== process.pid && row.command && new RegExp(provider, 'i').test(row.name + ' ' + row.command.split(' ').slice(0, 3).join(' ')) && (resume.test(row.command) || registered.has(row.pid)));
 }

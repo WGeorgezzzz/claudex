@@ -194,3 +194,11 @@ test('simultaneous monitors cannot claim the same session before provider startu
   monitorsDb.finish(first.id,run!,null,now);
   assert.ok(monitorsDb.claim(second.id,now));
 }));
+
+test('scheduled monitor updates only its own instructions and rejects scheduling changes',()=>fixture(user=>{
+ const row=create(user), other=create(user), context={userId:user,sessionId:'monitor-session',monitorId:row.id};
+ executeMonitorTool(context,{action:'update',name:'Updated',content:'Updated instructions'});
+ assert.equal(monitorsDb.get(user,row.id)?.content,'Updated instructions');
+ assert.equal(monitorsDb.get(user,row.id)?.interval_minutes,1);
+ for(const input of [{id:other.id,content:'escape'},{intervalMinutes:10},{schedule:null},{permissionMode:'bypassPermissions'}]) assert.throws(()=>executeMonitorTool(context,{action:'update',...input}));
+}));

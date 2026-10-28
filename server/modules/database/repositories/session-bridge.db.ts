@@ -5,7 +5,8 @@ import { getConnection } from '@/modules/database/connection.js';
 export const sessionBridgeDb = {
   resolve(id: string) {
     const db = getConnection();
-    return db.prepare(`SELECT s.* FROM sessions s WHERE ${ownerPredicate('s')} AND (s.session_id=? OR s.provider_session_id=? OR s.session_id LIKE ? ESCAPE '\\' OR s.provider_session_id LIKE ? ESCAPE '\\') ORDER BY (s.session_id=?) DESC,(s.provider_session_id=?) DESC,s.updated_at DESC LIMIT 1`).get(id,id,`${id.replace(/[\\%_]/g,'\\$&')}%`,`${id.replace(/[\\%_]/g,'\\$&')}%`,id,id) as any ?? null;
+    const rows = db.prepare(`SELECT s.* FROM sessions s WHERE ${ownerPredicate('s')} AND (s.session_id=? OR s.provider_session_id=? OR s.session_id LIKE ? ESCAPE '\\' OR s.provider_session_id LIKE ? ESCAPE '\\') ORDER BY (s.session_id=?) DESC,(s.provider_session_id=?) DESC,s.updated_at DESC LIMIT 2`).all(id,id,`${id.replace(/[\\%_]/g,'\\$&')}%`,`${id.replace(/[\\%_]/g,'\\$&')}%`,id,id) as any[];
+    return rows[0]?.session_id===id || rows[0]?.provider_session_id===id || rows.length===1 ? rows[0] : null;
   },
   search(query: string, limit: number, offset: number) {
     const pattern = `%${query.replace(/[\\%_]/g, '\\$&')}%`;

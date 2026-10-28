@@ -5,7 +5,7 @@ import path from 'node:path';
 import test from 'node:test';
 
 import { withUserContext } from '@/modules/auth/index.js';
-import { closeConnection, initializeDatabase, messageQueueDb, sessionsDb, userDb } from '@/modules/database/index.js';
+import { closeConnection, getConnection, initializeDatabase, messageQueueDb, sessionsDb, userDb } from '@/modules/database/index.js';
 import { sessionBridgeService } from '@/modules/session-bridge/session-bridge.service.js';
 import { executeSessionBridgeTool } from '@/modules/session-bridge/session-bridge.tools.js';
 
@@ -38,8 +38,20 @@ test('session parity actions create codex, hand off, wait, compact, and manage m
     const user=Number(userDb.createUser('parity','hash').id);
     withUserContext(user, () => { sessionsDb.createAppSession('source','claude',root,'Source'); });
     const created=sessionBridgeService.create(user,'source',{provider:'codex',cwd:root,title:'Codex target',prompt:'hello codex',requestId:'create-codex'});
+    assert.equal(sessionBridgeService.create(user,'source',{provider:'codex',cwd:root,title:'Codex target',prompt:'hello codex',requestId:'create-codex'}).sessionId,created.sessionId);
+    assert.throws(()=>sessionBridgeService.create(user,'source',{prompt:'different',requestId:'create-codex'}),/different/);
     assert.equal(created.provider,'codex'); assert.equal(created.providerSessionId,null); assert.equal(created.receipt.status,'queued');
     assert.equal(JSON.parse(messageQueueDb.get(user,created.receipt.id)!.options).cloudcliBridgeSourceSessionId,'source');
+    const other=Number(userDb.createUser('parity-other','hash').id);
+    getConnection().prepare('UPDATE users SET allowed_folders=? WHERE id=?').run(JSON.stringify([root]),other);
+    withUserContext(other,()=>sessionsDb.createAppSession('foreign-owner','claude',path.join(root,'member-project'),'Foreign'));
+    assert.throws(()=>sessionBridgeService.create(user,'foreign-owner',{prompt:'forbidden',requestId:'foreign-create'}));
+    await assert.rejects(()=>sessionBridgeService.fork(user,'foreign-owner',{requestId:'foreign-fork'}));
+    assert.throws(()=>sessionBridgeService.rename(user,'foreign-owner','Forbidden'));
+    assert.throws(()=>sessionBridgeService.archive(user,'foreign-owner',true));
+    await assert.rejects(()=>sessionBridgeService.wait(user,{sessionIds:['foreign-owner'],timeoutSec:0}));
+    assert.throws(()=>sessionBridgeService.send(user,'source',{sessionId:'foreign-owner',content:'forbidden',requestId:'foreign-send'}));
+    assert.throws(()=>sessionBridgeService.create(user,'source',{cwd:path.dirname(root),prompt:'escape',requestId:'outside-project'}),/accessible project/);
     const renamed=sessionBridgeService.rename(user,created.sessionId,'Renamed target'); assert.equal(renamed.title,'Renamed target');
     assert.equal(sessionBridgeService.archive(user,created.sessionId,true).archived,true);
     assert.equal(sessionBridgeService.archive(user,created.sessionId,false).archived,false);
@@ -49,6 +61,7 @@ test('session parity actions create codex, hand off, wait, compact, and manage m
     assert.equal(handoff.provider,'claude'); assert.ok('receipt' in handoff); if ('receipt' in handoff) assert.ok(handoff.receipt.id);
     const compact=sessionBridgeService.compact(user,'source',{requestId:'compact-1',instruction:'retain decisions'});
     assert.equal(compact.status,'queued');
+    assert.equal(messageQueueDb.get(user,compact.id)!.content,'/compact retain decisions');
     await assert.rejects(() => executeSessionBridgeTool({userId:user,sessionId:'source',autonomous:true,planMode:false},{action:'create',prompt:'blocked',requestId:'blocked-1'}),/cannot.*dispatch/);
   } finally { closeConnection(); if(old===undefined)delete process.env.DATABASE_PATH; else process.env.DATABASE_PATH=old; await rm(root,{recursive:true,force:true}); }
 });

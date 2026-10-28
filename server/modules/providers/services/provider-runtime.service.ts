@@ -5,7 +5,7 @@ import { agentDiscoveryService } from './agent-discovery.service.js';
 import { AppError, userContextStorage } from '@/shared/utils.js';
 import { withUserContext, assertUserPath, getCurrentUserContext } from '@/modules/auth/index.js';
 import { providerRegistry } from '@/modules/providers/provider.registry.js';
-import { findClaudeCliProcessIds } from '@/modules/providers/services/claude-cli-liveness.service.js';
+import { findResumedProviderProcesses, findClaudeCliProcessIds } from '@/modules/providers/services/claude-cli-liveness.service.js';
 import { killProcessTree, listDescendants } from '@/shared/process-tree.js';
 import { providerModelsService } from '@/modules/providers/services/provider-models.service.js';
 import { sessionsService } from '@/modules/providers/services/sessions.service.js';
@@ -97,7 +97,7 @@ export function createProviderRuntimeService(
         effort:typeof options.effort==='string'?options.effort:undefined,
         permissionMode:typeof options.permissionMode==='string'?options.permissionMode:undefined});
       context.createQuery=createSessionBridgeQuery({userId,sessionId:options.sessionId,
-        autonomous:Boolean(options.cloudcliMonitorId||options.cloudcliBridgeSourceSessionId),planMode:options.permissionMode==='plan'},monitorQuery);
+        autonomous:Boolean(options.cloudcliMonitorId||options.cloudcliBridgeSourceSessionId),planMode:options.permissionMode==='plan',permissionMode:typeof options.permissionMode==='string'?options.permissionMode:'default'},monitorQuery);
       context.createQuery=createDotQuery({userId,sessionId:options.sessionId,
         autonomous:Boolean(options.cloudcliMonitorId||options.cloudcliBridgeSourceSessionId),planMode:options.permissionMode==='plan'},context.createQuery);
     }
@@ -175,8 +175,8 @@ export function createProviderRuntimeService(
       const { runtime } = dependencies.resolveProvider(providerName);
       // Snapshot before interrupt: a fast abort can remove the shell and its
       // MSYS ancestry before the forced kill gets a chance to enumerate it.
-      const providerSessionId = providerName === 'claude' ? dependencies.resolveProviderSessionId(sessionId) : null;
-      const pids = providerSessionId ? await dependencies.findClaudeCliProcessIds(providerSessionId) : [];
+      const providerSessionId = dependencies.resolveProviderSessionId(sessionId);
+      const pids = providerSessionId ? providerName === 'claude' ? await dependencies.findClaudeCliProcessIds(providerSessionId) : (await findResumedProviderProcesses(providerSessionId, providerName)).map(row => row.pid) : [];
       const trees = await Promise.all(pids.map(pid => dependencies.listDescendants(pid)));
       let abortPromise: Promise<unknown>;
       try {
@@ -193,7 +193,7 @@ export function createProviderRuntimeService(
         });
 
       const killedPids: number[] = [];
-      if (providerName === 'claude') {
+      {
         for (const [index, pid] of pids.entries()) {
           if (await dependencies.killProcessTree(pid, trees[index])) {
             killedPids.push(pid);

@@ -126,7 +126,7 @@ export function GlobalTasksPage({ onMenuClick }: { onMenuClick: () => void }) {
           {TASK_WORKSTREAMS.map(group => {
             const rows = tasks.filter(row => row.category === group.id);
             if (!rows.length) return null;
-            const expanded = Boolean(category || search.trim() || expandedGroups.includes(group.id));
+            const expanded = Boolean(!expandedGroups.includes(group.id));
             const visible = expanded ? rows : rows.slice(0, 3);
             const running = rows.filter(row => row.task.status === 'in-progress').length;
             const attention = rows.filter(row => ['blocked', 'review'].includes(row.task.status)).length;
@@ -153,7 +153,7 @@ function TaskRow({ project, task, busy, act }: { project: ProjectTasks; task: Ta
   // The selected option stays local until the user explicitly executes it.
   const [option, setOption] = useState(task.recommended || 'A');
   const navigate = useNavigate();
-  return <details className="group border-b border-border/60 last:border-b-0" data-testid="global-task-row">
+  return <details open className="group border-b border-border/60 last:border-b-0" data-testid="global-task-row">
     <summary className="flex cursor-pointer list-none items-start gap-3 px-4 py-3.5 transition-colors hover:bg-muted/25">
       <ChevronDown className="mt-1 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" size={15}/>
       <div className="min-w-0 flex-1"><h3 className="break-words text-sm font-medium leading-6">{task.title}</h3>

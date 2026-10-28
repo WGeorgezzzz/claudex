@@ -46,7 +46,7 @@ import { settingsRoutes } from './modules/settings/index.js';
 import { usageRoutes, initializeUsage, closeUsage } from './modules/usage/index.js';
 import { quotaRoutes, initializeQuota, closeQuota } from './modules/quota/index.js';
 import { remoteAccessRoutes, initializeRemoteAccess, closeRemoteAccess } from './modules/remote-access/index.js';
-import { initializeAgentDiscovery } from './modules/providers/index.js';
+import { sessionsService, initializeAgentDiscovery } from './modules/providers/index.js';
 import { createSystemModule } from './modules/system/index.js';
 import { createAgentModule } from './modules/agent/index.js';
 import projectModuleRoutes from './modules/projects/projects.routes.js';
@@ -413,6 +413,7 @@ async function startServer() {
 
             // Start watching the projects folder for changes
             await initializeSessionsWatcher();
+            void sessionsService.listRunningSessions().then(rows => console.log('[Recovery] Discoverable running sessions:', rows.length)).catch(error => console.warn('[Recovery]', error));
             // Sends anything that came due while the server was not running,
             // then keeps polling.
             // A backup-based verification instance must never replay production jobs

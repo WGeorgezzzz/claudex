@@ -52,11 +52,13 @@ test('workstreams keep robot operations together and distinguish research from i
   assert.equal(taskWorkstream('核对其他事项'), 'followup');
 });
 
-test('category previews reveal remaining tasks on expansion and search never drops a hidden task', async () => {
+test('all tasks and options are visible by default; explicit collapse and search preserve hidden tasks', async () => {
   const tasks = Array.from({length:5}, (_,i) => ({id:i+1,title:`Nexagent 任务 ${i+1}`,status:'pending',priority:'medium'}));
   mocks.list.mockResolvedValue(reply({projects:[{...project,tasks}]}));
   render(<MemoryRouter><GlobalTasksPage onMenuClick={() => {}}/></MemoryRouter>);
   await screen.findByText('Nexagent 任务 1');
+  assert.equal(screen.getAllByTestId('global-task-row').length,5);
+  fireEvent.click(screen.getByRole('button',{name:'收起为重点概览'}));
   assert.equal(screen.getAllByTestId('global-task-row').length,3);
   fireEvent.click(screen.getByRole('button',{name:'展开其余 2 项'}));
   assert.equal(screen.getAllByTestId('global-task-row').length,5);
