@@ -30,3 +30,25 @@ test('cross-session tools bind source identity, preserve queue semantics and rej
     assert.equal(messageQueueDb.list(user,'target').length,1);
   } finally {closeConnection();if(old===undefined)delete process.env.DATABASE_PATH;else process.env.DATABASE_PATH=old;if(oldProtected===undefined)delete process.env.CLOUDCLI_PROTECTED_SESSIONS_FILE;else process.env.CLOUDCLI_PROTECTED_SESSIONS_FILE=oldProtected;assert.ok(path.resolve(root).startsWith(path.resolve(os.tmpdir())+path.sep));await rm(root,{recursive:true,force:true});}
 });
+
+test('session parity actions create codex, hand off, wait, compact, and manage metadata', async () => {
+  const root=await mkdtemp(path.join(os.tmpdir(),'claudex-parity-')); const old=process.env.DATABASE_PATH;
+  closeConnection(); process.env.DATABASE_PATH=path.join(root,'test.db'); delete process.env.CLOUDCLI_PROTECTED_SESSIONS_FILE; await initializeDatabase();
+  try {
+    const user=Number(userDb.createUser('parity','hash').id);
+    withUserContext(user, () => { sessionsDb.createAppSession('source','claude',root,'Source'); });
+    const created=sessionBridgeService.create(user,'source',{provider:'codex',cwd:root,title:'Codex target',prompt:'hello codex',requestId:'create-codex'});
+    assert.equal(created.provider,'codex'); assert.equal(created.providerSessionId,null); assert.equal(created.receipt.status,'queued');
+    assert.equal(JSON.parse(messageQueueDb.get(user,created.receipt.id)!.options).cloudcliBridgeSourceSessionId,'source');
+    const renamed=sessionBridgeService.rename(user,created.sessionId,'Renamed target'); assert.equal(renamed.title,'Renamed target');
+    assert.equal(sessionBridgeService.archive(user,created.sessionId,true).archived,true);
+    assert.equal(sessionBridgeService.archive(user,created.sessionId,false).archived,false);
+    const waited=await sessionBridgeService.wait(user,{receiptIds:[created.receipt.id],timeoutSec:0});
+    assert.equal(waited.receipts[0]?.id,created.receipt.id); assert.equal(waited.timedOut,true);
+    const handoff=await sessionBridgeService.fork(user,'source',{mode:'handoff',requestId:'handoff-1'});
+    assert.equal(handoff.provider,'claude'); assert.ok('receipt' in handoff); if ('receipt' in handoff) assert.ok(handoff.receipt.id);
+    const compact=sessionBridgeService.compact(user,'source',{requestId:'compact-1',instruction:'retain decisions'});
+    assert.equal(compact.status,'queued');
+    await assert.rejects(() => executeSessionBridgeTool({userId:user,sessionId:'source',autonomous:true,planMode:false},{action:'create',prompt:'blocked',requestId:'blocked-1'}),/cannot.*dispatch/);
+  } finally { closeConnection(); if(old===undefined)delete process.env.DATABASE_PATH; else process.env.DATABASE_PATH=old; await rm(root,{recursive:true,force:true}); }
+});
