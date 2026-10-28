@@ -34,7 +34,14 @@ export function initializeMonitorTables(db: Database.Database): void {
 }
 
 // Retry transport/model failures without tight loops: 1, 2, 4, 8, 16, then 30 minutes.
-const retryAt = (failures: number, now: Date) => new Date(now.getTime() + Math.min(30, 2 ** Math.min(5, Math.max(0, failures - 1))) * 60_000).toISOString();
+const retryAt = (failures: number, now: Date, error = '') => {
+  // Provider session-limit errors are account-wide and retrying every 30
+  // minutes only burns more quota. Keep the monitor active, show the error,
+  // and wait for the provider reset window before trying again.
+  const sessionLimit = /session limit|hit your session limit|usage limit|rate limit/i.test(error);
+  const minutes = sessionLimit ? 120 : Math.min(30, 2 ** Math.min(5, Math.max(0, failures - 1)));
+  return new Date(now.getTime() + minutes * 60_000).toISOString();
+};
 
 /** Used by the monitors module to atomically reserve runs and retain their outcomes. */
 export const monitorsDb = {
@@ -131,7 +138,7 @@ export const monitorsDb = {
       db.prepare("UPDATE monitor_runs SET status=?,error=?,finished_at=? WHERE id=? AND status='running'")
         .run(error ? 'failed' : 'succeeded',error,now.toISOString(),runId);
       const failures = error ? row.consecutive_failures + 1 : 0;
-      const next = error ? retryAt(failures, now) : (row.schedule_json ? nextMonitorCalendarRun(JSON.parse(row.schedule_json),now) : new Date(now.getTime()+row.interval_minutes*60_000)).toISOString();
+      const next = error ? retryAt(failures, now, error) : (row.schedule_json ? nextMonitorCalendarRun(JSON.parse(row.schedule_json),now) : new Date(now.getTime()+row.interval_minutes*60_000)).toISOString();
       db.prepare(`UPDATE monitors SET running_id=NULL,run_count=run_count+1,last_error=?,next_run_at=?,consecutive_failures=?
         WHERE id=? AND running_id=?`).run(error,next,failures,id,runId);
     })();
