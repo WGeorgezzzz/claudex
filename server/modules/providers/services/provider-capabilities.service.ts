@@ -53,7 +53,7 @@ type ProviderCapabilities = {
  * - Cursor has no token usage endpoint support (its store.db has no usage rows).
  */
 const PROVIDER_CAPABILITIES: Record<LLMProvider, ProviderCapabilities> = {
-  gemini:{provider:'gemini',permissionModes:['default','plan','bypassPermissions'],defaultPermissionMode:'default',supportsImages:false,supportsFiles:false,supportsAbort:true,supportsPermissionRequests:false,supportsTokenUsage:false,supportsEffort:true,effortLevels:['low','medium','high','xhigh','max'],supportsMessageEditing:false,supportsSessionForking:false},
+  gemini:{provider:'gemini',permissionModes:['default'],defaultPermissionMode:'default',supportsImages:false,supportsFiles:false,supportsAbort:true,supportsPermissionRequests:false,supportsTokenUsage:false,supportsEffort:false,effortLevels:[],supportsMessageEditing:false,supportsSessionForking:false},
   claude: {
     provider: 'claude',
     permissionModes: ['default', 'auto', 'acceptEdits', 'bypassPermissions', 'plan'],
