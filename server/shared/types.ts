@@ -1472,7 +1472,7 @@ export type FileTreeServices = {
     suggestions: Array<{ path: string; name: string; type: 'directory' }>;
   }>;
   createWorkspaceFolder(folderPath: string): Promise<{ success: true; path: string }>;
-  readTextFile(projectId: string, filePath: string): Promise<{ content: string; path: string }>;
+  readTextFile(projectId: string, filePath: string, options?: {offset?: number; metadata?: boolean}): Promise<{ content: string; path: string; size?: number; modified?: string; directory?: boolean; truncated?: boolean; offset?: number; limit?: number }>;
   /** `rangeHeader` is the raw HTTP Range header; a satisfiable single range streams only that slice. */
   openFile(projectId: string, filePath: string, rangeHeader?: string): Promise<{
     contentType: string;

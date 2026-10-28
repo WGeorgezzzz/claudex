@@ -37,6 +37,10 @@ export const deepSeekHarnessRuntime: IProviderRuntime = {
     };
     const prompt = appendFilesInputTag(command, options.files);
     const scratch = mkdtempSync(path.join(os.tmpdir(), 'nexagent-harness-'));
+    const resolved = path.resolve(scratch);
+    if (path.dirname(resolved) !== path.resolve(os.tmpdir()) || !path.basename(resolved).startsWith('nexagent-harness-')) {
+      throw new Error('Refusing to remove an unexpected Harness scratch directory.');
+    }
     const taskFile = path.join(scratch, 'task.txt');
     writeFileSync(taskFile, prompt, 'utf8');
     persist({ type: 'user', text: prompt });
@@ -101,11 +105,7 @@ export const deepSeekHarnessRuntime: IProviderRuntime = {
         });
       });
     } finally {
-      const resolved = path.resolve(scratch);
-      if (path.dirname(resolved) !== path.resolve(os.tmpdir()) || !path.basename(resolved).startsWith('nexagent-harness-')) {
-        throw new Error('Refusing to remove an unexpected Harness scratch directory.');
-      }
-      rmSync(resolved, { recursive: true, force: true });
+      rmSync(scratch, { recursive: true, force: true });
     }
   },
   async abort(sessionId) {

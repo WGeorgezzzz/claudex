@@ -17,7 +17,7 @@ function paragraphFileDirectories(node: RootContent): string[] {
     if(directory)result.add(directory);
     // An explicitly named directory (`D:\out\`) is context for abbreviated names beside it.
     const named=child.type==='inlineCode'?child.value.replace(/\\/g,'/'):'';
-    if(/^(?:[a-z]:\/|\/)/i.test(named)&&named.endsWith('/'))result.add(named);
+    if(named.endsWith('/') && !/^[a-z]+:\/\//i.test(named))result.add(named);
     if('children' in child)for(const nested of child.children)visit(nested);
   };
   visit(node);return [...result];
@@ -43,11 +43,11 @@ export function remarkLocalFileDirectories() {
           if (rowDirectory) directories.add(rowDirectory);
         }
       }
-      if (node.type === 'inlineCode') {
-        const value = node.value.replace(/\\/g, '/');
+      if (node.type === 'inlineCode' || node.type === 'link') {
+        const value = (node.type === 'inlineCode' ? node.value : node.url).replace(/\\/g, '/');
         const parent=absoluteFileDirectory(value);
         if(parent)fileDirectories.add(parent);
-        if (/^(?:[a-z]:\/|\/)/i.test(value) && value.endsWith('/')) {
+        if (value.endsWith('/') && !/^[a-z]+:\/\//i.test(value)) {
           directories.add(value);
           base = value;
         } else if (!/^(?:[a-z]:\/|\/|file:)/i.test(value) && /\.[a-z0-9]+(?::\d+(?::\d+)?)?$/i.test(value)) {

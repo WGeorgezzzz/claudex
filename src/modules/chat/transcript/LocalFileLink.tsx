@@ -6,7 +6,7 @@ import { Copy, ExternalLink, FileText } from 'lucide-react';
 
 import { MarkdownWorkspaceContext } from '@/modules/chat/context/MarkdownWorkspaceContext';
 import { isAbbreviatedFileReference, parseLocalFileLink } from '@/modules/chat/utils/localFileLink';
-import { copyTextToClipboard } from '@/shared/utils';
+import { copyLocalPath, openLocalFile } from '@/shared/localPath';
 import { api } from '@/shared/api';
 
 type LocalFileLinkProps = AnchorHTMLAttributes<HTMLAnchorElement> & {
@@ -18,7 +18,7 @@ type LocalFileLinkProps = AnchorHTMLAttributes<HTMLAnchorElement> & {
 /** Markdown uses this for explicit links and inline file references, preserving left-click preview. */
 export function LocalFileLink({ fileReference, directories = [], onPreview, children, onClick, title, ...props }: LocalFileLinkProps) {
   const { t } = useTranslation('chat');
-  const { projectPath, projectId } = useContext(MarkdownWorkspaceContext);
+  const { projectPath, projectId, cwd } = useContext(MarkdownWorkspaceContext);
   const linkRef = useRef<HTMLAnchorElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   // The pointer position anchors the one open menu independently of transcript scrolling.
@@ -53,6 +53,7 @@ export function LocalFileLink({ fileReference, directories = [], onPreview, chil
       if (!(event.target instanceof Node) || !menuRef.current?.contains(event.target)) dismiss();
     };
     const outside = (event: MouseEvent) => {
+      if(touchHeld.current) return;
       if (!menuRef.current?.contains(event.target as Node)) dismiss();
     };
     const key = (event: KeyboardEvent) => {
@@ -78,52 +79,42 @@ export function LocalFileLink({ fileReference, directories = [], onPreview, chil
     };
   }, [position]);
 
-  const resolvedPath = async () => {
-    const { path } = parseLocalFileLink(fileReference);
-    if (/^(?:[a-z]:\/|\/)/i.test(path)) return path;
-    if (projectId && directories.length) {
-      if (directories.length > 32) throw new Error('目录过多，无法确定文件位置，请使用绝对路径。');
-      // Only probe paths explicitly named in this message. HEAD transfers no file payload.
-      const candidates = [...new Set(directories.map(directory => directory.replace(/\/$/, '') + '/' + path))];
-      const results = await Promise.all(candidates.map(async candidate => {
-        const response = await api.readFileBlob(projectId, candidate, { method: 'HEAD', signal: AbortSignal.timeout(8000) });
-        if (!response.ok && response.status !== 404) throw new Error(`无法确认文件路径 (${response.status}): ${candidate}`);
-        return response.ok ? candidate : null;
-      }));
-      const matches = results.filter((candidate): candidate is string => candidate !== null);
-      if (matches.length === 1) return matches[0];
-      if (matches.length > 1) throw new Error('找到多个同名文件，请使用完整路径：' + matches.join('；'));
-      throw new Error('正文所列目录中未找到文件：' + path);
+  const candidateGroups = () => {
+    const {path} = parseLocalFileLink(fileReference);
+    if (/^(?:[a-z]:\/|\/)/i.test(path)) return [[path]];
+    const roots = [...new Set([cwd,projectPath].filter((p):p is string=>Boolean(p)).map(p=>p.replace(/\\/g,'/').replace(/\/$/,'')))];
+    if (!roots.length) throw new Error('会话工作目录不可用，请使用绝对路径');
+    if (directories.length > 32) throw new Error('目录过多，请使用绝对路径');
+    const join=(base:string,relative:string)=>base.replace(/\/$/,'')+'/'+relative;
+    return [directories.flatMap(dir=> /^(?:[a-z]:\/|\/)/i.test(dir) ? [join(dir,path)] : roots.map(root=>join(join(root,dir),path))),...roots.map(root=>[join(root,path)])].filter(group=>group.length);
+  };
+  const resolvePaths = async (): Promise<string[]> => {
+    const groups = candidateGroups();
+    if(!abbreviated && /^(?:[a-z]:\/|\/)/i.test(parseLocalFileLink(fileReference).path)) return groups[0];
+    if (!projectId || (!directories.length && !cwd && !abbreviated)) return groups[0];
+    const tried:string[]=[]; const failures:string[]=[];
+    for (const group of groups) {
+      const matches:string[]=[];
+      for(const candidate of [...new Set(group)]) {
+        tried.push(candidate);
+        const response = abbreviated
+          ? await api.resolveFilePattern(projectId!, candidate, {signal:AbortSignal.timeout(8000)})
+          : await api.readFileBlob(projectId!, candidate, {method:'HEAD',signal:AbortSignal.timeout(8000)});
+        if(response.ok) {
+          if(abbreviated) matches.push(...((await response.json()) as {matches:string[]}).matches);
+          else matches.push(candidate);
+        } else if(response.status!==404) failures.push('读取被拒或路径不可用 ('+response.status+'): '+candidate);
+      }
+      const unique=[...new Set(matches.map(p=>p.replace(/\\/g,'/')))];
+      if(unique.length) {setResolvedTitle(unique.join('\n'));return unique;}
     }
-    if (!projectPath) throw new Error(t('fileLink.noProject', 'The project path is unavailable. Open this conversation in its project first.'));
-    // Resolve against this message's project, never the desktop process working directory.
-    return `${projectPath.replace(/\\/g, '/').replace(/\/$/, '')}/${path}`;
+    throw new Error((failures.length?failures.join('；'):'未找到文件')+'；已尝试：'+tried.join('；'));
   };
-  const resolveAbbreviated = async (): Promise<string[]> => {
-    const { path } = parseLocalFileLink(fileReference);
-    if (!projectId) throw new Error(t('fileLink.noProject', 'The project path is unavailable. Open this conversation in its project first.'));
-    const absolute = /^(?:[a-z]:\/|\/)/i.test(path);
-    const bases = absolute ? [''] : directories.length ? directories : projectPath ? [projectPath] : [];
-    if (!bases.length) throw new Error(t('fileLink.noProject', 'The project path is unavailable. Open this conversation in its project first.'));
-    if (bases.length > 32) throw new Error('目录过多，无法确定文件位置，请使用绝对路径。');
-    const candidates = [...new Set(bases.map(base => absolute ? path : base.replace(/\\/g, '/').replace(/\/$/, '') + '/' + path))];
-    const failures: string[] = [];
-    const results = await Promise.all(candidates.map(async candidate => {
-      const response = await api.resolveFilePattern(projectId, candidate, { signal: AbortSignal.timeout(8000) });
-      if (response.ok) return ((await response.json()) as { matches?: string[] }).matches ?? [];
-      if (response.status !== 404) failures.push(`无法解析省略的文件名 (${response.status}): ${candidate}`);
-      return [];
-    }));
-    const matches = [...new Set(results.flat().map(match => match.replace(/\\/g, '/')))];
-    if (!matches.length) throw new Error(failures[0] ?? '未找到与省略文件名匹配的文件：' + path);
-    setResolvedTitle(matches.length === 1 ? matches[0] : `找到 ${matches.length} 个匹配文件：\n${matches.join('\n')}`);
-    return matches;
-  };
-  /** Runs an action on the referenced file, asking the user to choose when an abbreviation matches several files. */
-  const withResolvedPath = async (action: (path: string) => unknown) => {
-    const paths = abbreviated ? await resolveAbbreviated() : [await resolvedPath()];
-    if (paths.length === 1) { await action(paths[0]); return; }
-    setChoices({ paths, action });
+  const resolveAbbreviated = resolvePaths;
+  const withResolvedPath = async (action:(path:string)=>unknown) => {
+    const paths=await resolvePaths();
+    if(paths.length===1){await action(paths[0]);return;}
+    setChoices({paths,action});
   };
   const openLocally = async () => {
     if (opening) return;
@@ -142,22 +133,32 @@ export function LocalFileLink({ fileReference, directories = [], onPreview, chil
       setError(reason instanceof Error ? reason.message : String(reason));
     } finally { setOpening(false); }
   };
-  const copyPath = async () => {
+  const copyPath = async (folder = false) => {
     setPosition(null);
     setError(null);
     try {
       await withResolvedPath(async path => {
-        if (!await copyTextToClipboard(path)) throw new Error(t('fileLink.copyFailed', 'Unable to copy the file path.'));
+        await copyLocalPath(path,folder);
       });
     } catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)); }
   };
+  const reveal = async () => {
+    setPosition(null);setError(null);
+    try {await withResolvedPath(path=>openLocalFile(path,true));}
+    catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
+  };
+  const touchHeld=useRef(false);
+  const touchTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
+  const cancelTouch=()=>{if(touchTimer.current)clearTimeout(touchTimer.current);touchTimer.current=null;};
+  useEffect(()=>cancelTouch,[]);
   const menuClass = 'flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm hover:bg-accent focus:bg-accent focus:outline-none disabled:opacity-50';
   return <>
-    <a {...props} title={resolvedTitle ?? title} ref={linkRef} onMouseEnter={() => {
+    <a {...props} onTouchStart={event=>{const touch=event.touches[0];cancelTouch();touchHeld.current=false;touchTimer.current=setTimeout(()=>{touchHeld.current=true;openMenuAt(touch.clientX,touch.clientY);},550);}} onTouchEnd={cancelTouch} onTouchMove={cancelTouch} onTouchCancel={cancelTouch} title={resolvedTitle ?? title} ref={linkRef} onMouseEnter={() => {
       if (!abbreviated || resolvedTitle || hoverResolving.current || !projectId) return;
       hoverResolving.current = true;
       void resolveAbbreviated().catch(() => { hoverResolving.current = false; });
     }} onClick={event => {
+      if(touchHeld.current){event.preventDefault();event.stopPropagation();touchHeld.current=false;return;}
       if (!onPreview) { onClick?.(event); return; }
       event.preventDefault(); setError(null); setChoices(null);
       const reference = parseLocalFileLink(fileReference);
@@ -169,7 +170,7 @@ export function LocalFileLink({ fileReference, directories = [], onPreview, chil
       if (/^(?:[a-z]:\/|\/)/i.test(reference.path) || (!projectPath && !directories.length)) {
         onPreview(reference.path, reference.line); return;
       }
-      void resolvedPath().then(path => onPreview(path, parseLocalFileLink(fileReference).line))
+      void withResolvedPath(path => onPreview(path, reference.line))
         .catch(reason => setError(reason instanceof Error ? reason.message : String(reason)));
     }}
       onContextMenu={event => {
@@ -184,13 +185,13 @@ export function LocalFileLink({ fileReference, directories = [], onPreview, chil
         }
       }}>{children}</a>
     {choices && <span role="group" aria-label="匹配的文件" className="ml-2 inline-flex flex-wrap items-center gap-1 align-middle text-xs">
-      <span className="text-muted-foreground">找到 {choices.paths.length} 个匹配文件：</span>
+      <span className="text-muted-foreground">找到多个同名文件（{choices.paths.length} 个匹配文件），请选择：</span>
       {choices.paths.map(path => <button key={path} type="button" title={path}
         className="rounded border border-border px-1.5 py-0.5 font-mono hover:bg-accent"
         onClick={() => {
           const { action } = choices; setChoices(null);
           void Promise.resolve().then(() => action(path)).catch(reason => setError(reason instanceof Error ? reason.message : String(reason)));
-        }}>{path.split('/').pop()}</button>)}
+        }}>{choices.paths.filter(candidate=>candidate.split('/').pop()===path.split('/').pop()).length>1?path:path.split('/').pop()}</button>)}
     </span>}
     {error && <span role="alert" className="ml-2 text-xs text-red-600 dark:text-red-400">{error}</span>}
     {position && createPortal(<div ref={menuRef} role="menu" aria-label={t('fileLink.menu', 'File actions')}
@@ -206,6 +207,8 @@ export function LocalFileLink({ fileReference, directories = [], onPreview, chil
       }}>
       <button type="button" role="menuitem" className={menuClass} disabled={opening} onClick={() => void openLocally()}><ExternalLink size={15}/>{t('fileLink.openLocally', 'Open locally')}</button>
       <button type="button" role="menuitem" className={menuClass} onClick={() => { setPosition(null); linkRef.current?.click(); }}><FileText size={15}/>{t('fileLink.preview', 'Preview in Nexagent')}</button>
+      <button type="button" role="menuitem" className={menuClass} onClick={() => void reveal()}>打开所在文件夹</button>
+      <button type="button" role="menuitem" className={menuClass} onClick={() => void copyPath(true)}>复制文件夹路径</button>
       <button type="button" role="menuitem" className={menuClass} onClick={() => void copyPath()}><Copy size={15}/>{t('fileLink.copyPath', 'Copy file path')}</button>
     </div>, document.body)}
   </>;

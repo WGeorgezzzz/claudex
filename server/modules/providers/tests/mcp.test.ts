@@ -314,8 +314,9 @@ test('providerMcpService global adder writes to all providers and rejects unsupp
       workspacePath,
     });
 
-    assert.equal(globalResult.length, 5);
-    assert.ok(globalResult.filter(entry => entry.provider !== 'workbuddy').every(entry => entry.created));
+    assert.deepEqual(globalResult.map(entry=>entry.provider).sort(),['claude','codex','cursor','deepseek-harness','opencode','workbuddy']);
+    assert.equal(globalResult.find(entry=>entry.provider==='deepseek-harness')?.created,false);
+    assert.ok(globalResult.filter(entry => entry.provider !== 'workbuddy' && entry.provider !== 'deepseek-harness').every(entry => entry.created));
     // WorkBuddy is optional and native Windows-only; unavailable installs report failure.
     const workBuddyResult = globalResult.find(entry => entry.provider === 'workbuddy');
     assert.equal(workBuddyResult?.created, Boolean(resolveWorkBuddyInstallation()));

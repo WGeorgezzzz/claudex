@@ -34,6 +34,7 @@ export const useCodeEditorDocument = ({ file, projectPath }: UseCodeEditorDocume
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [isBinary, setIsBinary] = useState(false);
+  const [previewMeta,setPreviewMeta]=useState<{size?:number;truncated?:boolean;offset?:number}>({});
   // Some binaries (images, PDFs, audio, video) can be rendered natively, so the
   // editor shows an inline preview instead of the generic binary placeholder.
   const previewKind = getPreviewKind(file.name);
@@ -64,7 +65,7 @@ export const useCodeEditorDocument = ({ file, projectPath }: UseCodeEditorDocume
     const loadFileContent = async () => {
       try {
         setLoading(true);
-        setIsBinary(false);
+        setIsBinary(false);setPreviewMeta({});
         // Any save still in flight or failed belongs to the previous file.
         setSaving(false);
         setSaveError(null);
@@ -102,10 +103,12 @@ export const useCodeEditorDocument = ({ file, projectPath }: UseCodeEditorDocume
         // Read through readApiJson so the API's own explanation reaches the
         // pane — a directory, a path outside the project root, a missing file.
         // The bare status showed all of those as an opaque "403 Forbidden".
-        const data = await readApiJson<{ content: string }>(response);
+        const data = await readApiJson<{ content: string; size?:number;truncated?:boolean;offset?:number }>(response);
         if (isStaleLoad()) {
           return;
         }
+        setPreviewMeta(data);
+        if(data.content.includes('\0')){setIsBinary(true);applyLoadedContent('');return;}
         applyLoadedContent(data.content);
       } catch (error) {
         if (isStaleLoad()) {
@@ -127,7 +130,7 @@ export const useCodeEditorDocument = ({ file, projectPath }: UseCodeEditorDocume
   const handleSave = useCallback(async () => {
     // Preview-only and binary files have no editable text buffer; never write
     // them back (e.g. via Cmd/Ctrl+S) or we'd corrupt the file on disk.
-    if (previewKind || isBinaryFile(fileName)) {
+    if (isBinary || previewMeta.truncated || previewKind || isBinaryFile(fileName)) {
       return;
     }
 
@@ -180,7 +183,7 @@ export const useCodeEditorDocument = ({ file, projectPath }: UseCodeEditorDocume
         setSaving(false);
       }
     }
-  }, [content, savedContent, filePath, fileProjectId, previewKind, fileName]);
+  }, [content, savedContent, filePath, fileProjectId, previewKind, fileName, previewMeta.truncated, isBinary]);
 
   const handleDownload = useCallback(() => {
     const blob = new Blob([content], { type: 'text/plain' });
@@ -224,6 +227,7 @@ export const useCodeEditorDocument = ({ file, projectPath }: UseCodeEditorDocume
     saveError,
     isBinary,
     previewKind,
+    previewMeta,
     fileProjectId,
     hasUnsavedChanges,
     handleSave,

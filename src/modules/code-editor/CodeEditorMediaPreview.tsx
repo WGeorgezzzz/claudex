@@ -1,3 +1,4 @@
+import LocalFileActions from '@/shared/ui/LocalFileActions';
 import { useEffect, useState } from 'react';
 
 import { api } from '@/shared/api';
@@ -78,7 +79,8 @@ export default function CodeEditorMediaPreview({
         const response = await api.readFileBlob(projectId, file.path, { signal: controller.signal });
 
         if (!response.ok) {
-          throw new Error(`Request failed with status ${response.status}`);
+          const detail = await response.json().catch(()=>null) as {error?:string}|null;
+          throw new Error(detail?.error ?? `Request failed with status ${response.status}`);
         }
 
         const blob = await response.blob();
@@ -122,7 +124,7 @@ export default function CodeEditorMediaPreview({
           return;
         }
         console.error('Error loading preview:', loadError);
-        setError(labels.error);
+        setError(loadError instanceof Error ? loadError.message : labels.error);
       } finally {
         setLoading(false);
       }
@@ -257,7 +259,7 @@ export default function CodeEditorMediaPreview({
       <div className="flex min-w-0 flex-1 items-center gap-2">
         <h3 className="truncate text-sm font-medium text-gray-900 dark:text-white">{file.name}</h3>
       </div>
-      {headerActions}
+      <LocalFileActions path={file.path} />{headerActions}
     </div>
   );
 

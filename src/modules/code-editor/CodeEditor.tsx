@@ -1,3 +1,4 @@
+import DataFilePreview from '@/modules/code-editor/DataFilePreview';
 import { EditorView } from '@codemirror/view';
 import { unifiedMergeView } from '@codemirror/merge';
 import type { Extension } from '@codemirror/state';
@@ -46,6 +47,8 @@ export default function CodeEditor({
 }: CodeEditorProps) {
   const { t } = useTranslation('codeEditor');
   const paletteOps = usePaletteOps();
+  const [dataSource,setDataSource]=useState(false);
+  useEffect(()=>setDataSource(false),[file.path]);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showDiff, setShowDiff] = useState(Boolean(file.diffInfo));
   // Documents open rendered; code, diffs and explicit line references remain source views.
@@ -73,6 +76,7 @@ export default function CodeEditor({
     saveError,
     isBinary,
     previewKind,
+    previewMeta,
     fileProjectId,
     hasUnsavedChanges,
     handleSave,
@@ -321,8 +325,11 @@ export default function CodeEditor({
             </div>
           )}
 
+          {/\.(csv|tsv|json|jsonl)$/i.test(file.name) && !previewMeta.truncated && <button className="border p-1 text-xs" onClick={()=>setDataSource(v=>!v)}>{dataSource?'查看格式化预览':'查看源码'}</button>}
           <div className="flex-1 overflow-hidden">
-            {isHtmlPreviewFile && markdownPreview ? (
+            {(previewMeta.truncated || (/\.(csv|tsv|json|jsonl)$/i.test(file.name) && !dataSource && !file.line && !file.diffInfo)) ? (
+              <DataFilePreview name={file.name} content={content} projectId={fileProjectId} path={file.path} size={previewMeta.size} truncated={previewMeta.truncated} initialOffset={previewMeta.offset} />
+            ) : isHtmlPreviewFile && markdownPreview ? (
               <iframe title={`HTML 预览：${file.name}`} sandbox="allow-scripts" referrerPolicy="no-referrer" srcDoc={content} className="h-full w-full border-0 bg-white" />
             ) : (
             <CodeEditorSurface

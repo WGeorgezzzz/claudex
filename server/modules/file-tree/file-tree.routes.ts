@@ -133,7 +133,9 @@ export function createFileTreeRouter(
 
   router.get('/projects/:projectId/file', createRouteHandler(async (request, response) => {
     const filePath = readRequiredString(request.query.filePath, 'filePath', 'Invalid file path');
-    response.json(await services.readTextFile(readProjectId(request), filePath));
+    const offset=request.query.offset;
+    if(offset!==undefined && (typeof offset!=='string' || !/^\d+$/.test(offset) || !Number.isSafeInteger(Number(offset)))) throw new AppError('Invalid preview offset',{statusCode:400});
+    response.json(await services.readTextFile(readProjectId(request), filePath, ...(request.query.metadata==='true'||offset!==undefined ? [{metadata:request.query.metadata==='true',...(offset!==undefined?{offset:Number(offset)}:{})}] : [])));
   }, logger));
 
   router.get('/projects/:projectId/files/content', createRouteHandler(async (request, response) => {

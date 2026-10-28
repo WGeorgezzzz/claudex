@@ -379,7 +379,13 @@ export function createFileTreeService(dependencies: FileTreeServiceDependencies)
       }
     }
 
-    return resolvePathInsideProject(projectRoot, targetPath);
+    try {return resolvePathInsideProject(projectRoot, targetPath);}
+    catch(error) {
+      if(!path.isAbsolute(targetPath)) throw error;
+      const validation=await dependencies.workspace.validatePath(targetPath);
+      if(!validation.valid) throw error;
+      return validation.resolvedPath || targetPath;
+    }
   }
 
   async function cleanupTemporaryFiles(files: FileTreeUploadedFile[]): Promise<void> {
@@ -473,12 +479,23 @@ export function createFileTreeService(dependencies: FileTreeServiceDependencies)
       return { success: true, path: targetPath };
     },
 
-    async readTextFile(projectId, filePath) {
+    async readTextFile(projectId, filePath, options) {
       const projectRoot = await resolveProjectRoot(projectId);
       const resolvedPath = await resolveReadablePath(projectRoot, filePath);
       try {
-        const content = await fileSystem.readTextFile(resolvedPath);
-        return { content, path: resolvedPath };
+        const stats = await fileSystem.stat(resolvedPath);
+        const metadata = {path:resolvedPath,size:stats.size,modified:stats.mtime.toISOString(),directory:stats.isDirectory()};
+        if (options?.metadata) return {content:'',...metadata};
+        if(stats.isDirectory()) throw createFileTreeError('Path is a directory, not a file',400,'PATH_IS_DIRECTORY');
+        const limit=256*1024;
+        if(stats.size>1024*1024 || options?.offset!==undefined) {
+          const offset=Math.max(0,Math.min(options?.offset ?? 0,Math.max(0,stats.size-1)));
+          const chunks:Buffer[]=[];
+          for await(const chunk of fileSystem.createReadStream(resolvedPath,{start:offset,end:Math.min(stats.size-1,offset+limit-1)})) chunks.push(Buffer.from(chunk));
+          return {content:Buffer.concat(chunks).toString('utf8'),...metadata,truncated:true,offset,limit};
+        }
+        const content=await fileSystem.readTextFile(resolvedPath);
+        return {content,...metadata};
       } catch (error) {
         mapFileSystemError(error, {
           ENOENT: { message: 'File not found', statusCode: 404 },

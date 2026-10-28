@@ -134,6 +134,10 @@ async function withGateway(
 
 /** The handler is async and the socket listener does not await it. */
 const settle = () => new Promise((resolve) => { setTimeout(resolve, 30); });
+async function waitForRun(runs:RunCall[]) {
+  const deadline=Date.now()+3000;
+  while(!runs.length && Date.now()<deadline)await new Promise(resolve=>setTimeout(resolve,10));
+}
 
 test('a background session refuses edits before truncating history', async () => {
   await withGateway('claude', async ({ socket, runs }) => {
@@ -153,7 +157,7 @@ test('an edit resumes through the turn before the one being replaced', async () 
       anchorId: 'e-u2',
       content: 'a better second prompt',
     }));
-    await settle();
+    await waitForRun(runs);
 
     assert.equal(runs.length, 1);
     assert.equal(runs[0].command, 'a better second prompt');
@@ -171,7 +175,7 @@ test('editing the first prompt starts the conversation over', async () => {
       anchorId: 'e-u1',
       content: 'a better first prompt',
     }));
-    await settle();
+    await waitForRun(runs);
 
     assert.equal(runs.length, 1);
     assert.equal(runs[0].options.resumeAnchorId, undefined);

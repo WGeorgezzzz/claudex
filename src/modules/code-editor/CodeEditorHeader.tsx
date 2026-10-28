@@ -1,7 +1,8 @@
+import LocalFileActions from '@/shared/ui/LocalFileActions';
 import { useEffect, useRef, useState } from 'react';
 import { Check, Code2, Copy, Download, Eye, Maximize2, Minimize2, Save, Settings as SettingsIcon, X } from 'lucide-react';
 
-import { copyTextToClipboard } from '@/shared/utils';
+import { copyLocalPath } from '@/shared/localPath';
 import type { CodeEditorFile } from '@/shared/types';
 
 type CodeEditorHeaderProps = {
@@ -72,8 +73,7 @@ export default function CodeEditorHeader({
   }, []);
 
   const handleCopyPath = async () => {
-    const didCopy = await copyTextToClipboard(file.path);
-    if (!didCopy) return;
+    try { await copyLocalPath(file.path); } catch { return; }
 
     setCopiedPath(file.path);
     if (copyResetTimeoutRef.current) {
@@ -122,6 +122,7 @@ export default function CodeEditorHeader({
         </div>
       </div>
 
+      <LocalFileActions path={file.path} />
       {/* Buttons - don't shrink, always visible */}
       <div className="flex shrink-0 items-center gap-0.5">
         {isMarkdownFile && (

@@ -9,7 +9,7 @@ import { DesktopNotificationsController } from './desktopNotifications.js';
 import { LocalServerController } from './localServer.js';
 import { TabsController } from './tabs.js';
 import { loadWorkbenchProfile } from './workbenchProfile.js';
-import { openLocalPath } from './localPath.js';
+import { openLocalPath, revealLocalPath } from './localPath.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -775,6 +775,11 @@ function registerIpcHandlers() {
       throw new Error('Open local files from a local Nexagent window.');
     }
     return openLocalPath(filePath, candidate=>shell.openPath(candidate));
+  });
+  ipcMain.handle('cloudcli-desktop:reveal-local-path', async (event, filePath) => {
+    const origin = new URL(event.senderFrame?.url || 'about:blank');
+    if (origin.protocol !== 'file:' && !(origin.protocol === 'http:' && ['127.0.0.1','localhost'].includes(origin.hostname))) throw new Error('需在 Nexagent 本地桌面窗口使用');
+    return revealLocalPath(filePath, candidate => shell.showItemInFolder(candidate), candidate => shell.openPath(candidate));
   });
   ipcMain.handle('cloudcli-desktop:open-local-web-ui', async () => openLocalWebUi());
   ipcMain.handle('cloudcli-desktop:refresh-environments', async () => {

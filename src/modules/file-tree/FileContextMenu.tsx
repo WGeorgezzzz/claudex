@@ -1,3 +1,4 @@
+import { copyLocalPath, openLocalFile } from '@/shared/localPath';
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Copy, Download, FileText, FolderPlus, Pencil, RefreshCw, Trash2, Upload, type LucideIcon } from 'lucide-react';
@@ -75,6 +76,11 @@ export default function FileContextMenu({
   const { t } = useTranslation();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 });
+  const [actionError,setActionError]=useState('');
+  const touchHeld=useRef(false);
+  const touchTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
+  const cancelTouch=()=>{if(touchTimer.current)clearTimeout(touchTimer.current);};
+  useEffect(()=>cancelTouch,[]);
   const menuRef = useRef<HTMLDivElement>(null);
 
   const closeContextMenu = useCallback(() => {
@@ -114,9 +120,11 @@ export default function FileContextMenu({
           key: 'copyPath',
           icon: Copy,
           label: t('fileTree.context.copyPath', 'Copy Path'),
-          onSelect: () => onCopyPath?.(item),
+          onSelect: () => {void copyLocalPath(item.path).catch(e=>setActionError(e.message));},
           showDividerBefore: true,
         },
+        {key:'reveal',label:'打开所在文件夹',onSelect:()=>{void openLocalFile(item.path,true).catch(e=>setActionError(e.message));}},
+        {key:'copyFolder',label:'复制文件夹路径',onSelect:()=>{void copyLocalPath(item.path,true,item.type==='directory').catch(e=>setActionError(e.message));}},
         {
           key: 'download',
           icon: Download,
@@ -164,9 +172,11 @@ export default function FileContextMenu({
           key: 'copyPath',
           icon: Copy,
           label: t('fileTree.context.copyPath', 'Copy Path'),
-          onSelect: () => onCopyPath?.(item),
+          onSelect: () => {void copyLocalPath(item.path).catch(e=>setActionError(e.message));},
           showDividerBefore: true,
         },
+        {key:'reveal',label:'打开所在文件夹',onSelect:()=>{void openLocalFile(item.path,true).catch(e=>setActionError(e.message));}},
+        {key:'copyFolder',label:'复制文件夹路径',onSelect:()=>{void copyLocalPath(item.path,true,true).catch(e=>setActionError(e.message));}},
         {
           key: 'download',
           icon: Download,
@@ -211,6 +221,7 @@ export default function FileContextMenu({
     }
 
     const handleOutsideMouseDown = (event: MouseEvent) => {
+      if(touchHeld.current)return;
       const menuElement = menuRef.current;
       if (menuElement && !menuElement.contains(event.target as Node)) {
         closeContextMenu();
@@ -272,7 +283,8 @@ export default function FileContextMenu({
 
   return (
     <>
-      <div onContextMenu={openContextMenuAtCursor} className={cn('contents', className)}>
+      {actionError && <span role="alert">{actionError}</span>}
+      <div onClickCapture={event=>{if(touchHeld.current){event.preventDefault();event.stopPropagation();touchHeld.current=false;}}} onTouchStart={event=>{const touch=event.touches[0];cancelTouch();touchHeld.current=false;touchTimer.current=setTimeout(()=>{touchHeld.current=true;setMenuPosition(calculateViewportSafePosition(touch.clientX,touch.clientY));setIsMenuOpen(true);},550);}} onTouchEnd={cancelTouch} onTouchMove={cancelTouch} onTouchCancel={cancelTouch} onContextMenu={openContextMenuAtCursor} className={cn('contents', className)}>
         {children}
       </div>
 
@@ -281,9 +293,9 @@ export default function FileContextMenu({
           ref={menuRef}
           role="menu"
           aria-label={t('fileTree.context.menuLabel', 'File context menu')}
-          style={{ position: 'fixed', left: menuPosition.x, top: menuPosition.y, zIndex: 9999 }}
+          style={{ position: 'fixed', left: menuPosition.x, top: menuPosition.y, maxHeight: Math.max(100,window.innerHeight-menuPosition.y-10), zIndex: 9999 }}
           className={cn(
-            'min-w-[180px] py-1 px-1',
+            'min-w-[180px] max-h-[80dvh] overflow-y-auto py-1 px-1',
             'bg-popover border border-border rounded-lg shadow-lg',
             'animate-in fade-in-0 zoom-in-95',
             'data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95',

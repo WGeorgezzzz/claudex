@@ -459,11 +459,21 @@ function ChatInterface({
     onPlanApproved: provider === 'claude' ? () => selectPermissionMode('default') : undefined,
   }), [pendingPermissionRequests, handlePermissionDecision, provider, selectPermissionMode]);
 
+  const [resolvedCwd,setResolvedCwd]=useState<{id:string;path:string}|null>(null);
+  const pathSessionId=currentSessionId || selectedSession?.id;
+  useEffect(()=>{
+    let active=true;
+    if(pathSessionId) void api.sessionWorkspace.get(pathSessionId).then(response=>response.ok?response.json():null).then(result=>{
+      if(active && typeof result?.data?.projectPath==='string')setResolvedCwd({id:pathSessionId,path:result.data.projectPath});
+    }).catch(()=>{});
+    return()=>{active=false;};
+  },[pathSessionId]);
   // Lets markdown image paths in the transcript resolve against this project.
   const markdownWorkspaceValue = useMemo(() => ({
     projectId: selectedProject?.projectId ?? null,
+    cwd: resolvedCwd && resolvedCwd.id===pathSessionId ? resolvedCwd.path : typeof selectedSession?.cwd === 'string' ? selectedSession.cwd : typeof selectedSession?.workingDirectory === 'string' ? selectedSession.workingDirectory : typeof selectedSession?.projectPath === 'string' ? selectedSession.projectPath : typeof selectedSession?.project_path === 'string' ? selectedSession.project_path : null,
     projectPath: selectedProject?.fullPath || selectedProject?.path || null,
-  }), [selectedProject?.projectId, selectedProject?.fullPath, selectedProject?.path]);
+  }), [selectedProject?.projectId, selectedProject?.fullPath, selectedProject?.path, selectedSession?.cwd, selectedSession?.workingDirectory, selectedSession?.projectPath, selectedSession?.project_path, resolvedCwd, pathSessionId]);
 
   // Lets a workflow card fetch its agents' timelines for this session.
   const transcriptSessionValue = useMemo(() => ({ sessionId: currentSessionId }), [currentSessionId]);

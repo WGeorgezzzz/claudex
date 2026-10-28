@@ -354,6 +354,7 @@ test('readTextFile rejects traversal before invoking the filesystem adapter', as
 test('readTextFile reports a directory as a client error, not a 500', async () => {
   const projectRoot = path.resolve('file-tree-test-project');
   const fileSystem = createFakeFileSystem({
+    stat: async () => createStats(true,0o755),
     readTextFile: async () => {
       const error = new Error('EISDIR: illegal operation on a directory, read');
       (error as NodeJS.ErrnoException).code = 'EISDIR';
@@ -365,7 +366,7 @@ test('readTextFile reports a directory as a client error, not a 500', async () =
   await assert.rejects(
     service.readTextFile('project-1', 'decisions'),
     (error: unknown) => error instanceof AppError
-      && error.code === 'EISDIR'
+      && error.code === 'PATH_IS_DIRECTORY'
       && error.statusCode === 400
       && error.message === 'Path is a directory, not a file',
   );
@@ -554,4 +555,31 @@ test('saving an unchanged file accepts the exact original text including CRLF', 
   }), root));
   await service.saveTextFile('project-1','a.txt','edited','one\r\ntwo');
   assert.equal(saved,'edited');
+});
+
+test('text preview bounds IO to 256 KiB and metadata never reads binary content', async () => {
+  const root=path.resolve('preview-bounded'); const size=8*1024*1024;
+  const ranges:Array<{start:number;end:number}>=[];
+  const service=createFileTreeService(createDependencies(createFakeFileSystem({
+    stat:async()=>({...createStats(false,0o644),size}),
+    readTextFile:async()=>{throw Error('Unbounded read forbidden');},
+    createReadStream:(_file,range)=>{assert.ok(range);ranges.push(range);return Readable.from([Buffer.alloc(range.end-range.start+1,65)]);},
+  }),root));
+  const first=await service.readTextFile('one','large.log');
+  assert.equal(first.content.length,262144);assert.equal(first.truncated,true);assert.equal(first.size,size);
+  const last=await service.readTextFile('one','large.log',{offset:size-262144});
+  assert.equal(last.offset,size-262144);assert.equal(last.content.length,262144);
+  const metadata=await service.readTextFile('one','sample.docx',{metadata:true});
+  assert.equal(metadata.content,'');assert.equal(metadata.size,size);assert.equal(ranges.length,2);
+});
+
+test('external absolute preview follows workspace permission and remains read only',async()=>{
+  const root=path.resolve('project'),external=path.resolve('approved','report.md');let writes=0;
+  const deps=createDependencies(createFakeFileSystem({stat:async()=>createStats(false,0o644),readTextFile:async()=> '# report',writeTextFile:async()=>{writes++;}}),root);
+  deps.workspace.validatePath=async(candidate)=>({valid:candidate===external,resolvedPath:candidate});
+  const service=createFileTreeService(deps);
+  assert.equal((await service.readTextFile('one',external)).content,'# report');
+  await assert.rejects(service.readTextFile('one',path.resolve('denied','secret.md')));
+  await assert.rejects(service.saveTextFile('one',external,'bad'));
+  assert.equal(writes,0);
 });

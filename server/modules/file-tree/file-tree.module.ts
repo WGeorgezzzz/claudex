@@ -17,7 +17,7 @@ import type {
   FileTreeProjectGateway,
   FileTreeWorkspaceGateway,
 } from '@/shared/types.js';
-import { WORKSPACES_ROOT, resolveReadOnlyRootPath, validateWorkspacePath } from '@/shared/utils.js';
+import { WORKSPACES_ROOT, resolveReadOnlyRootPath, resolvePathUnderRoots, validateWorkspacePath } from '@/shared/utils.js';
 
 const MAXIMUM_UPLOAD_SIZE_MEGABYTES = 200;
 const MAXIMUM_UPLOAD_SIZE_BYTES = MAXIMUM_UPLOAD_SIZE_MEGABYTES * 1024 * 1024;
@@ -82,7 +82,11 @@ const fileTreeWorkspace: FileTreeWorkspaceGateway = {
     assertContextPath(candidatePath);
     return getCurrentUserContext()?.role === 'member' ? { valid: true, resolvedPath: candidatePath } : validateWorkspacePath(candidatePath);
   },
-  resolveReadOnlyRootPath: (candidatePath) => resolveReadOnlyRootPath(candidatePath),
+  resolveReadOnlyRootPath: async (candidatePath) => {
+    assertContextPath(candidatePath);
+    return await resolveReadOnlyRootPath(candidatePath)
+      ?? await resolvePathUnderRoots(candidatePath, projectsDb.getProjectPaths().map(project=>project.project_path));
+  },
 };
 
 const fileTreeLogger: FileTreeLogger = {

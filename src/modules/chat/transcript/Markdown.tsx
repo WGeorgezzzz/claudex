@@ -12,7 +12,7 @@ import { MarkdownImage } from '@/modules/chat/transcript/MarkdownImage';
 import { LocalFileLink } from '@/modules/chat/transcript/LocalFileLink';
 import { remarkLocalFileDirectories } from '@/modules/chat/utils/remarkLocalFileDirectories';
 import { normalizeInlineCodeFences } from '@/modules/chat/utils/chatFormatting';
-import { isAbbreviatedFileReference, isInlineFileReference, localFileUrlTransform, parseLocalFileLink } from '@/modules/chat/utils/localFileLink';
+import { isInlineFileReference, localFileUrlTransform, parseLocalFileLink } from '@/modules/chat/utils/localFileLink';
 import { normalizeLatexDelimiters } from '@/modules/chat/utils/latexDelimiters';
 import { copyTextToClipboard } from '@/shared/utils';
 import { SyntaxHighlighter } from '@/shared/syntaxHighlighter';
@@ -297,7 +297,7 @@ function MarkdownBodyRenderer({ children, breaks = false }: Omit<MarkdownProps, 
   const components = useMemo(
     () => ({
       ...markdownComponents,
-      a: ({ href, children: linkChildren }: { href?: string; children?: React.ReactNode }) => {
+      a: ({ href, children: linkChildren, node }: { href?: string; children?: React.ReactNode; node?: any }) => {
         // Prefer the href when it is a real path; otherwise fall back to the
         // link text, since models often emit `[src/foo.ts]()` with an empty href.
         const linkText = childrenToText(linkChildren);
@@ -308,7 +308,8 @@ function MarkdownBodyRenderer({ children, breaks = false }: Omit<MarkdownProps, 
             <LocalFileLink fileReference={fileRef}
               href={href || fileRef}
               // An abbreviated name must be resolved before the editor can open it.
-              onPreview={isAbbreviatedFileReference(fileRef) ? openFileInEditor : undefined}
+              directories={JSON.parse(node?.properties?.['data-local-directories'] ?? '[]')}
+              onPreview={parseLocalFileLink(fileRef).path.endsWith('/') ? undefined : openFileInEditor}
               className="cursor-pointer text-blue-600 hover:underline dark:text-blue-400"
               onClick={(event) => {
                 event.preventDefault();

@@ -72,7 +72,7 @@ async function withProject(run: (root: string, service: FileTreeServices) => Pro
     const service = createFileTreeService({
       fileSystem: realFileSystem,
       projects: { getProjectPathById: async () => root },
-      workspace: { rootPath: root, validatePath: async (candidate) => ({ valid: true, resolvedPath: candidate }), resolveReadOnlyRootPath: async () => null },
+      workspace: { rootPath: root, validatePath: async (candidate) => ({ valid: path.relative(root,candidate) === '' || (!path.relative(root,candidate).startsWith('..') && !path.isAbsolute(path.relative(root,candidate))), resolvedPath: candidate }), resolveReadOnlyRootPath: async () => null },
       resolveMimeType: (filePath) => filePath.endsWith('.mp4') ? 'video/mp4' : 'text/plain',
       fileSystemConcurrency: 4,
       logger: { error: () => undefined },

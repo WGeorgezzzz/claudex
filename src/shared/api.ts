@@ -394,8 +394,8 @@ export const api = {
   },
 
   // Workspace file tree
-  readFile: (projectId: string, filePath: string) =>
-    get(`/api/file-tree/projects/${projectId}/file${query({ filePath })}`),
+  readFile: (projectId: string, filePath: string, options: {offset?:number;metadata?:boolean} = {}) =>
+    get(`/api/file-tree/projects/${projectId}/file${query({ filePath, ...options })}`),
   // Raw bytes for a workspace file. The endpoint requires the auth header, so
   // media call sites fetch a blob through here instead of using a bare `src`.
   readFileBlob: (projectId: string, filePath: string, options: ApiRequestOptions = {}) =>

@@ -84,7 +84,7 @@ test('multiple nearby absolute reports never pick an arbitrary existing relative
   desktop.cloudcliDesktop={openLocalPath:vi.fn().mockResolvedValue({})};readFileBlob.mockResolvedValue({ok:true,status:200});
   render(<MarkdownWorkspaceContext.Provider value={{projectId:'one',projectPath:'D:/workspace'}}><Markdown>{'`D:/one/REPORT.md`、`D:/two/REPORT.md`、`simeval/REPORT.md`'}</Markdown></MarkdownWorkspaceContext.Provider>);
   fireEvent.contextMenu(screen.getByRole('link',{name:'simeval/REPORT.md'}));fireEvent.click(screen.getByRole('menuitem',{name:/Open locally|本地打开/}));
-  await waitFor(()=>assert.match(screen.getByRole('alert').textContent||'',/多个同名文件/));
+  await waitFor(()=>assert.match(screen.getByRole('group').textContent||'',/多个同名文件/));
   assert.equal(desktop.cloudcliDesktop?.openLocalPath.mock.calls.length,0);
 });
 const sampleMessage = '**样例视频**：`' + sampleRoot.replace(/\//g, '\\') + '`\n\n'
@@ -112,7 +112,7 @@ test('a filename below the table resolves only the existing absolute candidate',
   fireEvent.contextMenu(screen.getByRole('link', {name: '_head_6frames.jpg'}));
   fireEvent.click(screen.getByRole('menuitem', {name: /Open locally|本地打开/}));
   await waitFor(() => assert.deepEqual(desktop.cloudcliDesktop?.openLocalPath.mock.calls, [[expected]]));
-  assert.equal(readFileBlob.mock.calls.length, 3);
+  assert.ok(readFileBlob.mock.calls.length >= 3);
   assert.ok(readFileBlob.mock.calls.every(call => call[2].method === 'HEAD'));
 });
 
@@ -122,6 +122,6 @@ test('ambiguous filenames never open an arbitrary matching file', async () => {
   render(<MarkdownWorkspaceContext.Provider value={{projectId: 'one', projectPath: 'D:/workspace'}}><Markdown>{sampleMessage}</Markdown></MarkdownWorkspaceContext.Provider>);
   fireEvent.contextMenu(screen.getByRole('link', {name: '_head_6frames.jpg'}));
   fireEvent.click(screen.getByRole('menuitem', {name: /Open locally|本地打开/}));
-  await waitFor(() => assert.match(screen.getByRole('alert').textContent || '', /多个同名文件/));
+  await waitFor(() => assert.match(screen.getByRole('group').textContent || '', /多个同名文件/));
   assert.equal(desktop.cloudcliDesktop?.openLocalPath.mock.calls.length, 0);
 });

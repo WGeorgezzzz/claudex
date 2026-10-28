@@ -160,3 +160,13 @@ test('create route rejects invalid entry types without calling the service', asy
 
   assert.equal(createCalled, false);
 });
+
+test('preview HTTP accepts metadata and offsets and rejects malformed paging', async()=>{
+  const calls:unknown[][]=[];
+  await withFileTreeServer(createFakeServices({readTextFile:async(...args)=>{calls.push(args);return {content:'page',path:'report.md',size:1000000,truncated:true};}}),async base=>{
+    const first=await fetch(base+'/api/file-tree/projects/project-1/file?filePath=report.md&offset=262144');assert.equal(first.status,200);
+    const metadata=await fetch(base+'/api/file-tree/projects/project-1/file?filePath=report.md&metadata=true');assert.equal(metadata.status,200);
+    const invalid=await fetch(base+'/api/file-tree/projects/project-1/file?filePath=report.md&offset=-1');assert.equal(invalid.status,400);
+    assert.deepEqual(calls,[['project-1','report.md',{metadata:false,offset:262144}],['project-1','report.md',{metadata:true}]]);
+  });
+});
