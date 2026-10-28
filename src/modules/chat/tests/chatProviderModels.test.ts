@@ -156,5 +156,5 @@ test('Claude remembers permissions per folder and Plan never becomes the folder 
   await waitFor(()=>assert.equal(b.result.current.permissionMode,'acceptEdits'));
   b.unmount();
   const c=await renderProviderState(null,{...project,projectId:'folder-b',fullPath:'/folder-b'});
-  await waitFor(()=>assert.equal(c.result.current.permissionMode,'default'));
+  await waitFor(()=>assert.equal(c.result.current.permissionMode,'bypassPermissions'));
 });

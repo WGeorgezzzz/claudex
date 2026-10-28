@@ -37,7 +37,7 @@ export const monitorsService = {
     const safeOptions: Record<string,unknown>={};
     for(const key of ['model','effort']) if(typeof options[key]==='string') safeOptions[key]=options[key];
     if(['default','acceptEdits','plan','bypassPermissions'].includes(String(options.permissionMode))) safeOptions.permissionMode=options.permissionMode;
-    safeOptions.permissionMode ??= 'default';
+    safeOptions.permissionMode ??= 'bypassPermissions';
     if(options.runMode!==undefined){if(!['isolated','original'].includes(String(options.runMode)))throw new AppError('无效运行方式',{statusCode:400});safeOptions.runMode=options.runMode;}
     return monitorsDb.create({userId,sessionId,name,content,intervalMinutes,schedule,options:safeOptions});
   },

@@ -11,7 +11,7 @@ function setup() {
 }
 test('relay Claude survives unavailable local collector and Codex takes the maximum across the pool', () => {
   setup(); render(<QuotaIndicator onOpen={() => {}}/>);
-  expect(screen.getByTestId('quota-indicator').textContent).toBe('Claude 5h 18% · Codex 5h 30%');
+  expect(screen.getByTestId('quota-indicator').textContent).toBe('Claude 5h 18% / 7天 — · Codex 5h 30% / 7天 6%');
   expect(screen.queryByText('未连接')).toBeNull();
 });
 test('only a stale or failed segment dims and its reason stays in the tooltip', () => {
@@ -19,7 +19,7 @@ test('only a stale or failed segment dims and its reason stays in the tooltip', 
   render(<QuotaIndicator onOpen={() => {}}/>);
   expect(screen.getByTitle('读取失败（上次 1 分钟前）').className).toContain('opacity-60');
   expect(screen.getByTitle('1 分钟前').className).not.toContain('opacity-60');
-  expect(screen.getByTestId('quota-indicator').textContent).toBe('Claude 5h 18% · Codex 5h 30%');
+  expect(screen.getByTestId('quota-indicator').textContent).toBe('Claude 5h 18% / 7天 — · Codex 5h 30% / 7天 6%');
 });
 test('both missing sources give one settings link', () => {
   const open = vi.fn(); render(<QuotaIndicator onOpen={open}/>);
@@ -28,6 +28,6 @@ test('both missing sources give one settings link', () => {
 test('empty pool falls back to retained local Codex and preserves red pool warnings', () => {
   setup(); fixture.data!.pool!.data!.accounts = []; fixture.data!.pool!.data!.warnings = ['号池告警'];
   render(<QuotaIndicator onOpen={() => {}}/>);
-  expect(screen.getByTestId('quota-indicator').textContent).toContain('Claude 5h 18% · Codex 7天 6%');
+  expect(screen.getByTestId('quota-indicator').textContent).toContain('Claude 5h 18% / 7天 — · Codex 5h — / 7天 6%');
   expect(screen.getByText('号池告警').className).toContain('text-red');
 });

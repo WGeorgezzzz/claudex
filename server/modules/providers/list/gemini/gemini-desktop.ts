@@ -10,7 +10,7 @@ import {getCurrentUserContext} from '@/modules/auth/index.js';
 const execute=promisify(execFile),powershell=path.join(process.env.SystemRoot||'C:/Windows','System32/WindowsPowerShell/v1.0/powershell.exe');
 const script=()=>path.resolve('scripts/gemini-desktop/bridge.ps1');
 let cached:{at:number;value:{model:string;authenticated:boolean}}|undefined,pending:Promise<{model:string;authenticated:boolean}>|undefined;
-export async function inspectGeminiDesktop(){if(cached&&Date.now()-cached.at<5000)return cached.value;if(pending)return pending;pending=execute(powershell,['-NoProfile','-ExecutionPolicy','Bypass','-File',script(),'-Operation','Inspect'],{windowsHide:true,timeout:20000,encoding:'utf8'}).then(r=>{const value=JSON.parse(r.stdout.trim());cached={at:Date.now(),value};return value;}).finally(()=>{pending=undefined;});return pending;}
+export async function inspectGeminiDesktop(){if(cached&&Date.now()-cached.at<300000)return cached.value;if(!pending)pending=execute(powershell,['-NoProfile','-ExecutionPolicy','Bypass','-File',script(),'-Operation','Inspect'],{windowsHide:true,timeout:20000,encoding:'utf8'}).then(r=>{const value=JSON.parse(r.stdout.trim());cached={at:Date.now(),value};return value;}).finally(()=>{pending=undefined;});if(cached){void pending.catch(()=>{});return {...cached.value,stale:true};}let timer:ReturnType<typeof setTimeout>|undefined;try{return await Promise.race([pending,new Promise<never>((_,reject)=>{timer=setTimeout(()=>reject(Error('Gemini 探测超时')),3000);})]);}finally{clearTimeout(timer);}}
 let queue=Promise.resolve();const stops=new Map<string,()=>void>();
 export const geminiDesktopRuntime:IProviderRuntime={
  async run(command,options,writer,context){
@@ -22,7 +22,7 @@ export const geminiDesktopRuntime:IProviderRuntime={
   try{
    await previous;if(cancelled)throw Error('Gemini 排队回合已取消，未发送到桌面');
    if(getCurrentUserContext()?.role==='member')throw Error('Gemini 桌面桥接仅限本机主账号');
-   if(options.permissionMode&&options.permissionMode!=='default')throw Error('Gemini 桌面版权限由原生应用管理，请选择默认权限');
+   if(options.permissionMode&&!['default','bypassPermissions'].includes(options.permissionMode))throw Error('Gemini 桌面版权限由原生应用管理，请选择默认权限');
    const info=await inspectGeminiDesktop(),model=options.model||info.model,nativeId=context.resolveProviderSessionId(id);if(nativeId&&!/^[a-z0-9]{16}$/i.test(nativeId))throw Error('原CLI会话保留只读；请新建 Gemini 桌面会话');
    if(cancelled)throw Error('Gemini 本轮已取消，未发送到桌面');
    folder=fs.mkdtempSync(path.join(os.tmpdir(),'nexagent-gemini-'));file=path.join(folder,'request.json');

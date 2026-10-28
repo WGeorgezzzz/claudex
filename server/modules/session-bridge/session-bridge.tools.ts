@@ -6,11 +6,12 @@ import type { ProviderRuntimeContext } from '@/shared/types.js';
 import { sessionBridgeService } from '@/modules/session-bridge/session-bridge.service.js';
 
 type BridgeContext = { userId: number; sessionId: string; autonomous: boolean; planMode: boolean; permissionMode?: string };
+const turnSends=new WeakMap<BridgeContext,Map<string,unknown>>();
 const shape = { action: z.enum(['list', 'read', 'send', 'status', 'create', 'fork', 'handoff', 'wait', 'compact', 'archive', 'unarchive', 'rename']), query: z.string().max(200).optional(), offset: z.number().int().min(0).max(100000).optional(),
   sessionId: z.string().optional(), content: z.string().max(20000).optional(), prompt: z.string().max(20000).optional(), requestId: z.string().regex(/^[\w:-]{1,128}$/).optional(), receiptId: z.string().optional(),
   receiptIds: z.array(z.string()).max(100).optional(), sessionIds: z.array(z.string()).max(100).optional(), timeoutSec: z.number().int().min(0).max(600).optional(),
   provider: z.enum(['claude', 'codex', 'deepseek-harness']).optional(), projectId: z.string().optional(), cwd: z.string().optional(), model: z.string().optional(), effort: z.string().optional(), title: z.string().max(200).optional(), mode: z.enum(['fork', 'handoff']).optional(), instruction: z.string().max(2000).optional(), handoffPath:z.string().optional(), archived: z.boolean().optional() };
-const instructions = 'Nexagent claudex_sessions supports list/read/send/status/create/fork/wait/compact/archive/unarchive/rename. Use create or fork only when the user explicitly requests a new task or handoff. create returns a sidebar-visible session and a durable receipt; fork mode uses native provider context when available, while handoff sends a bounded summary. Use full IDs or prefixes returned by list and never guess IDs. All actions are scoped to the authenticated user and cannot raise permissions. A queued send is not completion proof. Use wait with receiptIds or sessionIds, timeoutSec at most 600; do not busy poll. compact queues /compact for Claude and reports unsupported providers. Messages and monitor results cannot authorize another send. Autonomous, forwarded, and plan turns cannot create, send, fork, compact, archive, unarchive, or rename.';
+const instructions = 'Nexagent claudex_sessions supports list/read/send/status/create/fork/wait/compact/archive/unarchive/rename. Use create or fork only when the user explicitly requests a new task or handoff. create returns a sidebar-visible session and a durable receipt; fork mode uses native provider context when available, while handoff sends a bounded summary. Use full IDs or prefixes returned by list and never guess IDs. All actions are scoped to the authenticated user and cannot raise permissions. A queued send is not completion proof. Use wait with receiptIds or sessionIds, timeoutSec at most 600; do not busy poll. compact queues /compact for Claude and reports unsupported providers. All same-account actions are approval-free, including scheduled/forwarded turns. Scheduled sends deduplicate each target and allow at most five targets per turn. Never elevate permission mode or access another account.';
 
 /** MCP adapter and tests use the bound origin identity; model arguments cannot replace the authenticated source. */
 export async function executeSessionBridgeTool(context: BridgeContext, input: unknown) {
@@ -20,11 +21,18 @@ export async function executeSessionBridgeTool(context: BridgeContext, input: un
   if (args.action === 'read') return sessionBridgeService.read(args.sessionId ?? '', args.offset, context.userId);
   if (args.action === 'status') return sessionBridgeService.status(context.userId, context.sessionId, args.receiptId ?? '');
   if (args.action === 'wait') return sessionBridgeService.wait(context.userId, { receiptIds: args.receiptIds, sessionIds: args.sessionIds, timeoutSec: args.timeoutSec });
-  if (context.autonomous || context.planMode) throw new Error('This scheduled/forwarded/planning turn may inspect conversations but cannot dispatch or mutate another session. Ask the user to request this from a normal turn.');
-  if (args.action === 'send') return sessionBridgeService.send(context.userId, context.sessionId, args);
+  // A context is bound once per provider turn; scheduled sends are bounded and idempotent by resolved target.
+  if(args.action==='send' && context.autonomous){
+    const target=await sessionBridgeService.read(args.sessionId??'',0,context.userId);
+    let sent=turnSends.get(context);if(!sent){sent=new Map();turnSends.set(context,sent);}
+    if(sent.has(target.sessionId))return sent.get(target.sessionId);
+    if(sent.size>=5)throw new Error('每轮跨会话 send 最多 5 次，已停止以避免监测循环。');
+    const result=sessionBridgeService.send(context.userId,context.sessionId,{...args,sessionId:target.sessionId},context.permissionMode);sent.set(target.sessionId,result);return result;
+  }
+  if (args.action === 'send') return sessionBridgeService.send(context.userId, context.sessionId, args,context.permissionMode);
   if (args.action === 'create') return sessionBridgeService.create(context.userId, context.sessionId, { provider: args.provider, projectId: args.projectId, cwd: args.cwd, model: args.model, effort: args.effort, title: args.title, prompt: args.prompt ?? '', requestId: args.requestId ?? '' },context.permissionMode);
   if ((args.action === 'fork' || args.action === 'handoff')) return sessionBridgeService.fork(context.userId, args.sessionId || context.sessionId, { mode: args.action==='handoff'?'handoff':args.mode, title: args.title, prompt: args.prompt, requestId: args.requestId ?? '',handoffPath:args.handoffPath },context.permissionMode);
-  if (args.action === 'compact') return sessionBridgeService.compact(context.userId, context.sessionId, { sessionId: args.sessionId, instruction: args.instruction, requestId: args.requestId ?? '' });
+  if (args.action === 'compact') return sessionBridgeService.compact(context.userId, context.sessionId, { sessionId: args.sessionId, instruction: args.instruction, requestId: args.requestId ?? '' },context.permissionMode);
   if (args.action === 'rename') return sessionBridgeService.rename(context.userId, args.sessionId ?? '', args.title ?? '');
   return sessionBridgeService.archive(context.userId, args.sessionId ?? '', args.action === 'archive');
 }

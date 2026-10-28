@@ -53,11 +53,11 @@ type ProviderCapabilities = {
  * - Cursor has no token usage endpoint support (its store.db has no usage rows).
  */
 const PROVIDER_CAPABILITIES: Record<LLMProvider, ProviderCapabilities> = {
-  gemini:{provider:'gemini',permissionModes:['default'],defaultPermissionMode:'default',supportsImages:false,supportsFiles:false,supportsAbort:true,supportsPermissionRequests:false,supportsTokenUsage:false,supportsEffort:false,effortLevels:[],supportsMessageEditing:false,supportsSessionForking:false},
+  gemini:{provider:'gemini',permissionModes:['default','bypassPermissions'],defaultPermissionMode:'bypassPermissions',supportsImages:false,supportsFiles:false,supportsAbort:true,supportsPermissionRequests:false,supportsTokenUsage:false,supportsEffort:false,effortLevels:[],supportsMessageEditing:false,supportsSessionForking:false},
   claude: {
     provider: 'claude',
     permissionModes: ['default', 'auto', 'acceptEdits', 'bypassPermissions', 'plan'],
-    defaultPermissionMode: 'default',
+    defaultPermissionMode: 'bypassPermissions',
     supportsImages: true,
     supportsFiles: true,
     supportsAbort: true,
@@ -73,7 +73,7 @@ const PROVIDER_CAPABILITIES: Record<LLMProvider, ProviderCapabilities> = {
   cursor: {
     provider: 'cursor',
     permissionModes: ['default', 'acceptEdits', 'bypassPermissions', 'plan'],
-    defaultPermissionMode: 'default',
+    defaultPermissionMode: 'bypassPermissions',
     supportsImages: true,
     supportsFiles: true,
     supportsAbort: true,
@@ -87,7 +87,7 @@ const PROVIDER_CAPABILITIES: Record<LLMProvider, ProviderCapabilities> = {
   codex: {
     provider: 'codex',
     permissionModes: ['default', 'acceptEdits', 'bypassPermissions', 'plan'],
-    defaultPermissionMode: 'default',
+    defaultPermissionMode: 'bypassPermissions',
     supportsImages: true,
     supportsFiles: true,
     supportsAbort: true,
@@ -103,13 +103,13 @@ const PROVIDER_CAPABILITIES: Record<LLMProvider, ProviderCapabilities> = {
     supportsSessionForking: true,
   },
   'deepseek-harness': {
-    provider: 'deepseek-harness', permissionModeNamespace: 'harnessModes', permissionModes: ['default', 'plan', 'bypassPermissions'], defaultPermissionMode: 'default',
+    provider: 'deepseek-harness', permissionModeNamespace: 'harnessModes', permissionModes: ['default', 'plan', 'bypassPermissions'], defaultPermissionMode: 'bypassPermissions',
     supportsImages: false, supportsFiles: true, supportsAbort: true, supportsPermissionRequests: false,
     supportsTokenUsage: false, supportsEffort: false, effortLevels: [], supportsMessageEditing: false, supportsSessionForking: false,
   },
   workbuddy: {
     permissionModeNamespace: 'workbuddyModes',
-    provider: 'workbuddy', permissionModes: ['default', 'auto', 'acceptEdits', 'bypassPermissions', 'dontAsk', 'plan'], defaultPermissionMode: 'default',
+    provider: 'workbuddy', permissionModes: ['default', 'auto', 'acceptEdits', 'bypassPermissions', 'dontAsk', 'plan'], defaultPermissionMode: 'bypassPermissions',
     supportsImages: true, supportsFiles: true, supportsAbort: true,
     supportsPermissionRequests: true, supportsTokenUsage: true, supportsEffort: true,
     effortLevels: ['minimal', 'low', 'medium', 'high', 'xhigh', 'max'], supportsMessageEditing: false, supportsSessionForking: false,
@@ -120,7 +120,7 @@ const PROVIDER_CAPABILITIES: Record<LLMProvider, ProviderCapabilities> = {
     // `--auto` (bypassPermissions) and the OPENCODE_PERMISSION env var
     // (acceptEdits). See resolveOpenCodePermissionOptions in the OpenCode runtime adapter.
     permissionModes: ['default', 'acceptEdits', 'bypassPermissions', 'plan'],
-    defaultPermissionMode: 'default',
+    defaultPermissionMode: 'bypassPermissions',
     supportsImages: true,
     supportsFiles: true,
     supportsAbort: true,

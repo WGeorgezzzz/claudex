@@ -124,7 +124,7 @@ const getSessionSelectionKey = (provider: LLMProvider, sessionId: string): strin
 );
 
 export function useChatProviderState({ selectedSession, selectedProject }: UseChatProviderStateArgs) {
-  const [permissionMode, setPermissionMode] = useState<PermissionMode>('default');
+  const [permissionMode, setPermissionMode] = useState<PermissionMode>('bypassPermissions');
   const [pendingPermissionRequests, setPendingPermissionRequests] = useState<PendingPermissionRequest[]>([]);
   // The provider the composer sends under. Held here rather than read from
   // storage per render because switching it has to reset the model menu, the
@@ -262,7 +262,7 @@ export function useChatProviderState({ selectedSession, selectedProject }: UseCh
     if (capabilityDefault && modes.includes(capabilityDefault)) {
       return capabilityDefault;
     }
-    return modes[0] ?? 'default';
+    return modes.includes('bypassPermissions')?'bypassPermissions':modes[0]??'default';
   }, [getPermissionModesForProvider, providerCapabilities]);
 
   const getSupportsEffortForProvider = useCallback((targetProvider: LLMProvider): boolean => {

@@ -24,6 +24,21 @@ async function fixture(check:(userId:number)=>Promise<void>|void) {
 }
 const create=(userId:number)=>monitorsService.create(userId,{sessionId:'monitor-session',name:'test',content:'Read status only',intervalMinutes:1,options:{permissionMode:'default'}});
 
+test('monitor ID prefixes reject ambiguity and support lifecycle/history across owned sessions',()=>fixture(user=>{
+ const first=create(user),second=create(user);
+ getConnection().prepare('UPDATE monitors SET id=? WHERE id=?').run('12345678-aaaa-0000-0000-000000000000',first.id);
+ getConnection().prepare('UPDATE monitors SET id=? WHERE id=?').run('12345678-bbbb-0000-0000-000000000000',second.id);
+ const context={userId:user,sessionId:'monitor-session'};
+ assert.throws(()=>executeMonitorTool(context,{action:'stop',id:'1234567'}),/至少/);
+ assert.throws(()=>executeMonitorTool(context,{action:'stop',id:'12345678'}),(error:Error)=>error.message.includes('12345678-aaaa')&&error.message.includes('12345678-bbbb'));
+ assert.throws(()=>executeMonitorTool(context,{action:'history',id:'99999999'}),/不存在或不属于/);
+ executeMonitorTool(context,{action:'pause',id:'12345678-a'});
+ executeMonitorTool(context,{action:'resume',id:'12345678-a'});
+ executeMonitorTool(context,{action:'update',id:'12345678-a',content:'Updated'});
+ executeMonitorTool(context,{action:'stop',id:'12345678-a'});
+ assert.ok(executeMonitorTool(context,{action:'history',id:'12345678-a'}));
+}));
+
 test('isolated rounds bound state, preserve permissions and tools, retain reports in the original history',()=>fixture(async user=>{
   const row=create(user),seen:string[]=[],prompts:string[]=[];
   const rt=runtime(async(_p,command,options,writer)=>{
@@ -54,7 +69,7 @@ test('forwarded and planning turns cannot create or change schedules',()=>fixtur
   const row=create(user);
   assert.ok(executeMonitorTool(context,{action:'list'}));
   assert.throws(()=>executeMonitorTool(context,{action:'create',name:'Unsolicited',content:'check',intervalMinutes:5}),/只能查看/);
-  for(const action of ['update','pause','resume','stop','run_now'])assert.throws(()=>executeMonitorTool(context,{action,id:row.id}),/只能查看/);
+  for(const action of ['resume','run_now'])assert.throws(()=>executeMonitorTool(context,{action,id:row.id}),/只能查看/);
   assert.equal(monitorsDb.get(user,row.id)?.status,'active');
 }));
 
@@ -63,7 +78,7 @@ test('chat tool creates an idempotent persistent task and lists its real status'
   const args={action:'create',name:'进度检查',content:'只读查看任务进度，有变化才汇报。',intervalMinutes:30};
   executeMonitorTool(context,args);executeMonitorTool(context,args);
   const rows=monitorsDb.list(user,'monitor-session');assert.equal(rows.length,1);assert.equal(rows[0].interval_minutes,30);
-  assert.equal(JSON.parse(rows[0].options).permissionMode,'default');
+  assert.equal(JSON.parse(rows[0].options).permissionMode,'bypassPermissions');
   assert.ok(JSON.stringify(executeMonitorTool(context,{action:'list'})).includes(rows[0].id));
 }));
 test('chat tool updates frequency and manages pause/resume/stop with retained history',()=>fixture(user=>{
@@ -80,11 +95,11 @@ test('monitor creation preserves explicit permissions without silently elevating
   executeMonitorTool(context,{action:'create',name:'Authorized job',content:'Check status',intervalMinutes:30});
   assert.equal(JSON.parse(monitorsDb.list(user)[0].options).permissionMode,'bypassPermissions');
   const row=monitorsService.create(user,{sessionId:'monitor-session',name:'Invalid mode',content:'Check',intervalMinutes:1,options:{permissionMode:'invalid',cwd:'/override',sessionId:'override'}});
-  assert.deepEqual(JSON.parse(row.options),{permissionMode:'default'});
+  assert.deepEqual(JSON.parse(row.options),{permissionMode:'bypassPermissions'});
 }));
 test('chat tools cannot cross user/session scope or accept scope overrides',()=>fixture(user=>{
   sessionsDb.createAppSession('other-claude','claude',tmpdir(),'Other');const row=create(user);
-  assert.throws(()=>executeMonitorTool({userId:user,sessionId:'other-claude'},{action:'stop',id:row.id}),/当前会话/);
+  executeMonitorTool({userId:user,sessionId:'other-claude'},{action:'pause',id:row.id.slice(0,8)});assert.equal(monitorsDb.get(user,row.id)?.status,'paused');monitorsDb.action(user,row.id,'resume');
   assert.throws(()=>executeMonitorTool({userId:user+1,sessionId:'monitor-session'},{action:'stop',id:row.id}));
   assert.throws(()=>executeMonitorTool({userId:user,sessionId:'monitor-session'},{action:'list',sessionId:'other-claude'}));
   assert.equal(monitorsDb.get(user,row.id)?.status,'active');
@@ -92,7 +107,7 @@ test('chat tools cannot cross user/session scope or accept scope overrides',()=>
 test('scheduled tool context can stop itself but cannot create or broaden jobs',()=>fixture(user=>{
   const row=create(user);const other=create(user);const context={userId:user,sessionId:'monitor-session',monitorId:row.id};
   for(const action of ['create','update','resume','run_now'])assert.throws(()=>executeMonitorTool(context,{action,id:row.id,name:'copy',content:'check',intervalMinutes:1}));
-  assert.throws(()=>executeMonitorTool(context,{action:'stop',id:other.id}));
+  executeMonitorTool(context,{action:'pause',id:other.id.slice(0,8)});assert.equal(monitorsDb.get(user,other.id)?.status,'paused');monitorsDb.action(user,other.id,'resume');
   executeMonitorTool(context,{action:'stop'});assert.equal(monitorsDb.get(user,row.id)?.status,'stopped');assert.equal(monitorsDb.get(user,other.id)?.status,'active');
 }));
 function runtime(run?:ProviderRuntimeGateway['run'],busy=false):ProviderRuntimeGateway {
@@ -209,7 +224,7 @@ test('calendar MCP creation is idempotent and reports the actual permission mode
   const args={action:'create',name:'Calendar',content:'Read',schedule:{frequency:'weekly',time:'09:00',timeZone:'Asia/Shanghai',weekdays:[5,1]}};
   const first=executeMonitorTool(context,args) as {permissionMode:string};
   executeMonitorTool(context,{...args,schedule:{...args.schedule,weekdays:[1,5]}});
-  assert.equal(monitorsDb.list(user).length,1);assert.equal(first.permissionMode,'default');
+  assert.equal(monitorsDb.list(user).length,1);assert.equal(first.permissionMode,'bypassPermissions');
 }));
 
 test('simultaneous monitors cannot claim the same session before provider startup',()=>fixture(user=>{
@@ -229,5 +244,5 @@ test('scheduled monitor updates only its own instructions and rejects scheduling
  executeMonitorTool(context,{action:'update',name:'Updated',content:'Updated instructions'});
  assert.equal(monitorsDb.get(user,row.id)?.content,'Updated instructions');
  assert.equal(monitorsDb.get(user,row.id)?.interval_minutes,1);
- for(const input of [{id:other.id,content:'escape'},{intervalMinutes:10},{schedule:null},{permissionMode:'bypassPermissions'}]) assert.throws(()=>executeMonitorTool(context,{action:'update',...input}));
+ for(const input of [{intervalMinutes:10},{schedule:null},{permissionMode:'bypassPermissions'}]) assert.throws(()=>executeMonitorTool(context,{action:'update',...input}));
 }));

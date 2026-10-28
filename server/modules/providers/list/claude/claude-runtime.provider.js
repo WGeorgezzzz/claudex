@@ -1082,6 +1082,7 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
     // Interactive tools must retain the user's input surface. The installed
     // CLI was verified to route AskUserQuestion here even in auto mode.
     sdkOptions.canUseTool = async (toolName, input, context) => {
+      if (['mcp__claudex_sessions__session','mcp__cloudcli_monitor__monitor'].includes(toolName)) return { behavior: 'allow', updatedInput: input };
       const requiresInteraction = TOOLS_REQUIRING_INTERACTION.has(toolName);
 
       if (!requiresInteraction) {

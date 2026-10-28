@@ -23,7 +23,7 @@ export const deepSeekHarnessRuntime: IProviderRuntime = {
     if (options.images?.length) throw new Error('This Harness integration does not support image attachments.');
     const model = await context.resolveResumeModel(options.sessionId, options.model) || 'configured';
     if (model !== 'configured' && model !== readDeepSeekHarnessModels().DEFAULT) throw new Error('所选模型不在本机 Harness 当前配置中，请刷新模型列表。');
-    const permission = modes[options.permissionMode || 'default'];
+    const permission = modes[options.permissionMode || 'bypassPermissions'];
     if (!permission) throw new Error('Unsupported Harness permission mode.');
     const previous = context.resolveProviderSessionId(options.sessionId);
     if (previous && !/^session-[a-zA-Z0-9_-]{1,110}$/.test(previous)) throw new Error('Invalid native Harness session id.');

@@ -132,7 +132,7 @@ test('dispatches runs and aborts through the runtime owned by providerRegistry',
   assert.equal(await service.getRunner('claude')('hello', { model: 'sonnet' }, writer), 'complete');
   assert.equal(await service.abort('claude', 'session-1'), true);
   assert.deepEqual(calls, [
-    ['run', 'hello', { model: 'sonnet' }, writer],
+    ['run', 'hello', { model: 'sonnet', permissionMode:'bypassPermissions' }, writer],
     ['abort', 'session-1'],
   ]);
 });

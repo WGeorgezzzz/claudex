@@ -365,6 +365,7 @@ async function queryCodex(
     // turn runs is folded into it. CLAUDEX_CODEX_TRANSPORT=exec restores the
     // SDK's `codex exec` path, which cannot take input mid-turn.
     const bridge = ws.userId != null && sessionId ? (await import('@/modules/session-bridge/index.js')).createCodexSessionTool({userId:Number(ws.userId),sessionId,autonomous:Boolean(options.cloudcliMonitorId || options.cloudcliBridgeSourceSessionId),planMode:permissionMode==='plan',permissionMode}) : null;
+    const monitor=ws.userId!=null&&sessionId?(await import('@/modules/monitors/index.js')).createCodexMonitorTool({userId:Number(ws.userId),sessionId,monitorId:options.cloudcliMonitorId,permissionMode}):null;
     const events: AsyncIterable<AnyRecord> = process.env.CLAUDEX_CODEX_TRANSPORT === 'exec' && !/^\/compact(?:\s|$)/.test(command.trim())
       ? (await thread.runStreamed(turnInput, { signal: abortController.signal })).events as AsyncIterable<AnyRecord>
       : runCodexAppServerTurn({
@@ -376,12 +377,13 @@ async function queryCodex(
         approvalPolicy: approvalPolicy || 'on-request',
         effort: resolvedEffort,
         planMode: permissionMode === 'plan',
-        dynamicTools: bridge ? [bridge.specification] : undefined,
+        dynamicTools: [bridge?.specification,monitor?.specification].filter(Boolean) as any,
         onRequest: (message, reply) => {
           if (bridge && message.method === 'item/tool/call' && message.params?.tool === 'claudex_sessions') {
             void bridge.execute(message.params.arguments).then(result => reply({success:true,contentItems:[{type:'inputText',text:JSON.stringify(result)}]}), error => reply({success:false,contentItems:[{type:'inputText',text:String(error.message || error)}]}));
             return true;
           }
+          if(monitor&&message.method==='item/tool/call'&&message.params?.tool==='cloudcli_monitor'){void monitor.execute(message.params.arguments).then(result=>reply({success:true,contentItems:[{type:'inputText',text:JSON.stringify(result)}]}),error=>reply({success:false,contentItems:[{type:'inputText',text:String(error.message||error)}]}));return true;}
           return permissions.request(sessionKey() || '', message, ws, reply);
         },
         onRequestResolved: id => permissions.cancel(sessionKey() || '', id),

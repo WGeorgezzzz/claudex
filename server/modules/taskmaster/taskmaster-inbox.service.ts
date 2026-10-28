@@ -39,7 +39,7 @@ export const taskmasterInboxService = {
     return { projectId: project.project_id, ...await taskmasterWorkspace.importInbox(root, requireContextUserId(), input.batchId, input.items) };
   },
   syncInfohub() {return syncInfohubTasks(requireContextUserId());},
-  executionSettings(){return userPreferencesDb.getPreferences(requireContextUserId()).taskExecutionSettings||{};},
+  executionSettings(){const settings=(userPreferencesDb.getPreferences(requireContextUserId()).taskExecutionSettings||{}) as Record<string,string>;return {...settings,permissionMode:settings.permissionMode==='default'&&!settings.permissionModeExplicit?'bypassPermissions':settings.permissionMode||'bypassPermissions'};},
   sessionSource(sessionId:string){return userPreferencesDb.getPreferences(requireContextUserId())['taskSource:'+sessionId]||null;},
   async global() {
     const projects = projectsDb.getProjectPaths();
@@ -83,7 +83,7 @@ export const taskmasterInboxService = {
     const effort=settings?.effort||'';if(effort&&!selectedModel.effort?.values.some(e=>e.value===effort))throw new AppError('所选模型不支持该推理强度',{statusCode:400});
     if(settings?.cwd&&!path.isAbsolute(settings.cwd))throw new AppError('请填写绝对工作目录',{statusCode:400});
     const cwd=path.resolve(settings?.cwd||root);assertContextPath(cwd);const directory=await stat(cwd).catch(()=>null);if(!directory?.isDirectory())throw new AppError('工作目录不存在',{statusCode:400});
-    const chosen={provider,model,effort,permissionMode,cwd};
+    const chosen={provider,model,effort,permissionMode,cwd,permissionModeExplicit:true};
     const result=await taskmasterWorkspace.changeInboxTask(root,userId,taskId,async task=>{
       if(['done','cancelled'].includes(task.status))throw new AppError('任务已完成或已忽略。',{statusCode:409});
       if(task.executionSessionId&&task.status==='in-progress')return {executionSessionId:task.executionSessionId};

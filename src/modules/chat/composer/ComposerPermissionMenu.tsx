@@ -128,7 +128,7 @@ function ComposerPermissionMenu({
         title={isClaude ? t('input.claudeChangeMode', 'Change permissions (Shift+Tab)') : t('input.clickToChangeMode')}
       >
         <ActiveIcon className="h-4 w-4" />
-        <span className="max-w-28 truncate">{t(`${modeNamespace}.modes.${permissionMode}`, {defaultValue:permissionMode})}</span>
+        <span className="max-w-28 truncate">{permissionMode==='bypassPermissions'?'免确认':t(`${modeNamespace}.modes.${permissionMode}`, {defaultValue:permissionMode})}</span>
       </button>
 
       {isOpen && anchor && createPortal(

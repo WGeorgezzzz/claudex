@@ -20,10 +20,10 @@ test('cross-session tools bind source identity, preserve queue semantics and rej
     const receipt=sessionBridgeService.send(user,'source',args);assert.equal(receipt.status,'queued');
     assert.equal(sessionBridgeService.send(user,'source',args).id,receipt.id);
     assert.throws(()=>sessionBridgeService.send(user,'source',{...args,content:'different'}),/different/);
-    const options=JSON.parse(messageQueueDb.get(user,receipt.id)!.options);assert.equal(options.permissionMode,'default');assert.equal(options.cloudcliBridgeSourceSessionId,'source');
+    const options=JSON.parse(messageQueueDb.get(user,receipt.id)!.options);assert.equal(options.permissionMode,'bypassPermissions');assert.equal(options.cloudcliBridgeSourceSessionId,'source');
     assert.throws(()=>sessionBridgeService.status(user+1,'source',receipt.id));assert.throws(()=>sessionBridgeService.status(user,'foreign',receipt.id));
-    await assert.rejects(()=>executeSessionBridgeTool({userId:user,sessionId:'source',autonomous:true,planMode:false},{...args,action:'send'}),/cannot dispatch/);
-    await assert.rejects(()=>executeSessionBridgeTool({userId:user,sessionId:'source',autonomous:false,planMode:true},{...args,action:'send'}),/cannot dispatch/);
+    assert.ok(await executeSessionBridgeTool({userId:user,sessionId:'source',autonomous:true,planMode:false},{...args,action:'send'}));
+    assert.ok(await executeSessionBridgeTool({userId:user,sessionId:'source',autonomous:false,planMode:true},{...args,action:'send'}));
     assert.throws(()=>sessionBridgeService.send(user,'source',{...args,sessionId:'source'}),/another/);
     const protection=path.join(root,'protected.json');await writeFile(protection,JSON.stringify({sessionIds:['target']}));process.env.CLOUDCLI_PROTECTED_SESSIONS_FILE=protection;
     assert.equal(sessionBridgeService.list('target', 0, user).sessions[0].canSend,false);assert.throws(()=>sessionBridgeService.send(user,'source',{...args,requestId:'send-2'}),/owned/);
@@ -62,7 +62,13 @@ test('session parity actions create codex, hand off, wait, compact, and manage m
     const compact=sessionBridgeService.compact(user,'source',{requestId:'compact-1',instruction:'retain decisions'});
     assert.equal(compact.status,'queued');
     assert.equal(messageQueueDb.get(user,compact.id)!.content,'/compact retain decisions');
-    await assert.rejects(() => executeSessionBridgeTool({userId:user,sessionId:'source',autonomous:true,planMode:false},{action:'create',prompt:'blocked',requestId:'blocked-1'}),/cannot.*dispatch/);
+    assert.ok(await executeSessionBridgeTool({userId:user,sessionId:'source',autonomous:true,planMode:false},{action:'create',prompt:'allowed',requestId:'allowed-1'}));
+    const scheduled={userId:user,sessionId:'source',autonomous:true,planMode:false};
+    for(let index=0;index<6;index++)withUserContext(user,()=>sessionsDb.createAppSession('bounded-target-'+index,'claude',root,'Bounded target'));
+    for(let index=0;index<5;index++)await executeSessionBridgeTool(scheduled,{action:'send',sessionId:'bounded-target-'+index,content:'test',requestId:'bounded-'+index});
+    const repeated=await executeSessionBridgeTool(scheduled,{action:'send',sessionId:'bounded-target-0',content:'repeat',requestId:'repeat'}) as {id:string};
+    assert.equal(repeated.id,messageQueueDb.byRequest(user,'bounded-0')!.id);
+    await assert.rejects(()=>executeSessionBridgeTool(scheduled,{action:'send',sessionId:'bounded-target-5',content:'limit',requestId:'bounded-5'}),/最多 5 次/);
   } finally { closeConnection(); if(old===undefined)delete process.env.DATABASE_PATH; else process.env.DATABASE_PATH=old; await rm(root,{recursive:true,force:true}); }
 });
 

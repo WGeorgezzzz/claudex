@@ -87,6 +87,8 @@ export function createProviderRuntimeService(
     options: AnyRecord,
     writer: ProviderRuntimeWriter,
   ): Promise<unknown> => {
+    // Missing choices use the user's new default; explicit modes remain intact.
+    options={...options,permissionMode:options.permissionMode??'bypassPermissions'};
     const provider = dependencies.resolveProvider(providerName);
     const context=createRuntimeContext(provider);
     const userId=Number(writer.userId);
