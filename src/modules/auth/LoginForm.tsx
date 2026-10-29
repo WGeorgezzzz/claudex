@@ -61,8 +61,8 @@ export default function LoginForm() {
 
   return (
     <AuthScreenLayout
-      title={remoteLogin?'远程登录 Nexagent':t('login.title')}
-      description={remoteLogin?'成员使用用户名和密码；管理员使用远程账号及动态验证码。':localIdentity?'从 Nexagent 桌面端打开即可使用本机身份；浏览器也可使用原账号登录。':t('login.description')}
+      title={remoteLogin?'远程登录 Drover':t('login.title')}
+      description={remoteLogin?'成员使用用户名和密码；管理员使用远程账号及动态验证码。':localIdentity?'从 Drover 桌面端打开即可使用本机身份；浏览器也可使用原账号登录。':t('login.description')}
       footerText={t('login.footerText')}
     >
       <form onSubmit={handleSubmit} className="space-y-4">

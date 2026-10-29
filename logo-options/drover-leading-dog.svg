@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <title>Drover leading dog</title>
+  <rect width="512" height="512" rx="112" fill="#132B2B"/>
+  <path d="M102 304c42-104 119-162 217-162 42 0 75 10 98 27" fill="none" stroke="#F7F1E6" stroke-width="46" stroke-linecap="round"/>
+  <path d="M118 326c42 49 104 72 176 72 55 0 93-15 119-39" fill="none" stroke="#E3D7C3" stroke-width="28" stroke-linecap="round"/>
+  <path d="M230 194 334 248l-104 54z" fill="#F4A7B9"/>
+  <path d="m329 225 50-14-24 45z" fill="#F4A7B9"/>
+  <circle cx="349" cy="244" r="8" fill="#132B2B"/>
+  <path d="M169 298c-23 0-42 19-42 42v23h24v-17h36v17h24v-23c0-23-19-42-42-42z" fill="#F4A7B9"/>
+  <path d="m141 302-16-25 31 12m35 13 17-25-31 12" fill="#F4A7B9"/>
+</svg>

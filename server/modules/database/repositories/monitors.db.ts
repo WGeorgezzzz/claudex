@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import type Database from 'better-sqlite3';
 
 import { getConnection } from '@/modules/database/connection.js';
-import type { MonitorCalendarSchedule, MonitorRecord, MonitorRunRecord } from '@/shared/types.js';
+import type { MonitorCalendarSchedule, MonitorProbeSpec, MonitorRecord, MonitorRunRecord } from '@/shared/types.js';
 import { nextMonitorCalendarRun } from '@/shared/index.js';
 
 /** Used by database migrations to add durable, non-destructive monitoring tables. */
@@ -30,8 +30,9 @@ export function initializeMonitorTables(db: Database.Database): void {
   if(!columns.some(column=>column.name==='pause_reason')) db.exec('ALTER TABLE monitors ADD COLUMN pause_reason TEXT');
   if(!columns.some(column=>column.name==='state_record')) db.exec("ALTER TABLE monitors ADD COLUMN state_record TEXT NOT NULL DEFAULT ''");
   if(!columns.some(column=>column.name==='no_change_count')) db.exec("ALTER TABLE monitors ADD COLUMN no_change_count INTEGER NOT NULL DEFAULT 0");
+  for(const [name,type] of Object.entries({probe_json:'TEXT',probe_state_json:'TEXT',monitor_mode:"TEXT NOT NULL DEFAULT 'scheduled'",last_event_json:'TEXT',last_probe_at:'TEXT',heartbeat_count:'INTEGER NOT NULL DEFAULT 0',model_round_count:'INTEGER NOT NULL DEFAULT 0',probe_error:'TEXT'})) if(!columns.some(c=>c.name===name)) db.exec(`ALTER TABLE monitors ADD COLUMN ${name} ${type}`);
   const runColumns=db.prepare('PRAGMA table_info(monitor_runs)').all() as {name:string}[];
-  for(const [name,type] of Object.entries({session_id:'TEXT',report:'TEXT',input_tokens:'INTEGER',context_tokens:'INTEGER',output_tokens:'INTEGER',cache_read_tokens:'INTEGER',cache_creation_tokens:'INTEGER',total_tokens:'INTEGER',round_number:'INTEGER'})) if(!runColumns.some(c=>c.name===name)) db.exec(`ALTER TABLE monitor_runs ADD COLUMN ${name} ${type}`);
+  for(const [name,type] of Object.entries({session_id:'TEXT',report:'TEXT',input_tokens:'INTEGER',context_tokens:'INTEGER',output_tokens:'INTEGER',cache_read_tokens:'INTEGER',cache_creation_tokens:'INTEGER',total_tokens:'INTEGER',round_number:'INTEGER',event_type:'TEXT',prompt_evidence:'TEXT'})) if(!runColumns.some(c=>c.name===name)) db.exec(`ALTER TABLE monitor_runs ADD COLUMN ${name} ${type}`);
   // Keep a rollback copy before changing inherited Opus monitor defaults. The
   // table is durable and the INSERT is idempotent across restarts.
   db.exec(`CREATE TABLE IF NOT EXISTS monitor_model_migration_backup_20261029 (id TEXT PRIMARY KEY,user_id INTEGER NOT NULL,options TEXT NOT NULL)`);
@@ -51,6 +52,16 @@ const retryAt = (failures: number, now: Date, error = '') => {
   const minutes = sessionLimit ? 120 : Math.min(30, 2 ** Math.min(5, Math.max(0, failures - 1)));
   return new Date(now.getTime() + minutes * 60_000).toISOString();
 };
+
+function nextProbeAt(row: MonitorRecord, now: Date): string {
+  try {
+    const probe = row.probe_json ? JSON.parse(row.probe_json) as MonitorProbeSpec : null;
+    const minutes = Math.min(60, Math.max(1, Number(probe?.intervalMinutes) || 3));
+    return new Date(now.getTime() + minutes * 60_000).toISOString();
+  } catch {
+    return new Date(now.getTime() + 3 * 60_000).toISOString();
+  }
+}
 
 /** Used by the monitors module to atomically reserve runs and retain their outcomes. */
 export const monitorsDb = {
@@ -74,6 +85,10 @@ export const monitorsDb = {
       const stateLimit=Math.max(0,2000-meta.length);
       db.prepare('UPDATE monitors SET state_record=? WHERE id=? AND user_id=?').run(state.slice(0,stateLimit)+meta,id,userId);
     })();
+  },
+  recordPromptEvidence(id:string,runId:string,eventType:string|null,promptEvidence:string): void {
+    getConnection().prepare('UPDATE monitor_runs SET event_type=?,prompt_evidence=? WHERE id=? AND monitor_id=? AND status=\'running\'')
+      .run(eventType, promptEvidence.slice(0, 12_000), runId, id);
   },
   reportMessages(sessionId:string) {
     return getConnection().prepare(`SELECT r.id,r.report,r.session_id,COALESCE(r.finished_at,r.started_at) AS started_at,r.round_number,m.name,m.id AS monitor_id FROM monitor_runs r JOIN monitors m ON m.id=r.monitor_id JOIN sessions s ON s.session_id=m.session_id WHERE m.session_id=? AND (r.session_id<>m.session_id OR r.error LIKE '上下文维护：%') AND r.report IS NOT NULL AND s.owner_id=m.user_id ORDER BY r.started_at,r.rowid`).all(sessionId) as {id:string;report:string;session_id:string;started_at:string;name:string;monitor_id:string;round_number:number|null}[];
@@ -105,14 +120,14 @@ export const monitorsDb = {
     getConnection().prepare('UPDATE monitors SET session_id=?,options=? WHERE id=? AND user_id=? AND running_id=? AND session_id=?')
       .run(sessionId, JSON.stringify({ ...options, previousSessionId, previousSessionIds: [...(options.previousSessionIds || []), previousSessionId] }), id, userId, runId, previousSessionId);
   },
-  create(input: { userId: number; sessionId: string; name: string; content: string; options: unknown; intervalMinutes: number; schedule?:MonitorCalendarSchedule|null }): MonitorRecord {
+  create(input: { userId: number; sessionId: string; name: string; content: string; options: unknown; intervalMinutes: number; schedule?:MonitorCalendarSchedule|null; probe?:MonitorProbeSpec|null }): MonitorRecord {
     const id = randomUUID();
     const now = new Date();
     getConnection().prepare(`INSERT INTO monitors
-      (id,user_id,session_id,name,content,options,interval_minutes,next_run_at,created_at,schedule_json)
-      VALUES (?,?,?,?,?,?,?,?,?,?)`).run(id,input.userId,input.sessionId,input.name,input.content,
+      (id,user_id,session_id,name,content,options,interval_minutes,next_run_at,created_at,schedule_json,probe_json,monitor_mode)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`).run(id,input.userId,input.sessionId,input.name,input.content,
       JSON.stringify(input.options),input.intervalMinutes,
-      (input.schedule ? nextMonitorCalendarRun(input.schedule,now) : new Date(now.getTime()+input.intervalMinutes*60_000)).toISOString(),now.toISOString(),input.schedule?JSON.stringify(input.schedule):null);
+      (input.schedule ? nextMonitorCalendarRun(input.schedule,now) : new Date(now.getTime()+input.intervalMinutes*60_000)).toISOString(),now.toISOString(),input.schedule?JSON.stringify(input.schedule):null,input.probe?JSON.stringify(input.probe):null,input.probe?'event':'scheduled');
     return this.get(input.userId,id)!;
   },
   get(userId: number, id: string): MonitorRecord | undefined {
@@ -134,6 +149,26 @@ export const monitorsDb = {
     return getConnection().prepare("SELECT * FROM monitors WHERE status='active' AND running_id IS NULL AND next_run_at<=? ORDER BY next_run_at LIMIT 20")
       .all(now.toISOString()) as MonitorRecord[];
   },
+  probeDue(now: Date): MonitorRecord[] {
+    return getConnection().prepare("SELECT * FROM monitors WHERE status='active' AND running_id IS NULL AND monitor_mode='event' AND (last_probe_at IS NULL OR last_probe_at<=?) ORDER BY COALESCE(last_probe_at,created_at) LIMIT 32")
+      .all(new Date(now.getTime()-1000).toISOString()) as MonitorRecord[];
+  },
+  setProbe(userId:number,id:string,probe:MonitorProbeSpec|null): void {
+    getConnection().prepare("UPDATE monitors SET probe_json=?,probe_state_json=NULL,monitor_mode=?,last_event_json=NULL,probe_error=NULL,next_run_at=? WHERE user_id=? AND id=? AND status<>'stopped'")
+      .run(probe?JSON.stringify(probe):null,probe?'event':'scheduled',new Date().toISOString(),userId,id);
+  },
+  saveProbeObservation(id:string,state:Record<string,unknown>,event:unknown|null,nextRunAt:Date,probeError:string|null=null): void {
+    const eventAt = event && typeof event === 'object' && typeof (event as {at?:unknown}).at === 'string'
+      ? String((event as {at:string}).at) : null;
+    getConnection().prepare('UPDATE monitors SET probe_state_json=?,last_event_json=?,last_probe_at=?,next_run_at=?,probe_error=? WHERE id=? AND status=\'active\'')
+      .run(JSON.stringify(state),event?JSON.stringify(event):null,new Date().toISOString(),eventAt || nextRunAt.toISOString(),probeError,id);
+  },
+  recordHeartbeat(id:string,now=new Date()): void {
+    const db=getConnection(); const row=db.prepare('SELECT user_id,session_id FROM monitors WHERE id=?').get(id) as {user_id:number;session_id:string}|undefined; if(!row)return;
+    db.prepare("INSERT INTO monitor_runs(id,monitor_id,started_at,finished_at,status,error,session_id,event_type) VALUES(?,?,?,?,?,?,?,?)").run(randomUUID(),id,now.toISOString(),now.toISOString(),'heartbeat','无事件，未调用模型。',row.session_id,'heartbeat');
+    db.prepare('UPDATE monitors SET heartbeat_count=heartbeat_count+1 WHERE id=?').run(id);
+  },
+  markModelRound(id:string): void { getConnection().prepare('UPDATE monitors SET model_round_count=model_round_count+1,probe_state_json=json_set(COALESCE(probe_state_json,\'{}\'),\'$.lastModelAt\',?) WHERE id=?').run(new Date().toISOString(),id); },
   claim(id: string, now: Date): string | null {
     const db=getConnection();
     return db.transaction(() => {
@@ -160,7 +195,9 @@ export const monitorsDb = {
       db.prepare("UPDATE monitor_runs SET status=?,error=?,finished_at=? WHERE id=? AND status='running'")
         .run(error ? 'failed' : 'succeeded',error,now.toISOString(),runId);
       const failures = error ? row.consecutive_failures + 1 : 0;
-      const next = error ? retryAt(failures, now, error) : (row.schedule_json ? nextMonitorCalendarRun(JSON.parse(row.schedule_json),now) : new Date(now.getTime()+row.interval_minutes*60_000)).toISOString();
+      const next = error ? retryAt(failures, now, error) : row.monitor_mode === 'event'
+        ? nextProbeAt(row, now)
+        : (row.schedule_json ? nextMonitorCalendarRun(JSON.parse(row.schedule_json),now) : new Date(now.getTime()+row.interval_minutes*60_000)).toISOString();
       db.prepare(`UPDATE monitors SET running_id=NULL,run_count=run_count+1,last_error=?,next_run_at=?,consecutive_failures=?,no_change_count=0
         WHERE id=? AND running_id=?`).run(error,next,failures,id,runId);
     })();
@@ -174,7 +211,8 @@ export const monitorsDb = {
       const lastReal=this.lastModelRunAt(id);
       const nextAt=lastReal?Math.min(now.getTime()+minutes*60000,Math.max(now.getTime()+1000,Date.parse(lastReal)+60*60000)):now.getTime()+minutes*60000;
       db.prepare("UPDATE monitor_runs SET status='skipped',report='无变化，未调用模型',input_tokens=0,output_tokens=0,cache_read_tokens=0,cache_creation_tokens=0,total_tokens=0,context_tokens=0,error=?,finished_at=? WHERE id=? AND status='running'").run('无变化，未调用模型。',now.toISOString(),runId);
-      db.prepare('UPDATE monitors SET running_id=NULL,run_count=run_count+1,last_error=?,next_run_at=?,consecutive_failures=0,no_change_count=? WHERE id=? AND running_id=?').run('无变化，未调用模型。',new Date(nextAt).toISOString(),count,id,runId);
+       const scheduledNext = row.monitor_mode === 'event' ? nextProbeAt(row, now) : new Date(nextAt).toISOString();
+       db.prepare('UPDATE monitors SET running_id=NULL,run_count=run_count+1,last_error=?,next_run_at=?,consecutive_failures=0,no_change_count=? WHERE id=? AND running_id=?').run('无变化，未调用模型。',scheduledNext,count,id,runId);
     })();
   },
   action(userId: number,id: string,action: 'pause'|'resume'|'stop'|'run-now'): void {

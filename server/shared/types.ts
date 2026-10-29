@@ -1675,6 +1675,19 @@ export type SandboxCommandService = {
 export type MonitorCalendarSchedule = {
   frequency: 'daily'|'weekly'; time: string; timeZone: string; weekdays?: number[];
 };
+export type MonitorProbeSpec = {
+  intervalMinutes?: number;
+  stallMinutes?: number;
+  heartbeatMinutes?: number;
+  items: Array<Record<string, unknown>>;
+};
+export type MonitorProbeEvent = {
+  type: 'done'|'error'|'stall'|'dead'|'threshold'|'heartbeat';
+  at: string;
+  evidence: string;
+  delta?: string;
+  fields?: Record<string, unknown>;
+};
 /** Persisted monitor, shared by its repository, dispatcher and HTTP service. Times are ISO UTC instants. */
 export type MonitorRecord = {
   id: string; user_id: number; session_id: string; name: string; content: string; options: string;
@@ -1683,11 +1696,15 @@ export type MonitorRecord = {
   consecutive_failures: number; pause_reason: string|null;
   running_id: string|null; run_count: number; last_error: string|null; created_at: string;
   state_record?: string; no_change_count?: number;
+  probe_json?: string|null; probe_state_json?: string|null; monitor_mode?: 'scheduled'|'event';
+  last_event_json?: string|null; last_probe_at?: string|null; heartbeat_count?: number;
+  model_round_count?: number; probe_error?: string|null;
 };
 /** One attempted monitor execution. Failures/interruption stay recorded while active monitors retry with backoff. */
 export type MonitorRunRecord = {
   id: string; monitor_id: string; started_at: string; finished_at: string|null;
-  status: 'running'|'succeeded'|'failed'|'interrupted'|'skipped'; error: string|null;
+  status: 'running'|'succeeded'|'failed'|'interrupted'|'skipped'|'heartbeat'; error: string|null;
+  event_type?: string|null; prompt_evidence?: string|null;
   session_id?:string|null;report?:string|null;input_tokens?:number|null;context_tokens?:number|null;
   output_tokens?:number|null;cache_read_tokens?:number|null;cache_creation_tokens?:number|null;total_tokens?:number|null;
 };

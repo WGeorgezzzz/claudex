@@ -1,4 +1,6 @@
-# Nexagent
+# 驭手 Drover
+
+一处驾驭所有 Agent。
 
 一个后端统一管理 Claude Code、Codex、Cursor、OpenCode 和 WorkBuddy，
 在桌面、手机和远程设备上继续工作。
@@ -6,9 +8,9 @@
 [English](README.md) · [安装包](https://github.com/WGeorgezzzz/nexagent/releases)
 · [更新日志](CHANGELOG.md) · [参与贡献](CONTRIBUTING.md)
 
-![Nexagent 桌面工作区，使用虚构演示数据](public/screenshots/desktop-main.png)
+<img src="public/drover-mark.svg" width="80" alt="驭手 Drover：缰绳弧线与前导箭头" />
 
-<img src="public/screenshots/mobile-chat.png" width="260" alt="Nexagent 手机工作区，使用演示数据" />
+<img src="public/screenshots/mobile-chat.png" width="260" alt="驭手 Drover 手机工作区，使用演示数据" />
 
 ## 功能
 
@@ -85,7 +87,7 @@ node dist-server/server/modules/cli/cli.js start --port 3001
 | Cloudflare 临时隧道 | 无需隧道账号，公网可达 | 临时 `*.trycloudflare.com` |
 | 自定义域名 | 自行配置隧道与 Cloudflare Access | 自己的域名 |
 
-主机与服务须保持运行。经隧道访问一律需要 Nexagent 登录，不能借本机转发免登录。
+主机与服务须保持运行。经隧道访问一律需要驭手 Drover 登录，不能借本机转发免登录。
 管理员使用远程密码和 TOTP，成员使用自己的密码。二维码只包含地址，不包含凭据。
 各隧道服务和 Agent 的账号、可用性与使用条款独立适用。
 
@@ -97,7 +99,7 @@ node dist-server/server/modules/cli/cli.js start --port 3001
 凭据存放在仓库外，并绑定目标地址。详见 [额度配置](docs/QUOTA.md)。
 
 成员不能查看上游账号池，也不能修改中转地址或隧道。Claude 凭据只读、不主动刷新。
-看板负责观察，额度限制仍由中转调度器执行。Nexagent 没有点数重置操作，
+看板负责观察，额度限制仍由中转调度器执行。驭手 Drover 没有点数重置操作，
 不能据看板证明其他客户端绝不会消耗点数。
 
 编码 Agent 和终端具备操作主机文件及执行命令的能力。仅向可信用户开放，
@@ -106,7 +108,7 @@ node dist-server/server/modules/cli/cli.js start --port 3001
 
 ## 上游与许可
 
-Nexagent 是 [CloudCLI / Claude Code UI](https://github.com/siteboon/claudecodeui)
+驭手 Drover 是 [CloudCLI / Claude Code UI](https://github.com/siteboon/claudecodeui)
 的独立维护分叉，基于上游 1.37.5。与 Anthropic、OpenAI、Cursor、Microsoft
 及上游维护者不存在官方产品关系，商标归各自权利人所有。
 

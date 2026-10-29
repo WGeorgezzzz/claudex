@@ -1,6 +1,6 @@
-# Contributing to Nexagent
+# Contributing to Drover
 
-Thanks for your interest in contributing to Nexagent! Before you start, please take a moment to read through this guide.
+Thanks for your interest in contributing to Drover! Before you start, please take a moment to read through this guide.
 
 ## Before You Start
 

@@ -2,7 +2,7 @@
 export const TASK_WORKSTREAMS = [
   { id: 'robotics', name: '机器人与现场', description: '真机部署、遥操、硬件与现场问题', accent: 'bg-blue-500' },
   { id: 'research', name: '仿真与研究', description: '仿真数据、模型评测、实验与复现', accent: 'bg-violet-500' },
-  { id: 'platform', name: '工作台与基础设施', description: 'Nexagent、开发工具、服务器与存储', accent: 'bg-emerald-500' },
+  { id: 'platform', name: '工作台与基础设施', description: 'Drover、开发工具、服务器与存储', accent: 'bg-emerald-500' },
   { id: 'delivery', name: '合作与交付', description: '客户会议、材料、宣发与团队协作', accent: 'bg-amber-500' },
   { id: 'followup', name: '跟进与整理', description: '其他待办、文档核对与后续跟进', accent: 'bg-slate-400' },
 ] as const;

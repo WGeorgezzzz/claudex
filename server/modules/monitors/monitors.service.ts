@@ -3,15 +3,20 @@ import { monitorsDb, userPreferencesDb } from '@/modules/database/index.js';
 import { AppError } from '@/shared/utils.js';
 import { parseMonitorCalendarSchedule } from '@/shared/index.js';
 
+import { normalizeProbe } from './monitor-probe.service.js';
+
 /** Used by monitor HTTP routes for validation and lifecycle changes. */
 export const monitorsService = {
   listView(userId:number,sessionId?:string,includeStopped=false,offset=0) {
     return this.list(userId,sessionId,includeStopped).slice(offset,offset+10).map(row=>({
       id:row.id,name:row.name,status:row.status,
+      intervalMinutes:row.interval_minutes,
       schedule:row.schedule_json?JSON.parse(row.schedule_json):null,
       nextRunAt:row.status==='active'?row.next_run_at:null,
       lastRun:{count:row.run_count,error:row.last_error?.slice(0,120)??null},
       content:row.content.slice(0,200),
+      mode:row.monitor_mode||'scheduled',probe:row.probe_json?JSON.parse(row.probe_json):null,probeState:row.probe_state_json?JSON.parse(row.probe_state_json):null,
+      lastEvent:row.last_event_json?JSON.parse(row.last_event_json):null,heartbeatCount:row.heartbeat_count||0,modelRoundCount:row.model_round_count||0,probeError:row.probe_error||null,
     }));
   },
   contextSettings(userId: number) { const prefs=userPreferencesDb.getPreferences(userId);return { threshold:Number(prefs.monitorContextThreshold??300000),percent:Number(prefs.monitorContextPercent??40) }; },
@@ -51,7 +56,9 @@ export const monitorsService = {
     if(['default','acceptEdits','plan','bypassPermissions'].includes(String(options.permissionMode))) safeOptions.permissionMode=options.permissionMode;
     safeOptions.permissionMode ??= 'bypassPermissions';
     if(options.runMode!==undefined){if(!['isolated','original'].includes(String(options.runMode)))throw new AppError('无效运行方式',{statusCode:400});safeOptions.runMode=options.runMode;}
-    return monitorsDb.create({userId,sessionId,name,content,intervalMinutes,schedule,options:safeOptions});
+    const probe=input.probe===undefined?null:normalizeProbe(input.probe);
+    if(input.probe!==undefined&&!probe)throw new AppError('探针必须包含至少一个有效条目。',{code:'INVALID_PROBE',statusCode:400});
+    return monitorsDb.create({userId,sessionId,name,content,intervalMinutes,schedule,options:safeOptions,probe});
   },
   list(userId: number,sessionId?: string,includeStopped=false) {if(sessionId) assertOwnedSession(userId,sessionId); return monitorsDb.list(userId,sessionId,includeStopped);},
   update(userId: number,id: string,input: Record<string,unknown>) {
@@ -66,6 +73,7 @@ export const monitorsService = {
       throw new AppError('名称、内容或间隔无效。',{code:'INVALID_MONITOR',statusCode:400});
     if(input.runMode!==undefined){if(!['isolated','original'].includes(String(input.runMode)))throw new AppError('无效运行方式',{statusCode:400});monitorsDb.setMode(userId,id,String(input.runMode));}
     monitorsDb.update(userId,id,{name,content,intervalMinutes,schedule});
+    if(input.probe!==undefined){const probe=normalizeProbe(input.probe);if(!probe)throw new AppError('探针必须包含至少一个有效条目。',{code:'INVALID_PROBE',statusCode:400});monitorsDb.setProbe(userId,id,probe);}
     return this.require(userId,id);
   },
   history(userId: number,id: string) {this.require(userId,id);return monitorsDb.history(userId,id);},

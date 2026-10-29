@@ -24,7 +24,7 @@ export function DesktopSetup({ onComplete }: { onComplete: () => Promise<void> }
   // Keep a failed setup operation visible without discarding the current step.
   const [error, setError] = useState('');
   return <main className="h-dvh overflow-y-auto bg-background text-foreground"><div className="mx-auto max-w-3xl space-y-6 px-4 py-8 sm:py-12">
-    <header className="flex items-center gap-3"><img src="/nexagent-mark.svg" alt="" className="h-12 w-12"/><div><h1 className="text-2xl font-semibold">Nexagent</h1><p className="text-sm text-muted-foreground">本机管理员已创建 · 操作系统身份保护</p></div></header>
+    <header className="flex items-center gap-3"><img src="/drover-mark.svg" alt="" className="h-12 w-12"/><div><h1 className="text-2xl font-semibold">驭手</h1><p className="text-sm text-muted-foreground">本机管理员已创建 · 操作系统身份保护</p></div></header>
     <nav aria-label="首次设置" className="flex flex-wrap gap-4 border-b border-border pb-3 text-sm">{['本机 Agent', '远程管理员', '远程访问'].map((label, index) => <span key={label} aria-current={step === index ? 'step' : undefined} className={step === index ? 'font-semibold' : 'text-muted-foreground'}>{index < step ? <Check className="mr-1 inline" size={14}/> : `${index + 1}. `}{label}</span>)}</nav>
     {step === 0 && <AgentDiscoveryPanel onLogin={setLoginProvider}/>}
     {loginProvider && <ProviderLoginModal isOpen provider={loginProvider} onClose={() => setLoginProvider(null)} onComplete={() => { void api.providers.rescan().then(() => window.dispatchEvent(new Event('nexagent:discovery-updated'))); }}/>} 

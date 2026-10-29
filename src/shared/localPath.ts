@@ -16,7 +16,7 @@ export async function openLocalFile(path: string, reveal = false) {
   const bridge = (window as unknown as {cloudcliDesktop?: {openLocalPath?: (p:string)=>Promise<unknown>; revealLocalPath?: (p:string)=>Promise<unknown>};cloudcliDesktopNotifications?: {openLocalPath?: (p:string)=>Promise<unknown>;revealLocalPath?: (p:string)=>Promise<unknown>}});
   const api = bridge.cloudcliDesktopNotifications ?? bridge.cloudcliDesktop;
   const action = reveal ? api?.revealLocalPath : api?.openLocalPath;
-  if (!action) throw new Error('需在 Nexagent 桌面端使用；仍可复制路径');
+  if (!action) throw new Error('需在 Drover 桌面端使用；仍可复制路径');
   const capabilities = api as typeof api & {getCapabilities?: () => Promise<{localPaths:boolean}>};
   const upgrade = async () => {
     await copyLocalPath(path, reveal).catch(() => {});

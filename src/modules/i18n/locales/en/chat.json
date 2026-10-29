@@ -54,10 +54,10 @@
   "fileLink": {
     "menu": "File actions",
     "openLocally": "Open locally",
-    "preview": "Preview in Nexagent",
+    "preview": "Preview in Drover",
     "copyPath": "Copy file path",
     "noProject": "The project path is unavailable. Open this conversation in its project first.",
-    "desktopOnly": "Open this link in the Nexagent desktop app to use a local program.",
+    "desktopOnly": "Open this link in the Drover desktop app to use a local program.",
     "copyFailed": "Unable to copy the file path."
   },
   "codeBlock": {

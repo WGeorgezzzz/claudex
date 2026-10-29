@@ -88,7 +88,7 @@
     "openInEditor": "Ouvrir dans l'éditeur"
   },
   "mainContent": {
-    "loading": "Chargement de Nexagent",
+    "loading": "Chargement de Drover",
     "settingUpWorkspace": "Préparation de votre espace de travail...",
     "chooseProject": "Choisissez votre projet",
     "selectProjectDescription": "Sélectionnez un projet dans la barre latérale pour commencer à coder avec Claude. Chaque projet contient vos sessions de chat et l'historique des fichiers.",
@@ -269,5 +269,9 @@
       "closeSidebar": "Masquer la barre latérale",
       "resizeSidebar": "Redimensionner la barre latérale"
     }
+  },
+  "brand": {
+    "name": "Drover",
+    "tagline": "Drive every agent from one place"
   }
 }

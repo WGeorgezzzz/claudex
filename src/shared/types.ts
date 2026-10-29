@@ -1641,6 +1641,8 @@ export type PaletteSessionEntry = {
 //----------------- MONITOR CALENDAR CONTROLS ------------
 /** Wall-clock schedule shared by chat creation, dashboard editing and the monitor API. Weekdays use ISO 1–7. */
 export type MonitorCalendarSchedule = {frequency:'daily'|'weekly';time:string;timeZone:string;weekdays?:number[]};
+/** JSON probe configuration shown in the monitor panel and sent to the monitor API. */
+export type MonitorProbeSpec = {intervalMinutes?:number;stallMinutes?:number;heartbeatMinutes?:number;items:Array<Record<string,unknown>>};
 /** Persisted monitor fields rendered in the chat panel and global manager; absent schedule_json denotes legacy intervals. */
 export type MonitorTaskRecord = {
   id:string;session_id:string;name:string;content:string;interval_minutes:number;schedule_json?:string|null;
@@ -1648,9 +1650,9 @@ export type MonitorTaskRecord = {
   status:'active'|'paused'|'stopped';next_run_at:string;running_id:string|null;run_count:number;last_error:string|null;options?:string;state_record?:string;
 };
 /** A bounded execution receipt displayed by both monitor history views. */
-export type MonitorRunReceipt = {id:string;started_at:string;finished_at?:string|null;status:string;error:string|null;session_id?:string|null;report?:string|null;input_tokens?:number|null;context_tokens?:number|null;output_tokens?:number|null;cache_read_tokens?:number|null;cache_creation_tokens?:number|null;total_tokens?:number|null};
+export type MonitorRunReceipt = {id:string;started_at:string;finished_at?:string|null;status:string;error:string|null;session_id?:string|null;report?:string|null;event_type?:string|null;prompt_evidence?:string|null;input_tokens?:number|null;context_tokens?:number|null;output_tokens?:number|null;cache_read_tokens?:number|null;cache_creation_tokens?:number|null;total_tokens?:number|null};
 /** Compact default list payload; full monitor fields are fetched through actions/history. */
-export type MonitorListSummary = {id:string;name:string;status:'active'|'paused'|'stopped';schedule:MonitorCalendarSchedule|null;nextRunAt:string|null;lastRun:{count:number;error:string|null};content:string;run_count?:number;last_error?:string|null};
+export type MonitorListSummary = {id:string;name:string;status:'active'|'paused'|'stopped';schedule:MonitorCalendarSchedule|null;intervalMinutes?:number;nextRunAt:string|null;lastRun:{count:number;error:string|null};content:string;mode?:'scheduled'|'event';probe?:MonitorProbeSpec|null;probeState?:Record<string,unknown>|null;lastEvent?:Record<string,unknown>|null;heartbeatCount?:number;modelRoundCount?:number;probeError?:string|null;run_count?:number;last_error?:string|null};
 
 // ---------------------------
 

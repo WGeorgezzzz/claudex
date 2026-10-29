@@ -88,7 +88,7 @@
     "openInEditor": "Editörde Aç"
   },
   "mainContent": {
-    "loading": "Nexagent Yükleniyor",
+    "loading": "Drover Yükleniyor",
     "settingUpWorkspace": "Çalışma alanın hazırlanıyor...",
     "chooseProject": "Projeni Seç",
     "selectProjectDescription": "Claude ile kodlamaya başlamak için kenar çubuğundan bir proje seç. Her proje kendi sohbet oturumlarını ve dosya geçmişini içerir.",
@@ -269,5 +269,9 @@
       "closeSidebar": "Kenar çubuğunu kapat",
       "resizeSidebar": "Kenar çubuğunu yeniden boyutlandır"
     }
+  },
+  "brand": {
+    "name": "Drover",
+    "tagline": "Drive every agent from one place"
   }
 }

@@ -1,6 +1,6 @@
 # Desktop profiles and upgrades
 
-Nexagent installers include a separate Node.js 22 runtime, backend, native modules,
+Drover installers include a separate Node.js 22 runtime, backend, native modules,
 and frontend. First launch does not need to download a separately published server.
 
 | Platform | Default profile |
@@ -16,7 +16,7 @@ profile must finish its work and be stopped before an upgrade can use that profi
 Uninstalling retains application data. Back up the profile before upgrading.
 
 For isolated evaluation, set `WORKBENCH_USER_DATA_DIR` to a new absolute directory.
-Agent authentication is separate from the Nexagent administrator. The bundled
+Agent authentication is separate from the Drover administrator. The bundled
 Claude CLI starts with the profile's `providers/claude` configuration; sign in or
 select your existing configuration in desktop settings. Other local agents are
 detected from PATH and supported installation locations.

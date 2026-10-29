@@ -31,7 +31,7 @@ window.__MOCK_STATE__ = {
     getState: function () { return Promise.resolve(clone(mockState)); },
     openLocal: function () {
       mockState.localServerRunning = true;
-      mockState.activeTarget = { kind: 'local', name: 'Local Nexagent', url: mockState.localWebUrl };
+      mockState.activeTarget = { kind: 'local', name: 'Local Drover', url: mockState.localWebUrl };
       return Promise.resolve(clone(mockState));
     },
     openLocalWebUi: function () {
@@ -294,7 +294,7 @@ window.__MOCK_STATE__ = {
   CC.act = function (name, node) {
     switch (name) {
       case 'local':
-        return CC.run('Starting Local Nexagent...', function () { return bridge.openLocal(); });
+        return CC.run('Starting Local Drover...', function () { return bridge.openLocal(); });
       case 'connect':
         return CC.run('Opening the account page...', function () { return bridge.connectCloud(); });
       case 'logout':
@@ -318,7 +318,7 @@ window.__MOCK_STATE__ = {
       case 'settings-close':
         return CC.closeSheet();
       case 'dashboard':
-        return CC.run('Opening Nexagent dashboard...', function () { return bridge.openCloudDashboard(); });
+        return CC.run('Opening Drover dashboard...', function () { return bridge.openCloudDashboard(); });
       case 'refresh-environments':
         return CC.run('Refreshing cloud environments...', function () { return bridge.refreshEnvironments(); });
       case 'refresh-tab':
@@ -358,7 +358,7 @@ window.__MOCK_STATE__ = {
     var envActions = activeEnvironmentId ? '<button class="btn sm tb-action no-drag" data-cc-action="env-row-menu" data-cc-environment-id="' + esc(activeEnvironmentId) + '" title="Open environment actions">Open environment in...</button>' : '';
     var refreshAction = activeRefreshable ? '<button class="icon-btn tb-action no-drag" data-cc-action="refresh-tab" title="Refresh tab">' + icon('refresh', 16) + '</button>' : '';
     return '<div class="titlebar">' +
-      '<div class="brand"><img class="mk" src="' + esc(LOGO_URL) + '" alt=""><span>Nexagent</span></div>' +
+      '<div class="brand"><img class="mk" src="' + esc(LOGO_URL) + '" alt=""><span>Drover</span></div>' +
       '<div class="tb-tabs no-drag">' + renderTabs(state) + '</div>' +
       '<span style="flex:1"></span>' +
       refreshAction +
@@ -440,13 +440,13 @@ window.__MOCK_STATE__ = {
       '<div class="cc-row2"><button class="btn sm" data-cc-action="open-web">' + icon('arrow', 14) + 'Open in browser</button><button class="btn sm" data-cc-action="copy-web">' + icon('copy', 14) + 'Copy URL</button></div>';
     if (options.includePreferences) {
       body +=
-        '<label class="cc-toggle"><input type="checkbox" data-cc-setting="keepLocalServerRunning"' + (settings.keepLocalServerRunning ? ' checked' : '') + '><span><b>Keep server running</b><br>Leave Local Nexagent available after you quit the app.</span></label>' +
+        '<label class="cc-toggle"><input type="checkbox" data-cc-setting="keepLocalServerRunning"' + (settings.keepLocalServerRunning ? ' checked' : '') + '><span><b>Keep server running</b><br>Leave Local Drover available after you quit the app.</span></label>' +
         '<label class="cc-toggle"><input type="checkbox" data-cc-setting="exposeLocalServerOnNetwork"' + (settings.exposeLocalServerOnNetwork ? ' checked' : '') + '><span><b>Allow LAN access</b><br>Use the copied URL from another device on this network.</span></label>';
     }
     body += '</div>';
     return CC.renderSection(
       options.eyebrow || 'LOCAL SERVER',
-      options.title || 'Run Local Nexagent on this machine',
+      options.title || 'Run Local Drover on this machine',
       body
     );
   };
@@ -468,7 +468,7 @@ window.__MOCK_STATE__ = {
       CC.buildLocalServerSection(state, { includePreferences: false }),
       CC.renderSection('PREFERENCES', 'How the local service behaves', '' +
         '<div class="cc-surface">' +
-        '<label class="cc-toggle"><input type="checkbox" data-cc-setting="keepLocalServerRunning"' + ((state.desktopSettings || {}).keepLocalServerRunning ? ' checked' : '') + '><span><b>Keep server running</b><br>Leave Local Nexagent available after you quit the app.</span></label>' +
+        '<label class="cc-toggle"><input type="checkbox" data-cc-setting="keepLocalServerRunning"' + ((state.desktopSettings || {}).keepLocalServerRunning ? ' checked' : '') + '><span><b>Keep server running</b><br>Leave Local Drover available after you quit the app.</span></label>' +
         '<label class="cc-toggle"><input type="checkbox" data-cc-setting="exposeLocalServerOnNetwork"' + ((state.desktopSettings || {}).exposeLocalServerOnNetwork ? ' checked' : '') + '><span><b>Allow LAN access</b><br>Use the copied URL from another device on this network.</span></label>' +
         '</div>'
       ),
@@ -480,7 +480,7 @@ window.__MOCK_STATE__ = {
         '</div>'
       ) : '',
     ];
-    CC.renderSheet('Local Settings', 'Manage how Local Nexagent runs on this computer.', sections);
+    CC.renderSheet('Local Settings', 'Manage how Local Drover runs on this computer.', sections);
   };
 
   CC.renderDesktopSettings = function () {
@@ -628,9 +628,9 @@ window.__MOCK_STATE__ = {
   }
 
   function localPane(state) {
-    return '<div class="pane-h"><div><h2 class="pane-title">Local servers</h2><p class="pane-sub">Manage Local Nexagent on this machine. No account required.</p></div></div>' +
+    return '<div class="pane-h"><div><h2 class="pane-title">Local servers</h2><p class="pane-sub">Manage Local Drover on this machine. No account required.</p></div></div>' +
       '<div class="card"><div class="card-head"><div><div class="card-t">Local server</div><div class="card-sub mono">' + CC.esc(CC.localUrl(state) || 'Starts on demand') + '</div></div><div class="card-tools"><span class="dot" style="background:' + (state.localServerRunning ? 'var(--ok)' : 'var(--tx3)') + '"></span><button class="icon-btn" data-cc-action="local-settings-toggle" title="Local settings">' + CC.icon('gear', 16) + '</button></div></div>' +
-      '<div class="card-actions"><button class="btn pri" data-cc-action="local">' + CC.icon('play', 15) + 'Open Local Nexagent</button><button class="btn" data-cc-action="open-web">' + CC.icon('arrow', 14) + 'Open in browser</button><button class="btn" data-cc-action="copy-web">' + CC.icon('copy', 14) + 'Copy URL</button></div></div>';
+      '<div class="card-actions"><button class="btn pri" data-cc-action="local">' + CC.icon('play', 15) + 'Open Local Drover</button><button class="btn" data-cc-action="open-web">' + CC.icon('arrow', 14) + 'Open in browser</button><button class="btn" data-cc-action="copy-web">' + CC.icon('copy', 14) + 'Copy URL</button></div></div>';
   }
 
   function renderBody(state) {

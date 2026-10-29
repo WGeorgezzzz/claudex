@@ -74,7 +74,7 @@ export function RemoteAccessTab() {
         <AddressQr url={status.url} /><div className="min-w-0 flex-1 space-y-2">
           <a href={status.url} target="_blank" rel="noreferrer" className="block break-all text-sm text-primary underline">{status.url}</a>
           <Button size="sm" variant="ghost" onClick={() => void navigator.clipboard.writeText(status.url!).catch(() => setError('复制失败'))}><Copy className="mr-2 h-4 w-4" />复制地址</Button>
-          <p className="text-xs text-muted-foreground">{status.config?.provider === 'cloudflare' ? '临时地址，重启后会变化' : status.config?.public ? '任何人可访问 · 仍需 Nexagent 登录' : '私有访问 · 仍需 Nexagent 登录'}</p>
+          <p className="text-xs text-muted-foreground">{status.config?.provider === 'cloudflare' ? '临时地址，重启后会变化' : status.config?.public ? '任何人可访问 · 仍需驭手登录' : '私有访问 · 仍需驭手登录'}</p>
         </div>
       </div>}
       {status?.lastAddress?.previous && status.lastAddress.previous !== status.lastAddress.url && <p role="status" className="mt-3 break-all text-xs text-muted-foreground">地址已更新：{status.lastAddress.url}</p>}
@@ -90,7 +90,7 @@ export function RemoteAccessTab() {
         <Button size="sm" variant="outline" disabled={disabled || !status?.tools.devtunnel} onClick={() => void action(api.remoteAccess.login)}><LogIn className="mr-2 h-4 w-4" />GitHub 账号登录</Button>
         <Button size="sm" disabled={disabled || !status?.tools.devtunnel} onClick={() => void start('devtunnel')}><Play className="mr-2 h-4 w-4" />启动持久隧道</Button>
       </div>
-      <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={publicAccess} onChange={e => setPublicAccess(e.target.checked)} />任何人可访问（仍需 Nexagent 登录）</label>
+      <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={publicAccess} onChange={e => setPublicAccess(e.target.checked)} />任何人可访问（仍需驭手登录）</label>
       {status?.login.phase === 'pending' && <div role="status" className="space-y-2 rounded border border-border p-3">
         <p className="text-sm">GitHub 设备授权</p><strong className="block font-mono text-xl">{status.login.code || '正在获取设备码…'}</strong>
         {status.login.url && <a href={status.login.url} target="_blank" rel="noreferrer" className="flex items-center gap-2 break-all text-sm text-primary underline"><ExternalLink className="h-4 w-4 shrink-0" />{status.login.url}</a>}
