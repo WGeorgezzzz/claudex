@@ -19,6 +19,7 @@ import type {
   WorkflowAgentActivity,
 } from '@/shared/types.js';
 import { AppError, sliceTailPage, createNormalizedMessage } from '@/shared/utils.js';
+import { cleanLegacyMonitorUserMessage } from '@/shared/monitor-report.js';
 
 /**
  * One session the running-sessions poll reports as busy.
@@ -602,6 +603,7 @@ export const sessionsService = {
       ...result,
       messages: result.messages.map((message) => ({
         ...message,
+        ...(message.role==='user'&&typeof message.content==='string'?{content:cleanLegacyMonitorUserMessage(message.content)}:{}),
         sessionId,
       })),
     };

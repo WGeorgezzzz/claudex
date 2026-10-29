@@ -23,6 +23,13 @@ export function initializeMonitorTables(db: Database.Database): void {
       finished_at TEXT, status TEXT NOT NULL, error TEXT
     );
     CREATE INDEX IF NOT EXISTS idx_monitor_runs_monitor ON monitor_runs(monitor_id, started_at);
+    CREATE TABLE IF NOT EXISTS monitor_report_context_cursor (
+      session_id TEXT PRIMARY KEY, last_user_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS monitor_report_context_receipts (
+      session_id TEXT NOT NULL, run_id TEXT NOT NULL, injected_at TEXT NOT NULL,
+      PRIMARY KEY(session_id, run_id)
+    );
   `);
   const columns=db.prepare('PRAGMA table_info(monitors)').all() as {name:string}[];
   if(!columns.some(column=>column.name==='schedule_json')) db.exec('ALTER TABLE monitors ADD COLUMN schedule_json TEXT');
@@ -68,6 +75,22 @@ function nextProbeAt(row: MonitorRecord, now: Date): string {
 
 /** Used by the monitors module to atomically reserve runs and retain their outcomes. */
 export const monitorsDb = {
+  lastReportContextUserAt(sessionId:string): string|null {
+    return (getConnection().prepare('SELECT last_user_at FROM monitor_report_context_cursor WHERE session_id=?').get(sessionId) as {last_user_at:string}|undefined)?.last_user_at??null;
+  },
+  /** Reserve report ids and the ordinary-user boundary durably, before dispatch. */
+  claimReportContext(sessionId:string,lastUserAt:string,now:string,include=true) {
+    const db=getConnection();
+    return db.transaction(()=>{
+      const since=[this.lastReportContextUserAt(sessionId)??'',lastUserAt].sort().at(-1)!;
+      const eligible=db.prepare("SELECT 1 FROM monitor_runs r WHERE r.id=? AND r.status IN ('succeeded','failed','interrupted') AND (r.error IS NULL OR r.error NOT LIKE '上下文维护：%') AND NOT EXISTS(SELECT 1 FROM monitor_report_context_receipts c WHERE c.session_id=? AND c.run_id=r.id)");
+      const reports=include?this.reportMessages(sessionId).filter(row=>row.started_at>since&&row.started_at<=now&&eligible.get(row.id,sessionId)):[];
+      const insert=db.prepare('INSERT OR IGNORE INTO monitor_report_context_receipts(session_id,run_id,injected_at) VALUES(?,?,?)');
+      for(const report of reports)insert.run(sessionId,report.id,now);
+      db.prepare('INSERT INTO monitor_report_context_cursor(session_id,last_user_at) VALUES(?,?) ON CONFLICT(session_id) DO UPDATE SET last_user_at=excluded.last_user_at').run(sessionId,now);
+      return reports;
+    })();
+  },
   isMonitorSession(userId:number,sessionId:string) {
     return !!getConnection().prepare('SELECT 1 FROM monitor_runs r JOIN monitors m ON m.id=r.monitor_id WHERE m.user_id=? AND r.session_id=? AND (r.session_id<>m.session_id OR r.id=m.running_id) LIMIT 1').get(userId,sessionId);
   },
