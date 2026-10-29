@@ -16,6 +16,7 @@ import { providerTokenUsageService } from '@/modules/providers/services/provider
 import { providerSkillsService } from '@/modules/providers/services/skills.service.js';
 import { sessionConversationsSearchService } from '@/modules/providers/services/session-conversations-search.service.js';
 import { sessionsService } from '@/modules/providers/services/sessions.service.js';
+import { prepareProviderRestart } from './services/provider-supervision-controller.service.js';
 import { replySuggestionsRouter } from '@/modules/providers/reply-suggestions.routes.js';
 import type {
   CustomProviderModelEffort,
@@ -936,6 +937,10 @@ router.post(
     res.status(201).json(createApiSuccessResponse(result));
   }),
 );
+
+router.post('/restart/prepare', requireSharedResourceAdministrator, asyncHandler(async (_req, res) => {
+  res.json(createApiSuccessResponse(await prepareProviderRestart()));
+}));
 
 router.get(
   '/sessions/running',

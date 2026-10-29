@@ -1,7 +1,8 @@
 ﻿import fs from 'node:fs';
 import path from 'node:path';
-import { DurableProvider } from './provider-supervisor.service.js';
+
 import type { AnyRecord, LLMProvider, ProviderRuntimeWriter } from '@/shared/types.js';
+import { DurableProvider } from './provider-supervisor.service.js';
 
 // Composition/recovery can use this boundary without serializing SDK closures.
 // No implicit retry is performed: adoption is deliberately separate from launch.
@@ -10,7 +11,8 @@ export async function launchSupervisedTurn(root: string, provider: LLMProvider, 
   if (!options.sessionId || writer.userId == null) throw new Error('Supervision requires stable session and authenticated user identity');
   return DurableProvider.start(root, { mode: 'runtime', provider, command, options, userId: writer.userId,
     isWebSocketWriter: writer.isWebSocketWriter,
-    metadata: { provider, sessionId: options.sessionId, userId: writer.userId, formerlyRunning: true } });
+    metadata: { provider, sessionId: options.sessionId, userId: writer.userId, formerlyRunning: false,
+      userTurn: !options.cloudcliMonitorId && !options.bridgeCompact && !options.cloudcliBridgeSourceSessionId } });
 }
 
 // Caller must restore its chat run before attaching. Terminal records are read

@@ -40,7 +40,7 @@ async function executeClaim(row: QueuedTurnRecord, runtime: ProviderRuntimeGatew
     const session=withUserContext(row.user_id,()=>sessionsDb.getSessionById(row.session_id));
     if (!session || session.isArchived) throw new Error('Conversation was removed or archived before dispatch.');
     const observed: ProviderRuntimeGateway=Object.create(runtime);
-    observed.run=async(provider,command,options,writer)=>runtime.run(provider,command,options,{
+    observed.run=async(provider,command,options,writer)=>runtime.run(provider,command,{...options,cloudcliQueueAttempt:row},{
       ...writer,
       userId:writer.userId, isWebSocketWriter:writer.isWebSocketWriter,
       setSessionId:writer.setSessionId?.bind(writer),
@@ -117,11 +117,11 @@ export function wakeMessageQueue(): void {
 }
 
 /** Server startup recovers uncertain attempts without replay and dispatches independently of browser tabs. */
-export function initializeMessageQueue(runtime: ProviderRuntimeGateway): void {
+export function initializeMessageQueue(runtime: ProviderRuntimeGateway, protectedSessions: string[] = []): void {
   if (activeRuntime) return;
   activeRuntime = runtime;
   registerMessageQueueWakeup(wakeMessageQueue);
-  messageQueueDb.recover();
+  messageQueueDb.recover(protectedSessions);
   scheduleDispatch(0);
 }
 

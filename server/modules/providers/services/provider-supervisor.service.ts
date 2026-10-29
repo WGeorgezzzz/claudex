@@ -17,11 +17,24 @@ export class DurableProvider {
     fs.writeFileSync(path.join(directory, 'token'), crypto.randomBytes(32).toString('hex'), { mode: 0o600, flag: 'wx' });
     const worker = fileURLToPath(new URL('./provider-supervisor-worker.js', import.meta.url));
     const log = fs.openSync(path.join(directory, 'worker.log'), 'a', 0o600);
-    // A detached console host avoids inheriting the server's Windows console
-    // lifetime. No IPC channel or inherited pipe ties this worker to its client.
-    const command = process.platform === 'win32' ? path.join(process.env.SystemRoot || 'C:/Windows', 'System32/conhost.exe') : process.execPath;
-    const args = process.platform === 'win32' ? ['--headless', process.execPath, worker, directory] : [worker, directory];
-    const child = spawn(command, args, { detached: true, windowsHide: true, stdio: ['ignore', log, log], env });
+    // Windows Task Scheduler is a broker: a separate task owns the supervisor,
+    // so stopping the web server's task/job cannot terminate its provider tree.
+    // conhost alone and detached:true do not establish that ownership boundary.
+    const powershell = path.join(process.env.SystemRoot || 'C:/Windows', 'System32/WindowsPowerShell/v1.0/powershell.exe');
+    const command = process.platform === 'win32' ? powershell : process.execPath;
+    const quote = (value: string) => "'" + value.replaceAll("'", "''") + "'";
+    env = { ...env, NEXAGENT_PROVIDER_WORKER: '1' };
+    const environmentFile = path.join(directory, 'environment.json');
+    const taskName = 'Nexagent-Provider-' + path.basename(directory);
+    if (process.platform === 'win32') fs.writeFileSync(environmentFile, JSON.stringify(env), { mode: 0o600 });
+    const script = `$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$e=Get-Content -Raw -LiteralPath ${quote(environmentFile)}|ConvertFrom-Json;foreach($p in $e.PSObject.Properties){[Environment]::SetEnvironmentVariable($p.Name,[string]$p.Value,'Process')};Remove-Item -LiteralPath ${quote(environmentFile)};& ${quote(process.execPath)} ${quote(worker)} ${quote(directory)} *>> ${quote(path.join(directory, 'worker.log'))}`;
+    // conhost can hand off its clients and return. Keep the scheduler's root
+    // action waiting on the actual worker, or task completion can reap its job.
+    const broker = `$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';try{Start-Process -WindowStyle Hidden -FilePath ${quote(path.join(process.env.SystemRoot || 'C:/Windows', 'System32/conhost.exe'))} -ArgumentList @('--headless',${quote(powershell)},'-NoProfile','-NonInteractive','-EncodedCommand',${quote(Buffer.from(script, 'utf16le').toString('base64'))});$r=${quote(path.join(directory, 'registry.json'))};for($i=0;$i -lt 300 -and -not(Test-Path -LiteralPath $r);$i++){Start-Sleep -Milliseconds 100};$workerId=(Get-Content -Raw -LiteralPath $r|ConvertFrom-Json).pid;Wait-Process -Id $workerId -ErrorAction SilentlyContinue}finally{Unregister-ScheduledTask -TaskName ${quote(taskName)} -Confirm:$false -ErrorAction SilentlyContinue}`;
+    const taskArguments = `-NoProfile -NonInteractive -WindowStyle Hidden -EncodedCommand ${Buffer.from(broker, 'utf16le').toString('base64')}`;
+    const bootstrap = `$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$a=New-ScheduledTaskAction -Execute ${quote(powershell)} -Argument ${quote(taskArguments)};Register-ScheduledTask -TaskName ${quote(taskName)} -Action $a -Settings (New-ScheduledTaskSettingsSet -ExecutionTimeLimit ([TimeSpan]::Zero) -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -Hidden) | Out-Null;Start-ScheduledTask -TaskName ${quote(taskName)}`;
+    const args = process.platform === 'win32' ? ['-NoProfile', '-NonInteractive', '-EncodedCommand', Buffer.from(bootstrap, 'utf16le').toString('base64')] : [worker, directory];
+    const child = spawn(command, args, { detached: process.platform !== 'win32', windowsHide: true, stdio: ['ignore', log, log], env });
     let spawnError: Error | undefined;
     child.on('error', error => { spawnError = error; });
     child.unref();
@@ -29,7 +42,7 @@ export class DurableProvider {
     const client = new DurableProvider(directory);
     for (let attempt = 0; attempt < 300; attempt++) {
       if (spawnError) throw spawnError;
-      if (fs.existsSync(path.join(directory, 'registry.json'))) return client;
+      if (fs.existsSync(path.join(directory, 'registry.json')) && client.registry().state !== 'starting') return client;
       await new Promise(resolve => setTimeout(resolve, 100));
     }
     throw new Error(`Provider supervisor failed to start; retained diagnostics: ${directory}`);
@@ -59,28 +72,33 @@ export class DurableProvider {
   // Cursor advances only after the consumer successfully handles an event.
   // A crash can replay the last event; consumers must deduplicate by run+seq.
   async *events(offset = 0): AsyncGenerator<{ offset: number; event: Record<string, any> }> {
+    if (!Number.isSafeInteger(offset) || offset < 0) throw new Error('Invalid journal cursor');
     const file = path.join(this.directory, 'output.ndjson');
+    let readOffset = offset;
+    let pending = Buffer.alloc(0);
     for (;;) {
       const fd = fs.openSync(file, 'r');
       const buffer = Buffer.alloc(256 * 1024);
       let count: number;
-      try { count = fs.readSync(fd, buffer, 0, buffer.length, offset); }
+      try { count = fs.readSync(fd, buffer, 0, buffer.length, readOffset); }
       finally { fs.closeSync(fd); }
-      const lastNewline = buffer.subarray(0, count).lastIndexOf(10);
-      if (lastNewline >= 0) {
-        for (const line of buffer.subarray(0, lastNewline + 1).toString('utf8').split('\n').filter(Boolean)) {
-          const event = JSON.parse(line);
-          offset += Buffer.byteLength(line) + 1;
-          yield { offset, event };
-          if (event.kind === 'exit') return;
-        }
-      } else if (count === buffer.length) {
-        throw new Error('Supervisor journal record exceeds read bound');
+      readOffset += count;
+      pending = Buffer.concat([pending, buffer.subarray(0, count)]);
+      let newline: number;
+      while ((newline = pending.indexOf(10)) >= 0) {
+        const event = JSON.parse(pending.subarray(0, newline).toString('utf8'));
+        pending = pending.subarray(newline + 1);
+        offset += newline + 1;
+        yield { offset, event };
+        if (event.kind === 'exit') return;
       }
       const record = this.registry();
-      if (count === 0 && record.state !== 'running') return;
+      if (count === 0 && record.state !== 'running') {
+        if (pending.length) throw new Error('Incomplete supervisor journal; output retained');
+        return;
+      }
       if (count === 0 && !(await this.identity())) throw new Error('Supervisor unavailable; output retained, adoption failed');
-      await new Promise(resolve => setTimeout(resolve, 100));
+      if (count < buffer.length) await new Promise(resolve => setTimeout(resolve, 100));
     }
   }
 }

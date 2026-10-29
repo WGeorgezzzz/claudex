@@ -216,6 +216,9 @@ export const chatRunRegistry = {
      */
     connection: RealtimeClientConnection | null;
     userId: string | number | null;
+    /** Recovery preserves the original stream sequence and live-input turn identity. */
+    initialSeq?: number;
+    startedAt?: number;
   }): ChatRun | null {
     const existing = runs.get(input.appSessionId);
     if (existing && existing.status === 'running') {
@@ -228,10 +231,10 @@ export const chatRunRegistry = {
       provider: input.provider,
       providerSessionId: input.providerSessionId,
       status: 'running',
-      lastSeq: 0,
+      lastSeq: input.initialSeq ?? 0,
       events: [],
       writer: null as unknown as ChatSessionWriter,
-      startedAt: Date.now(),
+      startedAt: input.startedAt ?? Date.now(),
       completedAt: null,
     };
 

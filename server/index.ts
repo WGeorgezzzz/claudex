@@ -28,6 +28,7 @@ import {
     closeSessionsWatcher,
     initializeSessionsWatcher,
     providerRuntimeService,
+    recoverProviderSupervision,
     sessionTitlesService,
 } from '@/modules/providers/index.js';
 import { chatRunRegistry, createWebSocketServer } from '@/modules/websocket/index.js';
@@ -446,6 +447,7 @@ async function startServer() {
     try {
         // Initialize authentication database
         await initializeDatabase();
+        const protectedProviderSessions = process.env.CLAUDEX_PASSIVE_INSTANCE === '1' ? [] : await recoverProviderSupervision();
         initializeUsage();
         initializeQuota();
         initializeAgentDiscovery();
@@ -499,7 +501,7 @@ async function startServer() {
                 initializeInfohubTaskSync();
                 initializeTaskIntelligence();
                 sideChatsDb.recover();
-                initializeMessageQueue(providerRuntimeService);
+                initializeMessageQueue(providerRuntimeService, protectedProviderSessions);
             }
 
             // Start server-side plugin processes for enabled plugins

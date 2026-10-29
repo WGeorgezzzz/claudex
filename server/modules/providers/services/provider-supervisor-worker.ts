@@ -11,17 +11,31 @@ const journal = fs.openSync(path.join(directory, 'output.ndjson'), 'ax', 0o600);
 let sequence = 0;
 let terminal = false;
 let record: Record<string, unknown> = { version: 1, id: path.basename(directory), pid: process.pid,
-  startedAt: new Date().toISOString(), state: 'running', metadata: spec.metadata || {} };
+  startedAt: new Date().toISOString(), state: 'starting', metadata: spec.metadata || {} };
 const save = () => {
   const file = path.join(directory, 'registry.json');
   const fd = fs.openSync(file + '.tmp', 'w', 0o600);
   try { fs.writeFileSync(fd, JSON.stringify(record)); fs.fsyncSync(fd); } finally { fs.closeSync(fd); }
-  fs.renameSync(file + '.tmp', file);
+  // Windows readers/antivirus can briefly deny replacement despite an atomic
+  // rename being valid. Keep the old durable registry until replacement wins.
+  for (let attempt = 0; ; attempt++) {
+    try { fs.renameSync(file + '.tmp', file); break; }
+    catch (error) {
+      if (!['EPERM', 'EBUSY', 'EACCES'].includes((error as NodeJS.ErrnoException).code || '') || attempt >= 100) throw error;
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 10);
+    }
+  }
 };
 const emit = (kind: string, data: unknown) => {
   if (terminal) return;
   fs.writeSync(journal, JSON.stringify({ seq: ++sequence, kind, data }) + '\n');
   fs.fsyncSync(journal);
+  if (kind === 'message' && !(record.metadata as Record<string, unknown>).formerlyRunning && ['text', 'tool_use', 'tool_result', 'permission_request', 'thinking'].includes(String((data as Record<string, unknown>)?.kind))) {
+    record.metadata = { ...(record.metadata as object), formerlyRunning: true }; save();
+  }
+  if (kind === 'message' && (data as Record<string, unknown>)?.kind === 'complete') {
+    record.metadata = { ...(record.metadata as object), foregroundCompleted: true }; save();
+  }
 };
 let control: (operation: Record<string, any>) => unknown | Promise<unknown> = () => { throw new Error('Provider is starting'); };
 const server = http.createServer(async (request, response) => {
@@ -57,11 +71,11 @@ const finish = (data: unknown) => {
 try {
   if (spec.mode === 'runtime') {
     const { executeSupervisedTurn } = await import('./provider-turn-worker.js');
-    const result = await executeSupervisedTurn(spec, emit, handler => { control = handler; });
+    const result = await executeSupervisedTurn(spec, emit, handler => { control = handler; record.state = 'running'; save(); });
     finish({ code: 0, result });
   } else {
     const child = spawn(spec.command, spec.args || [], { cwd: spec.cwd, env: process.env, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
-    record.childPid = child.pid; save();
+    record.childPid = child.pid;
     // Each journal row is bounded even when a CLI writes a huge single chunk.
     for (const name of ['stdout', 'stderr'] as const) child[name].on('data', (chunk: Buffer) => {
       for (let index = 0; index < chunk.length; index += 32768) emit(name, chunk.subarray(index, index + 32768).toString('base64'));
@@ -79,5 +93,6 @@ try {
       else throw new Error('Unknown operation');
       return { ok: true };
     };
+    record.state = 'running'; save();
   }
 } catch (error) { finish({ code: 1, error: error instanceof Error ? error.message : String(error) }); }

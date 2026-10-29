@@ -1,4 +1,5 @@
 import { recordModelRejection } from './provider-model-health.js';
+import { supervisedRuntimeState } from './provider-supervision-state.service.js';
 import path from 'node:path';
 import os from 'node:os';
 import { getSessionOwnerId, userPreferencesDb } from '@/modules/database/index.js';
@@ -59,6 +60,7 @@ const defaultDependencies: ProviderRuntimeServiceDependencies = {
  */
 export function createProviderRuntimeService(
   dependencyOverrides: Partial<ProviderRuntimeServiceDependencies> = {},
+  supervision = false,
 ) {
   const dependencies = { ...defaultDependencies, ...dependencyOverrides };
 
@@ -86,6 +88,9 @@ export function createProviderRuntimeService(
     options: AnyRecord,
     writer: ProviderRuntimeWriter,
   ): Promise<unknown> => {
+    if (supervision && ['codex', 'claude'].includes(providerName) && writer.userId != null && options.sessionId) {
+      return import('./provider-supervision-controller.service.js').then(module => module.runSupervised(providerName, command, options, writer));
+    }
     // Missing choices use the user's new default; explicit modes remain intact.
     options={...options,permissionMode:options.permissionMode??'bypassPermissions'};
     const provider = dependencies.resolveProvider(providerName);
@@ -149,6 +154,8 @@ export function createProviderRuntimeService(
     run,
     /** Message Queue uses this for explicit live additions; unsupported runtimes fail without starting a new run. */
     submitLiveInput(providerName: LLMProvider, sessionId: string, id: string, content: string, settled: (result: ProviderLiveInputResult) => void): void {
+      const owned = supervision ? supervisedRuntimeState.entries.get(sessionId) : undefined;
+      if (owned?.client) { void owned.client.control({ type: 'live-input', id, content }).then(settled, error => settled({ status: 'failed', error: String(error) })); return; }
       const submit=dependencies.resolveProvider(providerName).runtime.submitLiveInput;
       if (!submit) throw new Error('This provider does not support live additions.');
       submit(sessionId,id,content,settled);
@@ -167,6 +174,8 @@ export function createProviderRuntimeService(
     },
 
     async abort(providerName: LLMProvider, sessionId: string): Promise<boolean> {
+      const owned = supervision ? supervisedRuntimeState.entries.get(sessionId) : undefined;
+      if (owned) { const client = owned.client || await owned.launching; return Boolean(await client?.control({ type: 'abort' })); }
       return Boolean(await dependencies.resolveProvider(providerName).runtime.abort(sessionId));
     },
 
@@ -178,6 +187,8 @@ export function createProviderRuntimeService(
      * CLI Nexagent did not start, which a normal stop cannot interrupt.
      */
     async forceStop(providerName: LLMProvider, sessionId: string): Promise<{ killedPids: number[] }> {
+      const owned = supervision ? supervisedRuntimeState.entries.get(sessionId) : undefined;
+      if (owned) { const client = owned.client || await owned.launching; return client!.control({ type: 'force-stop' }); }
       const { runtime } = dependencies.resolveProvider(providerName);
       // Snapshot before interrupt: a fast abort can remove the shell and its
       // MSYS ancestry before the forced kill gets a chance to enumerate it.
@@ -213,23 +224,34 @@ export function createProviderRuntimeService(
     },
 
     async stopBackgroundTask(providerName: LLMProvider, sessionId: string, taskId: string): Promise<boolean> {
+      const owned = supervision ? supervisedRuntimeState.entries.get(sessionId) : undefined;
+      if (owned?.client) return Boolean(await owned.client.control({ type: 'stop-background', taskId }));
       // A runtime that never holds background work has no task to stop.
       const { runtime } = dependencies.resolveProvider(providerName);
       return Boolean(await runtime.stopBackgroundTask?.(sessionId, taskId));
     },
 
     hasBackgroundWork(sessionId: string): boolean {
+      if (supervision && supervisedRuntimeState.entries.get(sessionId)?.background) return true;
       return dependencies.listProviders().some((provider) =>
         (provider.runtime.listBackgroundWork?.() ?? []).some((entry) => entry.sessionId === sessionId));
     },
 
     resolveToolApproval(requestId: string, decision: ProviderPermissionDecision): void {
+      if (supervision) for (const owned of supervisedRuntimeState.entries.values()) {
+        if (owned.client && owned.pending.some(row => row.requestId === requestId)) {
+          void owned.client.control({ type: 'approval', requestId, decision }).catch(error => console.error('[Provider approval]', String(error)));
+          return;
+        }
+      }
       for (const provider of dependencies.listProviders()) {
         provider.runtime.permissions?.resolve(requestId, decision);
       }
     },
 
     getPendingApprovalsForSession(sessionId: string): unknown[] {
+      const owned = supervision ? supervisedRuntimeState.entries.get(sessionId) : undefined;
+      if (owned) return owned.pending;
       return dependencies.listProviders().flatMap(
         (provider) => provider.runtime.permissions?.listPending(sessionId) ?? [],
       );
@@ -237,4 +259,4 @@ export function createProviderRuntimeService(
   };
 }
 
-export const providerRuntimeService = createProviderRuntimeService();
+export const providerRuntimeService = createProviderRuntimeService({}, process.env.NEXAGENT_PROVIDER_WORKER !== '1');
