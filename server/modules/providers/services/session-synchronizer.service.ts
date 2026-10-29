@@ -175,4 +175,16 @@ export const sessionSynchronizerService = {
       sessionId,
     };
   },
+
+  async synchronizeProviderFileIncremental(
+    provider: LLMProvider,
+    filePath: string,
+  ): Promise<{ provider: LLMProvider; indexed: boolean; sessionId: string | null }> {
+    const resolvedProvider = providerRegistry.resolveProvider(provider);
+    const incremental = resolvedProvider.sessionSynchronizer.synchronizeFileIncremental;
+    const sessionId = await (incremental
+      ? incremental.call(resolvedProvider.sessionSynchronizer, filePath)
+      : resolvedProvider.sessionSynchronizer.synchronizeFile(filePath));
+    return { provider, indexed: Boolean(sessionId), sessionId };
+  },
 };

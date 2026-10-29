@@ -3,7 +3,7 @@ import fsp from 'node:fs/promises';
 import path from 'node:path';
 
 import { buildTemporaryTitle } from '@/modules/providers/services/session-title-text.service.js';
-import { projectsDb, sessionsDb, userPreferencesDb, monitorsDb } from '@/modules/database/index.js';
+import { projectsDb, sessionsDb, userPreferencesDb, monitorsDb, getConnection } from '@/modules/database/index.js';
 import { getCurrentUserContext } from '@/modules/auth/index.js';
 import { broadcastSessionUpserted, chatRunRegistry } from '@/modules/websocket/index.js';
 import { providerRegistry } from '@/modules/providers/provider.registry.js';
@@ -96,6 +96,9 @@ type SessionDetails = {
   } | null;
 };
 
+const RUNNING_SESSIONS_CACHE_MS = 500;
+const runningSessionsCaches = new WeakMap<object, Map<number, { expiresAt: number; value: Promise<RunningSessionEntry[]> }>>();
+
 
 /**
  * Removes one file if it exists.
@@ -159,7 +162,23 @@ export const sessionsService = {
    * This is intentionally status-only: callers that only need sidebar activity
    * indicators should not attach to chat streams or request replayed messages.
    */
-  async listRunningSessions(): Promise<RunningSessionEntry[]> {
+  async listRunningSessions(fresh = true): Promise<RunningSessionEntry[]> {
+    // HTTP status reads may share a short snapshot. Dispatchers retain fresh
+    // reads and the original asynchronous ordering before making claims.
+    if (!fresh) {
+    const now = Date.now();
+    const connection = getConnection();
+    const owner = getCurrentUserContext()?.userId ?? 0;
+    let cache = runningSessionsCaches.get(connection);
+    if (!cache) { cache = new Map(); runningSessionsCaches.set(connection, cache); }
+    const cached = cache.get(owner);
+    if (cached && cached.expiresAt > now) return cached.value;
+    const pending = this.listRunningSessions(true);
+    const entry = { expiresAt: Infinity, value: pending };
+    cache.set(owner, entry);
+    try { const value = await pending; entry.expiresAt = Date.now() + RUNNING_SESSIONS_CACHE_MS; return value; }
+    catch (error) { if (cache.get(owner) === entry) cache.delete(owner); throw error; }
+    }
     const entries: RunningSessionEntry[] = chatRunRegistry.listRunningRuns();
     const runningById = new Map(entries.map((entry) => [entry.sessionId, entry]));
 

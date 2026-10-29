@@ -27,6 +27,7 @@ export function useMessageQueue(sessionId: string|null) {
   // The ended-turn fallback is a temporary, session-scoped notice rather than an error.
   const [notification,setNotification]=useState({sessionId,message:''});
   const currentSession=useRef(sessionId);
+  const hasPendingWork=useRef(false);
   currentSession.current=sessionId;
   const setError=useCallback((message:string)=>{
     if(currentSession.current===sessionId)setFailure({sessionId,message});
@@ -45,14 +46,24 @@ export function useMessageQueue(sessionId: string|null) {
       api.sessionWorkspace?.get(sessionId).then(readQueueResult<SessionWorkspaceEntry>).catch(()=>null)??Promise.resolve(null),
     ]);
     if (!Array.isArray(items)) throw new Error('Invalid message queue response.');
-    if (currentSession.current===sessionId && sequence===requestSequence.current) setSnapshot({sessionId,items,paused:state?.queuePaused??null});
+    if (currentSession.current===sessionId && sequence===requestSequence.current) {
+      hasPendingWork.current=items.some(item=>item.status==='queued'||item.status==='running');
+      const paused=state?.queuePaused??null;
+      setSnapshot(previous=>previous.sessionId===sessionId&&previous.paused===paused&&JSON.stringify(previous.items)===JSON.stringify(items)?previous:{sessionId,items,paused});
+    }
   },[sessionId]);
   useEffect(()=>{
     if (!sessionId) return;
     let active=true;
-    const poll=()=>void reload().catch(reason=>{if(active)setError(String(reason.message));});
-    poll();const timer=setInterval(poll,2000);
-    return()=>{active=false;clearInterval(timer);requestSequence.current++;};
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const poll=async()=>{
+      if(!active||document.visibilityState==='hidden')return;
+      try{await reload();}catch(reason){if(active)setError(reason instanceof Error?reason.message:String(reason));}
+      if(active&&!document.hidden)timer=setTimeout(()=>void poll(),hasPendingWork.current?2000:15000);
+    };
+    const visibility=()=>{clearTimeout(timer);if(document.visibilityState!=='hidden')void poll();};
+    void poll();document.addEventListener('visibilitychange',visibility);
+    return()=>{active=false;clearTimeout(timer);document.removeEventListener('visibilitychange',visibility);requestSequence.current++;};
   },[sessionId,reload,setError]);
   const enqueue=useCallback(async(submission:QueueSubmission, targetSessionId: string,recoveryId?:string)=>{
     const options={...submission.options,attachments:submission.attachments};

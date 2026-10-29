@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { AlertCircle, Check, ChevronDown, ExternalLink, ListTodo, Menu, Play, RefreshCw, RotateCcw, Search, X } from 'lucide-react';
 
+import { startVisiblePolling } from '@/shared/utils';
 import { inboxTasksApi } from '@/shared/api';
 import { LLMProviderLogo } from '@/shared/ui';
 
@@ -31,7 +32,7 @@ function dueTime(due?: string) {
   const date = due?.match(/\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2})?/)?.[0];
   return date ? Date.parse(date) || Infinity : Infinity;
 }
-function useGlobalTasks() {
+function useGlobalTasks(enabled = true) {
   // Keeps the latest server snapshot for polling and explicit changes.
   const [projects, setProjects] = useState<ProjectTasks[]>([]);
   const [infohub,setInfohub]=useState<{online:boolean;lastSyncedAt?:string;error?:string|null}|null>(null);
@@ -40,25 +41,27 @@ function useGlobalTasks() {
   // Network errors stay visible until the next successful refresh.
   const [error, setError] = useState('');
   const load = useCallback(async () => {
-    try { const value = await read(await inboxTasksApi.list()); setProjects(value.projects);setInfohub(value.infohub||null); setError(''); }
+    try { const value = await read(await inboxTasksApi.list()); setProjects(previous=>JSON.stringify(previous)===JSON.stringify(value.projects)?previous:value.projects);setInfohub(previous=>JSON.stringify(previous)===JSON.stringify(value.infohub||null)?previous:value.infohub||null); setError(''); }
     catch (e) { setError(e instanceof Error ? e.message : String(e)); }
     finally { setLoading(false); }
   }, []);
-  useEffect(() => { void load(); const timer = setInterval(() => void load(), 10000); return () => clearInterval(timer); }, [load]);
+  useEffect(() => enabled ? startVisiblePolling(load,15000) : undefined,[enabled,load]);
   return { projects, error, loading, load, setError,infohub };
 }
 
 /** SidebarHeader uses the same global task collection to navigate and display open/high counts. */
 export function TasksNavigation() {
-  const navigate = useNavigate(), { projects, error, loading } = useGlobalTasks();
-  const tasks = projects.flatMap(p => p.tasks).filter(isOpenTask);
   // The sidebar uses the same default visibility and attention predicate as the unified task page.
   const [counts,setCounts]=useState<{attention:number;open:number}|null>(null);
-  useEffect(()=>{if(!inboxTasksApi.intelligence)return;let active=true;const load=async()=>{try{const snapshot=await read(await inboxTasksApi.intelligence());const rows=snapshot.tasks.filter((r:any)=>!r.testSource&&!snapshot.entries[r.id]?.mergedInto&&!['done','cancelled'].includes(r.task.status));if(active)setCounts({open:rows.length,attention:rows.filter((r:any)=>['blocked','review'].includes(r.task.status)||r.task.forMe||snapshot.entries[r.id]?.kind==='todo').length});}catch{/* Keep the last count when offline. */}};void load();const timer=setInterval(()=>void load(),10000);return()=>{active=false;clearInterval(timer);};},[]);
+  // The intelligence snapshot already includes the global task collection.
+  // Retain the legacy feed only as a fallback until that endpoint succeeds.
+  const navigate = useNavigate(), { projects, error, loading } = useGlobalTasks(counts === null);
+  const tasks = projects.flatMap(p => p.tasks).filter(isOpenTask);
+  useEffect(()=>{if(!inboxTasksApi.intelligence)return;let active=true;const load=async()=>{try{const snapshot=await read(await inboxTasksApi.intelligence());const rows=snapshot.tasks.filter((r:any)=>!r.testSource&&!snapshot.entries[r.id]?.mergedInto&&!['done','cancelled'].includes(r.task.status));if(active){const next={open:rows.length,attention:rows.filter((r:any)=>['blocked','review'].includes(r.task.status)||r.task.forMe||snapshot.entries[r.id]?.kind==='todo').length};setCounts(previous=>previous?.open===next.open&&previous?.attention===next.attention?previous:next);}}catch{/* Keep the last count when offline. */}};const stop=startVisiblePolling(load,30000);return()=>{active=false;stop();};},[]);
   const high = counts?.attention??tasks.filter(t => ['blocked','review'].includes(t.status)||t.forMe).length;
   const openCount=counts?.open??tasks.length;
   return <button type="button" className="sidebar-nav-action" onClick={() => navigate('/tasks')} title={`需要你处理 ${high} · 未完成 ${openCount}`} aria-label={`任务，需要你处理 ${high} · 未完成 ${openCount}`}>
-    <ListTodo size={16}/><span>任务</span><span className="ml-auto text-xs text-muted-foreground">{error ? '连接异常' : loading ? '…' : high}</span>
+    <ListTodo size={16}/><span>任务</span><span className="ml-auto text-xs text-muted-foreground">{error && !counts ? '连接异常' : loading && !counts ? '…' : high}</span>
 
   </button>;
 }

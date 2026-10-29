@@ -56,8 +56,8 @@ type UseChatRealtimeHandlersArgs = {
  * This is intentionally a thin reducer over the unified `kind`-based
  * protocol: every frame is keyed by the stable app session id, so there is
  * no session-id handoff, no provider branching, and no navigation here.
- * Sidebar events (`session_upserted`, `loading_progress`) are handled by
- * `useProjectsState`, not in this hook.
+ * Session upserts also refresh persisted history for externally driven CLI
+ * turns; sidebar metadata remains owned by useProjectsState.
  */
 export function useChatRealtimeHandlers({
   isActive,
@@ -203,8 +203,15 @@ export function useChatRealtimeHandlers({
           return;
         }
 
-        // Sidebar/global events — owned by useProjectsState.
-        case 'session_upserted':
+        case 'session_upserted': {
+          const activity = sid ? getSessionActivity?.(sid) : undefined;
+          // A local turn already streams its rows. External CLI writes only
+          // have this filesystem signal, including while their status is busy.
+          if (sid === activeViewSessionId && sid && (!activity || activity.canInterrupt === false || activity.background)) {
+            void requestLatestMessages(sid, isActiveRef.current && !document.hidden);
+          }
+          return;
+        }
         case 'loading_progress':
           return;
 

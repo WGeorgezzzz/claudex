@@ -166,15 +166,28 @@ export function SessionProtectionProvider({ children }: { children: ReactNode })
   }, [syncProcessingSessions]);
 
   useEffect(() => {
-    void refreshRunningSessions();
-  }, [refreshRunningSessions]);
-
-  useEffect(() => {
-    const interval = window.setInterval(() => {
+    let interval: number | null = null;
+    const stop = () => {
+      if (interval !== null) {
+        window.clearInterval(interval);
+        interval = null;
+      }
+    };
+    const start = () => {
+      if (document.visibilityState === 'hidden' || interval !== null) return;
       void refreshRunningSessions();
-    }, 5000);
-
-    return () => window.clearInterval(interval);
+      interval = window.setInterval(() => void refreshRunningSessions(), 15_000);
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') stop();
+      else start();
+    };
+    start();
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      stop();
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
   }, [refreshRunningSessions]);
 
   const actions = useMemo<SessionProtectionActions>(

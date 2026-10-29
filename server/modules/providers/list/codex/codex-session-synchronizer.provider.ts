@@ -12,6 +12,7 @@ import {
   readFileTimestamps,
 } from '@/shared/utils.js';
 import type { IProviderSessionSynchronizer } from '@/shared/interfaces.js';
+import { completeJsonlOffset, readAppendedJsonl } from '@/shared/utils.js';
 
 type ParsedSession = {
   sessionId: string;
@@ -24,6 +25,8 @@ type ParsedSession = {
  */
 export class CodexSessionSynchronizer implements IProviderSessionSynchronizer {
   private readonly provider = 'codex' as const;
+  private readonly fileOffsets = new Map<string, number>();
+  private readonly fileSessions = new Map<string, string>();
   private get codexHome(): string { return getCurrentUserContext()?.codexHome ?? (process.env.CODEX_HOME || path.join(os.homedir(), '.codex')); }
 
   /**
@@ -69,6 +72,7 @@ export class CodexSessionSynchronizer implements IProviderSessionSynchronizer {
       return null;
     }
 
+    const offset = await completeJsonlOffset(filePath);
     const nameMap = await buildLookupMap(path.join(this.codexHome, 'session_index.jsonl'), 'id', 'thread_name');
     const parsed = await this.processSessionFile(filePath, nameMap);
     if (!parsed) {
@@ -76,7 +80,7 @@ export class CodexSessionSynchronizer implements IProviderSessionSynchronizer {
     }
 
     const timestamps = await readFileTimestamps(filePath);
-    return sessionsDb.createSession(
+    const sessionId = sessionsDb.createSession(
       parsed.sessionId,
       this.provider,
       parsed.projectPath,
@@ -85,6 +89,30 @@ export class CodexSessionSynchronizer implements IProviderSessionSynchronizer {
       timestamps.updatedAt,
       filePath
     );
+    this.fileOffsets.set(filePath, offset);
+    this.fileSessions.set(filePath, sessionId);
+    return sessionId;
+  }
+
+  async synchronizeFileIncremental(filePath: string): Promise<string | null> {
+    if (!filePath.endsWith('.jsonl')) return null;
+    const sessionId = this.fileSessions.get(filePath);
+    const offset = this.fileOffsets.get(filePath);
+    if (!sessionId || offset === undefined) return this.synchronizeFile(filePath);
+    const result = await readAppendedJsonl(filePath, offset);
+    if (result.nextOffset === 0) return this.synchronizeFile(filePath);
+    this.fileOffsets.set(filePath, result.nextOffset);
+    const session = sessionsDb.getSessionById(sessionId);
+    if (!session?.project_path || !session.provider_session_id) return this.synchronizeFile(filePath);
+    let sessionName = session.custom_name && session.custom_name !== 'Untitled Codex Session' ? session.custom_name : undefined;
+    if (!sessionName) {
+      for (const record of result.records) {
+        const payload = record.payload as Record<string, unknown> | undefined;
+        if (record.type === 'event_msg' && payload?.type === 'task_complete' && typeof payload.last_agent_message === 'string') sessionName = payload.last_agent_message;
+      }
+    }
+    const timestamps = await readFileTimestamps(filePath);
+    return sessionsDb.createSession(session.provider_session_id, this.provider, session.project_path, normalizeSessionName(sessionName, 'Untitled Codex Session'), timestamps.createdAt, timestamps.updatedAt, filePath);
   }
 
   /**

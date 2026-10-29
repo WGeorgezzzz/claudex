@@ -13,6 +13,7 @@ import {
   readFileTimestamps,
 } from '@/shared/utils.js';
 import type { IProviderSessionSynchronizer } from '@/shared/interfaces.js';
+import { completeJsonlOffset, readAppendedJsonl } from '@/shared/utils.js';
 
 type ParsedSession = {
   sessionId: string;
@@ -25,6 +26,8 @@ type ParsedSession = {
  */
 export class ClaudeSessionSynchronizer implements IProviderSessionSynchronizer {
   private readonly provider = 'claude' as const;
+  private readonly fileOffsets = new Map<string, number>();
+  private readonly fileSessions = new Map<string, string>();
   private get claudeHome(): string { return getCurrentUserContext()?.claudeConfigDir ?? getClaudeConfigDir(); }
 
   /**
@@ -93,6 +96,8 @@ export class ClaudeSessionSynchronizer implements IProviderSessionSynchronizer {
       return null;
     }
 
+    const offset = await completeJsonlOffset(filePath);
+
     const nameMap = await buildLookupMap(path.join(this.claudeHome, 'history.jsonl'), 'sessionId', 'display');
     const parsed = await this.processSessionFile(filePath, nameMap);
     if (!parsed) {
@@ -100,7 +105,7 @@ export class ClaudeSessionSynchronizer implements IProviderSessionSynchronizer {
     }
 
     const timestamps = await readFileTimestamps(filePath);
-    return sessionsDb.createSession(
+    const sessionId = sessionsDb.createSession(
       parsed.sessionId,
       this.provider,
       parsed.projectPath,
@@ -109,6 +114,30 @@ export class ClaudeSessionSynchronizer implements IProviderSessionSynchronizer {
       timestamps.updatedAt,
       filePath
     );
+    this.fileOffsets.set(filePath, offset);
+    this.fileSessions.set(filePath, sessionId);
+    return sessionId;
+  }
+
+  async synchronizeFileIncremental(filePath: string): Promise<string | null> {
+    if (!filePath.endsWith('.jsonl') || this.isSubagentTranscript(filePath)) return null;
+    const sessionId = this.fileSessions.get(filePath);
+    const offset = this.fileOffsets.get(filePath);
+    if (!sessionId || offset === undefined) return this.synchronizeFile(filePath);
+    const result = await readAppendedJsonl(filePath, offset);
+    if (result.nextOffset === 0) return this.synchronizeFile(filePath);
+    this.fileOffsets.set(filePath, result.nextOffset);
+    const session = sessionsDb.getSessionById(sessionId);
+    if (!session?.project_path || !session.provider_session_id) return this.synchronizeFile(filePath);
+    let sessionName = session.custom_name && session.custom_name !== 'Untitled Claude Session' ? session.custom_name : undefined;
+    for (const data of result.records) {
+      if (data.sessionId !== session.provider_session_id) continue;
+      if (data.type === 'custom-title' && typeof data.customTitle === 'string' && data.customTitle.trim()) sessionName = data.customTitle;
+      if (data.type === 'ai-title' && typeof data.aiTitle === 'string' && data.aiTitle.trim() && !sessionName) sessionName = data.aiTitle;
+      if (data.type === 'last-prompt' && typeof data.lastPrompt === 'string' && data.lastPrompt.trim() && !sessionName) sessionName = data.lastPrompt;
+    }
+    const timestamps = await readFileTimestamps(filePath);
+    return sessionsDb.createSession(session.provider_session_id, this.provider, session.project_path, sessionName, timestamps.createdAt, timestamps.updatedAt, filePath);
   }
 
   /**

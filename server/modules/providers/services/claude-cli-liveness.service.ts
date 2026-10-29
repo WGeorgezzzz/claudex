@@ -143,6 +143,9 @@ export async function findClaudeCliProcessIds(providerSessionId: string): Promis
 }
 
 let processTableCache: { at: number; pending: Promise<string> } | undefined;
+let parsedProcessTable: { text: string; rows: ProcessRow[] } | undefined;
+const registrySnapshots = new WeakMap<Promise<string>, Map<string, Promise<Array<{ pid: number; provider: string; sessionIds?: string[]; startedAt: number }>>>>();
+const providerCandidates = new WeakMap<Promise<string>, Map<string, ProcessRow[]>>();
 
 type ProcessRow = { pid: number; ppid: number; name: string; command: string; startedAt?: number };
 /** Providers uses exact native IDs and executable names to find recoverable CLI orphans without touching unrelated agents. */
@@ -152,22 +155,50 @@ export async function findResumedProviderProcesses(id: string, provider: string)
     '-NoProfile', '-NonInteractive', '-Command',
     "@(Get-CimInstance Win32_Process | Where-Object { $_.Name -match 'claude|codex|node' } | ForEach-Object { @{pid=$_.ProcessId;ppid=$_.ParentProcessId;name=$_.Name;command=$_.CommandLine;startedAt=([DateTimeOffset]$_.CreationDate).ToUnixTimeMilliseconds()} }) | ConvertTo-Json -Compress"
   ] : ['-A', '-o', 'pid=,ppid=,comm=,args='], {windowsHide:true,timeout:15000,maxBuffer:4*1024*1024}, (_error, stdout) => resolve(String(stdout || '')))) };
-  const table = await processTableCache.pending;
+  const snapshot = processTableCache.pending;
+  const table = await snapshot;
   let rows: ProcessRow[] = [];
   try {
+    if (parsedProcessTable?.text === table) rows = parsedProcessTable.rows;
+    else {
     const parsed = process.platform === 'win32' ? JSON.parse(table || '[]') : table.trim().split('\n').map(line => { const m=line.trim().match(/^(\d+)\s+(\d+)\s+(\S+)\s+(.*)$/); return m ? {pid:Number(m[1]),ppid:Number(m[2]),name:m[3],command:m[4]} : null; }).filter(Boolean);
     rows = Array.isArray(parsed) ? parsed : [parsed];
+    parsedProcessTable = { text: table, rows };
+    }
   } catch { return []; }
   const escaped = id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const resume = new RegExp('(?:--resume(?:=|\\s+)|resume\\s+)["\\s]*' + escaped + '(?=["\\s]|$)', 'i');
   const registered = new Set<number>();
   const directory = path.join(getCloudCliHomeDir(), 'provider-processes');
-  for (const file of (await fsp.readdir(directory).catch(() => [])).slice(0, MAX_REGISTRY_FILES)) {
+  let registries = registrySnapshots.get(snapshot);
+  if (!registries) { registries = new Map(); registrySnapshots.set(snapshot, registries); }
+  let records = registries.get(directory);
+  if (!records) {
+    records = (async () => {
+      const files = (await fsp.readdir(directory).catch(() => [])).slice(0, MAX_REGISTRY_FILES);
+      const values = await Promise.all(files.map(async file => {
+        try { return JSON.parse(await fsp.readFile(path.join(directory, file), 'utf8')); }
+        catch { return null; }
+      }));
+      return values.filter(value => value && typeof value === 'object');
+    })();
+    registries.set(directory, records);
+  }
+  // One registry read per process-table snapshot, shared by every historical
+  // session lookup. Keep the existing three-second process freshness bound.
+  for (const record of await records) {
     try {
-      const record = JSON.parse(await fsp.readFile(path.join(directory,file),'utf8'));
       const row = rows.find(item => item.pid === record.pid);
       if (record.provider === provider && record.sessionIds?.includes(id) && row && row.startedAt && Math.abs(row.startedAt - record.startedAt) < 10000) registered.add(row.pid);
     } catch { /* stale record is never enough to kill a reused pid */ }
   }
-  return rows.filter(row => row.pid !== process.pid && row.command && new RegExp(provider, 'i').test(row.name + ' ' + row.command.split(' ').slice(0, 3).join(' ')) && (resume.test(row.command) || registered.has(row.pid)));
+  let candidatesByProvider = providerCandidates.get(snapshot);
+  if (!candidatesByProvider) { candidatesByProvider = new Map(); providerCandidates.set(snapshot, candidatesByProvider); }
+  let candidates = candidatesByProvider.get(provider);
+  if (!candidates) {
+    const executable = new RegExp(provider, 'i');
+    candidates = rows.filter(row => row.pid !== process.pid && row.command && executable.test(row.name + ' ' + row.command.split(' ').slice(0, 3).join(' ')));
+    candidatesByProvider.set(provider, candidates);
+  }
+  return candidates.filter(row => resume.test(row.command) || registered.has(row.pid));
 }

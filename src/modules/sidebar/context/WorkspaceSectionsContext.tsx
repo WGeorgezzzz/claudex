@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 
+import { startVisiblePolling } from '@/shared/utils';
 import { api, readApiErrorMessage } from '@/shared/api';
 import { Dialog, DialogContent, DialogTitle } from '@/shared/ui';
 import type { WorkspaceSectionsSnapshot, WorkspaceSectionTarget } from '@/shared/types';
@@ -43,10 +44,10 @@ export function WorkspaceSectionsProvider({ children }: { children: ReactNode })
     let live = true;
     const load = async () => {
       const request = ++sequence.current;
-      try { const next = await read(await api.workspaceSections.list()); if (live && request === sequence.current && !writing.current) setLayout(next); } catch { /* Older servers retain ordinary navigation. */ }
+      try { const next = await read(await api.workspaceSections.list()); if (live && request === sequence.current && !writing.current) setLayout(previous=>JSON.stringify(previous)===JSON.stringify(next)?previous:next); } catch { /* Older servers retain ordinary navigation. */ }
     };
-    void load(); const timer = setInterval(() => void load(), 15000);
-    return () => { live = false; clearInterval(timer); };
+    const stop = startVisiblePolling(load,15000);
+    return () => { live = false; stop(); };
   }, []);
   useEffect(() => {
     const handleEstablished = (event: Event) => {

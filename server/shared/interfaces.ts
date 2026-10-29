@@ -273,4 +273,7 @@ export interface IProviderSessionSynchronizer {
    * Parses and upserts one provider artifact file without running a full scan.
    */
   synchronizeFile(filePath: string): Promise<string | null>;
+
+  /** Parses only appended JSONL records when the provider supports it. */
+  synchronizeFileIncremental?(filePath: string): Promise<string | null>;
 }
