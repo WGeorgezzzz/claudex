@@ -32,7 +32,7 @@ async function login(c){
 }
 async function idle(c){
  const latest=read(cfgPath);assert.equal(latest.pid,c.pid,'Primary process changed');assert.equal(norm(latest.runtime),norm(c.runtime));assert.equal(norm(fs.realpathSync(link)),norm(c.runtime));
- const token=await login(c),response=await fetch('http://127.0.0.1:3001/api/providers/sessions/running',{headers:{Authorization:'Bearer '+token},signal:AbortSignal.timeout(600000)});assert(response.ok);const running=await response.json();assert(Array.isArray(running.data?.sessions),'Unrecognized running-session response');const ownership=partitionDeploymentSessions(running.data.sessions);write(path.join(root,'running-sessions-before-activation.json'),ownership.managed);write(path.join(root,'independent-sessions-before-activation.json'),ownership.independent);fs.appendFileSync(path.join(root,'STATUS.md'),'\n- 激活前正在运行的会话数：'+ownership.managed.length+'，详见 running-sessions-before-activation.json。用户授权 deploy-force。\n');
+ const token=await login(c),response=await fetch('http://127.0.0.1:3001/api/providers/sessions/running',{headers:{Authorization:'Bearer '+token},signal:AbortSignal.timeout(600000)});assert(response.ok);const running=await response.json();assert(Array.isArray(running.data?.sessions),'Unrecognized running-session response');const ownership=partitionDeploymentSessions(running.data.sessions);write(path.join(root,'running-sessions-before-activation.json'),ownership.managed);write(path.join(root,'independent-sessions-before-activation.json'),ownership.independent);fs.appendFileSync(path.join(root,'STATUS.md'),'\n- 激活前正在运行的会话数：'+ownership.managed.length+'，详见 running-sessions-before-activation.json。仅在会话和队列空闲后激活。\n');
  const db=new DB(c.database,{readonly:true});try{const n=db.prepare("SELECT COUNT(*) n FROM message_queue WHERE status IN ('running','processing','executing')").get().n;write(path.join(root,'running-queue-before-activation.json'),{count:n});}finally{db.close();}
  const p=JSON.parse(ps(`$p=Get-CimInstance Win32_Process -Filter 'ProcessId = ${Number(c.pid)}'; [pscustomobject]@{pid=$p.ProcessId;command=$p.CommandLine;children=@(Get-CimInstance Win32_Process | Where-Object ParentProcessId -eq ${Number(c.pid)}).Count;listeners=@(Get-NetTCPConnection -State Listen -LocalPort 3001 | Select-Object -ExpandProperty OwningProcess -Unique)} | ConvertTo-Json -Compress`));
  assert.equal(p.pid,c.pid);assert(p.command.replaceAll('\\','/').toLowerCase().includes(c.runtime.replaceAll('\\','/').toLowerCase()));assert.deepEqual(p.listeners,[c.pid]);
@@ -129,23 +129,13 @@ function releaseGuard(){
  for(const marker of ['forceStop','providerSessionId','findResumedProviderProcesses','mcp__claudex_sessions__session'])assert(backend.includes(marker),'Backend marker missing: '+marker);
 }
 async function running(c){const token=await login(c);const r=await fetch('http://127.0.0.1:3001/api/providers/sessions/running',{headers:{Authorization:'Bearer '+token},signal:AbortSignal.timeout(600000)});assert(r.ok);const ownership=partitionDeploymentSessions((await r.json()).data.sessions);write(path.join(root,'independent-sessions-before-activation.json'),ownership.independent);return ownership.managed;}
-async function waitIdle(c){const minutes=Number(arg('--idle-timeout-minutes')||30);assert(Number.isInteger(minutes)&&minutes>=1&&minutes<=30,'Idle timeout must be 1–30 minutes');const started=Date.now();for(;;){const rows=await running(c);write(path.join(root,'running-sessions-before-activation.json'),rows);if(!rows.length||Date.now()-started>=minutes*60*1000)return;console.log('Waiting for idle:',rows.length);await pause(15000);}}
+async function waitIdle(c){const minutes=Number(arg('--idle-timeout-minutes')||120);assert(Number.isInteger(minutes)&&minutes>=1&&minutes<=120,'Idle timeout must be 1–120 minutes');const started=Date.now();for(;;){const rows=await running(c);write(path.join(root,'running-sessions-before-activation.json'),rows);const db=new DB(c.database,{readonly:true});let queue;try{queue=db.prepare("SELECT id,status FROM message_queue WHERE status IN ('running','processing','executing')").all();}finally{db.close();}write(path.join(root,'running-queue-before-activation.json'),queue);if(!rows.length&&!queue.length)return;if(Date.now()-started>=minutes*60*1000)throw Error('Idle timeout; no sessions interrupted');console.log('Waiting for idle:',rows.length);await pause(15000);}}
 async function interruptManaged(c){
- const rows=await running(c),token=await login(c),WS=req('ws');
- // Only sessions reported by this production server are addressed; no host-wide process kill.
- for(const row of rows)await new Promise((resolve,reject)=>{
-  const ws=new WS('ws://127.0.0.1:3001/ws?token='+encodeURIComponent(token));
-  let poll;const finish=error=>{clearTimeout(timer);clearInterval(poll);ws.close();error?reject(error):resolve();};
-  const timer=setTimeout(()=>finish(Error('Session interruption timed out: '+row.sessionId)),600000);
-  ws.on('open',()=>{
-   if(row.tasks?.length)for(const task of row.tasks)ws.send(JSON.stringify({type:'chat.stop-task',sessionId:row.sessionId,taskId:task.taskId}));
-   else ws.send(JSON.stringify({type:'chat.abort',sessionId:row.sessionId,force:false}));
-   let checking=false;poll=setInterval(()=>{if(checking)return;checking=true;void running(c).then(current=>{if(!current.some(item=>item.sessionId===row.sessionId))finish();},finish).finally(()=>{checking=false;});},1000);
-  });
-  ws.on('error',finish);
- });
- const remaining=await running(c);assert.equal(remaining.length,0,'Managed sessions must be interrupted before stopping the server');
+ // The caller may stop only an idle server. Never abort user/provider work.
+ const rows=await running(c);assert.equal(rows.length,0,'Sessions became active; activation cancelled');
+ const db=new DB(c.database,{readonly:true});try{assert.equal(db.prepare("SELECT COUNT(*) n FROM message_queue WHERE status IN ('running','processing','executing')").get().n,0,'Queue became active; activation cancelled');}finally{db.close();}
 }
+
 async function main(){
  const lock=path.join(path.dirname(cfgPath),'nexagent-deploy.lock');
  const fd=fs.openSync(lock,'wx');fs.writeFileSync(fd,JSON.stringify({pid:process.pid,source,target,at:new Date().toISOString()}));
