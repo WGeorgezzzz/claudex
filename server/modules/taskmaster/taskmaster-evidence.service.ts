@@ -5,7 +5,7 @@ import {promisify} from 'node:util';
 import os from 'node:os';
 import {getCurrentUserContext} from '@/modules/auth/index.js';
 import {assertContextPath} from '@/modules/access-control/index.js';
-import {sessionBridgeDb} from '@/modules/database/index.js';
+import {sessionBridgeDb,monitorsDb} from '@/modules/database/index.js';
 import {sessionBridgeService} from '@/modules/session-bridge/index.js';
 import {infohubRequest} from './taskmaster-infohub.service.js';
 
@@ -32,9 +32,11 @@ async function index(){if(corpus&&Date.now()-corpus.at<300000)return corpus.docs
 /** Task intelligence reads five task-specific source passages, including completed project memories, without modifying source files. */
 export async function retrieveTaskEvidence(tasks:{id:string;title:string;description?:string;project:string;root:string;sessionIds:string[]}[]){
  const base=await index(),result:{type:string;path:string;excerpt:string;taskId:string}[]=[];
+ const user=getCurrentUserContext()?.userId;
+ const monitorDocs:Document[]=user?monitorsDb.list(user,undefined,true).flatMap(m=>monitorsDb.history(user,m.id).filter(r=>r.report).slice(0,10).map(r=>({type:'monitor',path:'/session/'+(r.session_id||m.session_id),text:m.name+'\n'+r.report,at:Date.parse(r.finished_at||r.started_at)}))):[];
  let units:Document[]=[];try{const items=await infohubRequest('/api/units?limit=300&order=activity');if(Array.isArray(items))units=items.map(item=>({type:'infohub',path:'/infohub/#unit/'+String(item.id),text:JSON.stringify(item),at:Date.now()}));}catch{}
  for(const task of tasks){const words=[...new Set([...terms(task.title+' '+task.project),...terms(String(task.description||'').slice(0,160))])].slice(0,32);const own=(await Promise.all(['STATUS.md','DONE.json','REPORT_zh.md','CONCLUSION_zh.md'].map(name=>document(path.join(task.root,name),'file')))).filter((doc):doc is Document=>doc!==null);
-  const candidates=await rankedDocuments([...own,...base,...units],words);
+  const candidates=await rankedDocuments([...own,...base,...units,...monitorDocs],words);
   const query=words.find(word=>/^[a-z]/.test(word)&&word.length>2)||words[0]||task.title.slice(0,8);let sessions:{sessionId:string;title?:string}[]=[];try{sessions=sessionBridgeDb.search(query,5,0).sessions;}catch{}
   for(const repo of [...new Set([task.root,...candidates.slice(0,2).map(item=>path.dirname(item.doc.path))].flatMap(root=>[root,path.join(root,'src')]))].slice(0,6)){const doc=await gitDocument(repo,query);if(doc)candidates.push({doc,score:score(doc,words)+8});}
   const ids=[...new Set([...task.sessionIds,...sessions.slice(0,3).map(session=>session.sessionId)])].slice(0,4);

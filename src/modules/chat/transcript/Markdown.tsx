@@ -1,3 +1,4 @@
+import { cleanMonitorReport } from '@/modules/chat/utils/monitorReport';
 import type { Components } from 'react-markdown';
 import React, { createContext, memo, useContext, useMemo, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
@@ -273,7 +274,7 @@ function MarkdownBodyRenderer({ children, breaks = false, components: overrides 
   const content = useMemo(
     // The LaTeX pass runs second because it reads the code spans the fence pass
     // normalizes, and must leave the LaTeX inside them literal.
-    () => normalizeLatexDelimiters(normalizeInlineCodeFences(String(children ?? ''))),
+    () => normalizeLatexDelimiters(normalizeInlineCodeFences(cleanMonitorReport(String(children ?? '')))),
     [children],
   );
   // Math support costs a remark tree pass plus a full KaTeX walk on every

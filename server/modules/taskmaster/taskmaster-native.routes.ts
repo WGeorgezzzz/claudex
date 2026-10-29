@@ -7,6 +7,7 @@ import { requireSharedResourceAdministrator } from '@/modules/auth/index.js';
 import { inboxBatchSchema, taskmasterInboxService } from './taskmaster-inbox.service.js';
 import { taskmasterAutoService, taskmasterWorkspace } from './taskmaster-auto.service.js';
 import { taskIntelligenceService } from './taskmaster-intelligence.service.js';
+import { taskmasterSourcesService } from './taskmaster-sources.service.js';
 
 /** TaskMaster composition mounts these native endpoints ahead of legacy document routes. */
 export function createTaskmasterNativeRouter() {
@@ -29,6 +30,10 @@ export function createTaskmasterNativeRouter() {
   router.post('/auto/sessions/:sessionId/undo', action(req => taskmasterAutoService.undo(String(req.params.sessionId), z.string().uuid().parse(req.body.auditId))));
   const root = (req: express.Request) => projectsDb.getProjectPathById(String(req.params.projectId))!;
   router.use('/inbox', requireSharedResourceAdministrator);
+  router.get('/inbox/sources', action(() => taskmasterSourcesService.snapshot()));
+  router.post('/inbox/sources/infohub/start', action(() => taskmasterSourcesService.start()));
+  router.get('/inbox/sources/infohub/settings', action(() => taskmasterSourcesService.settings()));
+  router.put('/inbox/sources/infohub/settings', action(req => taskmasterSourcesService.saveSettings(z.object({idleMinutes:z.number().int().min(1).max(1440)}).strict().parse(req.body))));
   const executionSettings=z.object({userInput:z.string().max(10000).optional(),provider:z.enum(['claude','codex','gemini','deepseek-harness']).optional(),model:z.string().max(200).optional(),effort:z.string().max(40).optional(),permissionMode:z.string().max(40).optional(),cwd:z.string().max(4096).optional()}).strict();
   const execution = z.object({ projectId: z.string().min(1), taskId: z.string().min(1), option: z.enum(['A', 'B', 'C']).optional(), userInput: z.string().max(10000).optional(),settings:executionSettings.optional() });
   router.post('/inbox/import', action(req => process.env.NEXAGENT_LEGACY_TODO_SYNC==='1'?taskmasterInboxService.import(inboxBatchSchema.parse(req.body)):{disabled:true,tasks:[],auditId:null,note:'飞书桥接待办同步已关闭；请在信息看板整理待办。'}));

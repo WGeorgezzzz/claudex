@@ -76,7 +76,18 @@ export function createTaskIntelligenceService(generate=generateTaskmasterExtract
   throw last;
  };
  return {
- async snapshot(){const user=requireContextUserId(),state=load(user),all=await rows();this.schedule(user);if(process.env.CLAUDEX_PASSIVE_INSTANCE!=='1'&&state.enabled&&!state.updatedAt&&!state.error&&!pending.has(user))void this.refresh(false).catch(()=>{});return {...state,audits:state.audits.map(({id,at,undone})=>({id,at,undone})),availableProjects:projectNames(all),groups:state.groups.map(group=>({...group,memberIds:all.filter(row=>state.entries[row.id]?.groupId===group.id).map(row=>row.id)})).filter(group=>group.memberIds.length>0),running:pending.has(user),progress:batchProgress.get(user)||{processed:all.filter(row=>state.entries[row.id]?.qualityVersion===3).length,total:all.length},tasks:all.map(row=>({...row,executionCwd:!row.testSource&&existsSync(row.root)?row.root:'D:/embodied',analysis:state.entries[row.id]}))};},
+ async snapshot(){
+  const user=requireContextUserId(),state=load(user),all=await rows();this.schedule(user);
+  if(process.env.CLAUDEX_PASSIVE_INSTANCE!=='1'&&state.enabled&&!state.updatedAt&&!state.error&&!pending.has(user))void this.refresh(false).catch(()=>{});
+  // Newly imported units remain visible before model processing, including when the budget is exhausted.
+  const entries={...state.entries},groups=[...state.groups];
+  for(const row of all)if(row.task.source==='infohub'&&!entries[row.id]){
+   const groupId='source:infohub:'+row.project;
+   if(!groups.some(g=>g.id===groupId))groups.push({id:groupId,name:'信息看板',summary:'来源待办，等待语义整理',project:row.project});
+   entries[row.id]={hash:taskHash(row.task),summary:row.task.title,project:row.project,kind:'todo',due:typeof row.task.due==='string'&&row.task.due?row.task.due:null,people:[],next_action:'查看原消息并处理',urgency:row.task.priority==='high'?1:row.task.priority==='low'?3:2,groupId};
+  }
+  return {...state,entries,audits:state.audits.map(({id,at,undone})=>({id,at,undone})),availableProjects:projectNames(all),groups:groups.map(group=>({...group,memberIds:all.filter(row=>entries[row.id]?.groupId===group.id).map(row=>row.id)})).filter(group=>group.memberIds.length>0),running:pending.has(user),progress:batchProgress.get(user)||{processed:all.filter(row=>state.entries[row.id]?.qualityVersion===3).length,total:all.length},tasks:all.map(row=>({...row,executionCwd:!row.testSource&&existsSync(row.root)?row.root:'D:/embodied',analysis:entries[row.id]}))};
+ },
  schedule(user:number){if(process.env.CLAUDEX_PASSIVE_INSTANCE==='1'||timers.has(user))return;const timer=setInterval(()=>{void withUserContext(user,async()=>{const state=load(user);if(!state.enabled||pending.has(user))return;const full=new Date().getHours()>=3&&state.lastFull!==today();const completion=!state.lastCompletion||Date.now()-Date.parse(state.lastCompletion)>12*3600000;const all=(await rows()).filter(row=>!row.testSource),changed=all.some(row=>state.entries[row.id]?.hash!==taskHash(row.task)||state.entries[row.id]?.qualityVersion!==3);if(full||completion||changed)await this.refresh(full||completion);}).catch(()=>{});},60000);timer.unref();timers.set(user,timer);},
  asyncStart(force=false){const user=requireContextUserId();void this.refresh(force).catch(error=>{const state=load(user);state.error=error instanceof Error?error.message:String(error);save(user,state);});return {running:true};},
  async refresh(force=false){const user=requireContextUserId();if(pending.has(user))return {running:true};const job=this.run(user,force);pending.set(user,job);try{return await job;}finally{pending.delete(user);}},

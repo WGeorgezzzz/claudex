@@ -45,6 +45,7 @@ test('isolated rounds bound state, preserve permissions and tools, retain report
   getConnection().prepare('UPDATE monitors SET content=? WHERE id=?').run('Read '+probe,row.id);
   const rt=runtime(async(_p,command,options,writer)=>{
     const id=String(options.sessionId);seen.push(id);prompts.push(command);
+    if(seen.length===1)assert.ok(command.includes(process.platform==='win32'?'必须使用 shell=powershell':'使用 shell=bash'));
     assert.notEqual(id,row.session_id);assert.equal(options.permissionMode,'default');
     assert.ok(executeMonitorTool({userId:user,sessionId:id,monitorId:row.id},{action:'list'}));
     assert.throws(()=>executeMonitorTool({userId:user,sessionId:id,monitorId:row.id},{action:'update',intervalMinutes:2}));
@@ -59,6 +60,16 @@ test('isolated rounds bound state, preserve permissions and tools, retain report
   const history=await withUserContext(user,()=>sessionsService.fetchHistory(row.session_id));
   assert.equal(history.messages.length,11);assert.match(history.messages.at(-1)!.content!,/ROUND 11/);
   assert.match(history.messages.at(-1)!.content!,/展开本轮会话/);
+}));
+
+test('legacy reports are cleaned on reads without rewriting stored evidence',()=>fixture(user=>{
+  const row=create(user), runId=monitorsDb.claim(row.id,new Date(Date.now()+120000))!;
+  monitorsDb.attachSession(row.id,runId,'isolated-report');
+  const raw='正常\n<monitor-probe>{"script":"internal"}</monitor-probe>';
+  monitorsDb.saveReport(user,row.id,runId,raw,'state',{});
+  assert.equal(monitorsDb.reportMessages(row.session_id)[0].report,'正常');
+  assert.equal(monitorsDb.history(user,row.id)[0].report,'正常');
+  assert.equal((getConnection().prepare('SELECT report FROM monitor_runs WHERE id=?').get(runId) as {report:string}).report,raw);
 }));
 
 test('state tags are bounded and removed from the user report',()=>{
