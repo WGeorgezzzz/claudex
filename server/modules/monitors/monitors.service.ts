@@ -1,7 +1,7 @@
 import { assertOwnedSession } from '@/modules/access-control/index.js';
 import { monitorsDb, userPreferencesDb } from '@/modules/database/index.js';
 import { AppError } from '@/shared/utils.js';
-import { parseMonitorCalendarSchedule } from '@/shared/index.js';
+import { parseMonitorCalendarSchedule, compactMonitorProbeState, summarizeMonitorProbeEvent } from '@/shared/index.js';
 
 import { normalizeProbe } from './monitor-probe.service.js';
 
@@ -15,8 +15,8 @@ export const monitorsService = {
       nextRunAt:row.status==='active'?row.next_run_at:null,
       lastRun:{count:row.run_count,error:row.last_error?.slice(0,120)??null},
       content:row.content.slice(0,200),
-      mode:row.monitor_mode||'scheduled',probe:row.probe_json?JSON.parse(row.probe_json):null,probeState:row.probe_state_json?JSON.parse(row.probe_state_json):null,
-      lastEvent:row.last_event_json?JSON.parse(row.last_event_json):null,heartbeatCount:row.heartbeat_count||0,modelRoundCount:row.model_round_count||0,probeError:row.probe_error||null,
+      mode:row.monitor_mode||'scheduled',probe:row.probe_json?JSON.parse(row.probe_json):null,probeState:row.probe_state_json?compactMonitorProbeState(JSON.parse(row.probe_state_json)):null,
+      lastEvent:row.last_event_json?summarizeMonitorProbeEvent(JSON.parse(row.last_event_json)):null,heartbeatCount:row.heartbeat_count||0,modelRoundCount:row.model_round_count||0,probeError:row.probe_error||null,
     }));
   },
   contextSettings(userId: number) { const prefs=userPreferencesDb.getPreferences(userId);return { threshold:Number(prefs.monitorContextThreshold??300000),percent:Number(prefs.monitorContextPercent??40) }; },
@@ -74,7 +74,15 @@ export const monitorsService = {
     if(input.runMode!==undefined){if(!['isolated','original'].includes(String(input.runMode)))throw new AppError('无效运行方式',{statusCode:400});monitorsDb.setMode(userId,id,String(input.runMode));}
     monitorsDb.update(userId,id,{name,content,intervalMinutes,schedule});
     if(input.probe!==undefined){const probe=normalizeProbe(input.probe);if(!probe)throw new AppError('探针必须包含至少一个有效条目。',{code:'INVALID_PROBE',statusCode:400});monitorsDb.setProbe(userId,id,probe);}
+    if(input.suppress!==undefined) {
+      if(!Array.isArray(input.suppress)||input.suppress.some(value=>typeof value!=='string'||value.length>256)||input.suppress.length>16)throw new AppError('抑制列表应为最多 16 个签名或正则。',{statusCode:400});
+      monitorsDb.setSuppressions(userId,id,input.suppress);
+    }
     return this.require(userId,id);
+  },
+  detailView(userId:number,id:string) {
+    const row=this.require(userId,id);
+    return {...row,probe_state_json:row.probe_state_json?JSON.stringify(compactMonitorProbeState(JSON.parse(row.probe_state_json))):null,last_event_json:row.last_event_json?JSON.stringify(summarizeMonitorProbeEvent(JSON.parse(row.last_event_json))):null};
   },
   history(userId: number,id: string) {this.require(userId,id);return monitorsDb.history(userId,id);},
   require(userId: number,id: string) {

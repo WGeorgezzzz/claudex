@@ -4,7 +4,7 @@ import type Database from 'better-sqlite3';
 
 import { getConnection } from '@/modules/database/connection.js';
 import type { MonitorCalendarSchedule, MonitorProbeSpec, MonitorRecord, MonitorRunRecord } from '@/shared/types.js';
-import { nextMonitorCalendarRun } from '@/shared/index.js';
+import { nextMonitorCalendarRun, compactMonitorProbeState, summarizeMonitorProbeEvent } from '@/shared/index.js';
 
 /** Used by database migrations to add durable, non-destructive monitoring tables. */
 export function initializeMonitorTables(db: Database.Database): void {
@@ -31,6 +31,9 @@ export function initializeMonitorTables(db: Database.Database): void {
   if(!columns.some(column=>column.name==='state_record')) db.exec("ALTER TABLE monitors ADD COLUMN state_record TEXT NOT NULL DEFAULT ''");
   if(!columns.some(column=>column.name==='no_change_count')) db.exec("ALTER TABLE monitors ADD COLUMN no_change_count INTEGER NOT NULL DEFAULT 0");
   for(const [name,type] of Object.entries({probe_json:'TEXT',probe_state_json:'TEXT',monitor_mode:"TEXT NOT NULL DEFAULT 'scheduled'",last_event_json:'TEXT',last_probe_at:'TEXT',heartbeat_count:'INTEGER NOT NULL DEFAULT 0',model_round_count:'INTEGER NOT NULL DEFAULT 0',probe_error:'TEXT'})) if(!columns.some(c=>c.name===name)) db.exec(`ALTER TABLE monitors ADD COLUMN ${name} ${type}`);
+  for(const row of db.prepare('SELECT id,probe_state_json,last_event_json FROM monitors WHERE probe_state_json IS NOT NULL OR last_event_json IS NOT NULL').all() as Array<{id:string;probe_state_json:string|null;last_event_json:string|null}>) {
+    try { db.prepare('UPDATE monitors SET probe_state_json=?,last_event_json=? WHERE id=?').run(row.probe_state_json?JSON.stringify(compactMonitorProbeState(JSON.parse(row.probe_state_json))):null,row.last_event_json?JSON.stringify(summarizeMonitorProbeEvent(JSON.parse(row.last_event_json))):null,row.id); } catch { }
+  }
   const runColumns=db.prepare('PRAGMA table_info(monitor_runs)').all() as {name:string}[];
   for(const [name,type] of Object.entries({session_id:'TEXT',report:'TEXT',input_tokens:'INTEGER',context_tokens:'INTEGER',output_tokens:'INTEGER',cache_read_tokens:'INTEGER',cache_creation_tokens:'INTEGER',total_tokens:'INTEGER',round_number:'INTEGER',event_type:'TEXT',prompt_evidence:'TEXT'})) if(!runColumns.some(c=>c.name===name)) db.exec(`ALTER TABLE monitor_runs ADD COLUMN ${name} ${type}`);
   // Keep a rollback copy before changing inherited Opus monitor defaults. The
@@ -146,8 +149,10 @@ export const monitorsDb = {
       }[];
   },
   due(now: Date): MonitorRecord[] {
-    return getConnection().prepare("SELECT * FROM monitors WHERE status='active' AND running_id IS NULL AND next_run_at<=? AND (monitor_mode<>'event' OR last_event_json IS NOT NULL) ORDER BY next_run_at LIMIT 20")
-      .all(now.toISOString()) as MonitorRecord[];
+    return getConnection().prepare(`SELECT * FROM monitors WHERE status='active' AND running_id IS NULL AND next_run_at<=? AND (monitor_mode<>'event' OR (last_event_json IS NOT NULL AND
+      (COALESCE(model_round_count,0)=0 OR json_extract(last_event_json,'$.type') IN ('done','dead') OR json_extract(last_event_json,'$.evidence')='用户手动立即运行'
+       OR COALESCE(julianday(json_extract(probe_state_json,'$.lastModelAt')),0)+interval_minutes/1440.0<=julianday(?)))) ORDER BY next_run_at LIMIT 20`)
+      .all(now.toISOString(),now.toISOString()) as MonitorRecord[];
   },
   probeDue(now: Date): MonitorRecord[] {
     return getConnection().prepare(`SELECT * FROM monitors WHERE status='active' AND running_id IS NULL AND monitor_mode='event' AND last_event_json IS NULL
@@ -158,18 +163,27 @@ export const monitorsDb = {
     getConnection().prepare("UPDATE monitors SET probe_json=?,probe_state_json=NULL,monitor_mode=?,last_event_json=NULL,last_probe_at=NULL,probe_error=NULL,next_run_at=? WHERE user_id=? AND id=? AND status<>'stopped'")
       .run(probe?JSON.stringify(probe):null,probe?'event':'scheduled',new Date().toISOString(),userId,id);
   },
+  setSuppressions(userId:number,id:string,suppress:string[]):void {
+    getConnection().prepare("UPDATE monitors SET probe_json=json_set(probe_json,'$.suppress',json(?)) WHERE user_id=? AND id=? AND probe_json IS NOT NULL").run(JSON.stringify(suppress.slice(0,16).map(value=>value.slice(0,256))),userId,id);
+  },
   saveProbeObservation(id:string,state:Record<string,unknown>,event:unknown|null,nextRunAt:Date,probeError:string|null=null,now=new Date()): void {
     const eventAt = event && typeof event === 'object' && typeof (event as {at?:unknown}).at === 'string'
       ? String((event as {at:string}).at) : null;
     getConnection().prepare('UPDATE monitors SET probe_state_json=?,last_event_json=?,last_probe_at=?,next_run_at=?,probe_error=? WHERE id=? AND status=\'active\'')
-      .run(JSON.stringify(state),event?JSON.stringify(event):null,now.toISOString(),eventAt || nextRunAt.toISOString(),probeError,id);
+      .run(JSON.stringify(compactMonitorProbeState(state)),event?JSON.stringify(summarizeMonitorProbeEvent(event as Record<string,unknown>)):null,now.toISOString(),eventAt || nextRunAt.toISOString(),probeError,id);
   },
   recordHeartbeat(id:string,now=new Date(),message='无事件，未调用模型。'): void {
     const db=getConnection(); const row=db.prepare('SELECT user_id,session_id FROM monitors WHERE id=?').get(id) as {user_id:number;session_id:string}|undefined; if(!row)return;
     db.prepare("INSERT INTO monitor_runs(id,monitor_id,started_at,finished_at,status,report,total_tokens,session_id,event_type) VALUES(?,?,?,?,?,?,?,?,?)").run(randomUUID(),id,now.toISOString(),now.toISOString(),'heartbeat',message,0,row.session_id,'heartbeat');
     db.prepare('UPDATE monitors SET heartbeat_count=heartbeat_count+1 WHERE id=?').run(id);
   },
-  markModelRound(id:string): void { getConnection().prepare('UPDATE monitors SET model_round_count=model_round_count+1,probe_state_json=json_set(COALESCE(probe_state_json,\'{}\'),\'$.lastModelAt\',?,\'$.pendingDelta\',\'\') WHERE id=?').run(new Date().toISOString(),id); },
+  markModelRound(id:string): void {
+    const db=getConnection(); const row=db.prepare('SELECT probe_state_json FROM monitors WHERE id=?').get(id) as {probe_state_json:string|null}|undefined;
+    const state=compactMonitorProbeState(JSON.parse(row?.probe_state_json||'{}'));
+    for(const value of Object.values((state.items||{}) as Record<string,Record<string,unknown>>))if(value.offset!==undefined)value.modelOffset=value.offset;
+    state.lastModelAt=new Date().toISOString(); delete state.pendingEvent; delete state.pendingCounts;
+    db.prepare('UPDATE monitors SET model_round_count=model_round_count+1,probe_state_json=? WHERE id=?').run(JSON.stringify(compactMonitorProbeState(state)),id);
+  },
   claim(id: string, now: Date): string | null {
     const db=getConnection();
     return db.transaction(() => {

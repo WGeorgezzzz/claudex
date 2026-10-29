@@ -8,6 +8,17 @@ import { MonitorPanel } from '@/modules/chat/composer/MonitorPanel';
 
 const response=(data:unknown)=>({ok:true,json:async()=>({data})}) as Response;
 afterEach(()=>{cleanup();vi.restoreAllMocks();});
+test('suppression signatures are visible and removable without saving a new probe',async()=>{
+  vi.spyOn(api.monitors,'list').mockResolvedValue(response([{id:'task',name:'检查',content:'status',status:'active',intervalMinutes:15,mode:'event',probe:{items:[{type:'file',path:'STATUS.md'}],suppress:['error:known']}}]));
+  vi.spyOn(api.monitors,'get').mockResolvedValue(response({name:'检查',content:'full instructions',interval_minutes:15}));
+  const update=vi.spyOn(api.monitors,'update').mockResolvedValue(response({}));
+  render(<MonitorPanel sessionId="session" draft="" options={{}}/>);
+  fireEvent.click(screen.getByRole('button',{name:'定期监测'}));
+  assert.ok(await screen.findByLabelText('抑制列表 检查'));
+  fireEvent.click(screen.getByRole('button',{name:'删除抑制'}));
+  await waitFor(()=>assert.equal(update.mock.calls.length,1));
+  assert.deepEqual(update.mock.calls[0],['task',{name:'检查',content:'full instructions',intervalMinutes:15,suppress:[]}]);
+});
 test('new session explains requirement without creating a task',()=>{
   render(<MonitorPanel sessionId={null} draft="" options={{}}/>);
   fireEvent.click(screen.getByRole('button',{name:'定期监测'}));

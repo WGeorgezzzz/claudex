@@ -391,7 +391,7 @@ export const api = {
     saveContextSettings: (threshold?: number, percent?:number) => put('/api/monitors/context-settings', { threshold,percent }),
     summaries: () => get('/api/monitors/summaries'),
     capabilities: (options: ApiRequestOptions = {}) => get('/api/monitors/capabilities',options),
-    update: (id: string, input: {name:string;content:string;intervalMinutes:number;schedule?:MonitorCalendarSchedule|null;runMode?:string;probe?:MonitorProbeSpec|null}) => patch('/api/monitors/' + encodeURIComponent(id), input),
+    update: (id: string, input: {name:string;content:string;intervalMinutes:number;schedule?:MonitorCalendarSchedule|null;runMode?:string;probe?:MonitorProbeSpec|null;suppress?:string[]}) => patch('/api/monitors/' + encodeURIComponent(id), input),
     list: (sessionId?: string,offset=0) => get('/api/monitors?'+new URLSearchParams({...sessionId?{sessionId}:{},...offset?{offset:String(offset)}:{}})),
     create: (input: Record<string, unknown>) => post('/api/monitors', input),
     action: (id: string, action: string) => post('/api/monitors/' + encodeURIComponent(id) + '/action', {action}),

@@ -1676,12 +1676,15 @@ export type MonitorCalendarSchedule = {
   frequency: 'daily'|'weekly'; time: string; timeZone: string; weekdays?: number[];
 };
 export type MonitorProbeSpec = {
+  suppress?: string[];
   intervalMinutes?: number;
   stallMinutes?: number;
   heartbeatMinutes?: number;
   items: Array<Record<string, unknown>>;
 };
 export type MonitorProbeEvent = {
+  signature?: string;
+  count?: number;
   type: 'done'|'error'|'stall'|'dead'|'threshold'|'heartbeat';
   at: string;
   evidence: string;

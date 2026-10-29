@@ -1552,3 +1552,38 @@ export async function readAppendedJsonl(filePath: string, offset: number): Promi
 
   return { records, nextOffset: offset + consumed };
 }
+
+//----------------- MONITOR PROBE SUMMARIES ------------
+/** Database persistence and monitor APIs retain cursor metadata and bounded summaries, never transcript deltas. */
+export function compactMonitorProbeState(input:Record<string,unknown>):Record<string,unknown> {
+  const state={...input};
+  delete state.pendingDelta; delete state.lastDelta;
+  const items:Record<string,unknown>={};
+  for(const [key,value] of Object.entries((state.items||{}) as Record<string,unknown>)) {
+    if(!value||typeof value!=='object')continue;
+    const item=value as Record<string,unknown>;
+    items[key]=Object.fromEntries(['offset','modelOffset','mtimeMs','lastChangeAt','fingerprint','alive'].filter(name=>item[name]!==undefined).map(name=>[name,item[name]]));
+  }
+  state.items=items;
+  const small=(value:unknown,depth=0):unknown=>{
+    if(typeof value==='string')return value.slice(0,100);
+    if(Array.isArray(value))return value.slice(0,4).map(item=>small(item,depth+1));
+    if(value&&typeof value==='object')return depth>2?JSON.stringify(value).slice(0,100):Object.fromEntries(Object.entries(value).slice(0,6).map(([key,item])=>[key.slice(0,40),small(item,depth+1)]));
+    return value;
+  };
+  state.lastFields=small(state.lastFields||{}); state.previousFields=small(state.previousFields||{}); state.progress=small(state.progress);
+  const size=()=>Buffer.byteLength(JSON.stringify(state),'utf8');
+  if(size()>2048)delete state.previousFields;
+  if(size()>2048)state.lastFields={progress:state.progress};
+  for(const value of Object.values(items)) { if(size()<=2048)break; const item=value as Record<string,unknown>; delete item.fingerprint; delete item.mtimeMs; delete item.lastChangeAt; }
+  if(size()>2048) { delete state.progress; delete state.lastFields; }
+  while(size()>2048&&Object.keys(items).length)delete items[Object.keys(items).at(-1)!];
+  if(size()>2048)return {items:{},lastModelAt:state.lastModelAt,lastProgressAt:state.lastProgressAt};
+  return state;
+}
+
+/** Repository and HTTP responses expose event metadata with bounded evidence and fields, excluding incremental text. */
+export function summarizeMonitorProbeEvent(input:Record<string,unknown>):Record<string,unknown> {
+  const state=compactMonitorProbeState({lastFields:input.fields});
+  return {type:input.type,at:input.at,evidence:String(input.evidence||'').slice(0,240),signature:input.signature,count:input.count,fields:state.lastFields};
+}

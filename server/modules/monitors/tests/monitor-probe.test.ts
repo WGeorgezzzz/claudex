@@ -24,7 +24,7 @@ test('normalizes all probe item settings and parses progress/status fields',()=>
 });
 
 test('file probes read only appended bytes and emit error then done events',async()=>fixture(async(user,root)=>{
-  const log=path.join(root,'codex-run.log'); const done=path.join(root,'DONE.json'); await writeFile(log,'1/4\n'); await writeFile(done,JSON.stringify({done:false}));
+  const log=path.join(root,'task.log'); const done=path.join(root,'DONE.json'); await writeFile(log,'1/4\n'); await writeFile(done,JSON.stringify({done:false}));
   const row=monitorsService.create(user,{sessionId:'probe-session',name:'Probe',content:'read logs',intervalMinutes:1,probe:{intervalMinutes:1,items:[{type:'file',path:log,read:'tail'},{type:'patterns',patterns:['ERROR']}]}});
   const t0=new Date('2026-10-29T10:00:00.000Z'); assert.equal(await runProbe(row,t0),null);
   await writeFile(log,'1/4\nERROR failed\n'); const error=await runProbe(monitorsDb.get(user,row.id)!,new Date(t0.getTime()+60_000)); assert.equal(error?.type,'error'); assert.match(error?.delta||'',/ERROR failed/);
@@ -81,13 +81,13 @@ test('event prompts retain all intervening deltas and clear them only at a model
   const now=new Date(); await runProbe(row,now); monitorsDb.markModelRound(row.id);
   await writeFile(log,'BASELINE_OLD 1/40 status=running\nDELTA_ONE 2/40\n');
   await runProbe(monitorsDb.get(user,row.id)!,new Date(now.getTime()+180000));
-  await writeFile(log,'BASELINE_OLD 1/40 status=running\nDELTA_ONE 2/40\nDELTA_TWO ERROR\n');
+  await writeFile(log,'BASELINE_OLD 1/40 status=running\nDELTA_ONE 2/40\nERROR DELTA_TWO\n');
   const event=await runProbe(monitorsDb.get(user,row.id)!,new Date(now.getTime()+360000));
   assert.equal(event?.type,'error'); assert.match(event?.delta||'',/DELTA_ONE/); assert.match(event?.delta||'',/DELTA_TWO/); assert.doesNotMatch(event?.delta||'',/BASELINE_OLD/);
   const runId=monitorsDb.claim(row.id,new Date(now.getTime()+361000))!; assert.ok(runId);
   const round=await prepareIsolatedRound(monitorsDb.get(user,row.id)!,runId);
   assert.match(round.content||'',/不要重新全面排查/); assert.match(round.content||'',/探针字段（前）/); assert.doesNotMatch(round.content||'',/BASELINE_OLD/);
-  monitorsDb.markModelRound(row.id); assert.equal(JSON.parse(monitorsDb.get(user,row.id)!.probe_state_json!).pendingDelta,'');
+  monitorsDb.markModelRound(row.id); assert.equal(JSON.parse(monitorsDb.get(user,row.id)!.probe_state_json!).pendingDelta,undefined);
   monitorsDb.finish(row.id,runId,null); assert.equal(monitorsDb.get(user,row.id)?.last_event_json,null);
 }));
 
@@ -105,7 +105,7 @@ test('file-only stalls trigger and process death remains a single event while ot
 }));
 
 test('UTF-8 event deltas retain head and tail within 8 KiB',async()=>fixture(async(user,root)=>{
-  const log=path.join(root,'large.log'); await writeFile(log,'HEAD_ERROR\n'+'中文进度'.repeat(3000)+'\nTAIL_MARKER');
+  const log=path.join(root,'large.log'); await writeFile(log,'ERROR HEAD_ERROR\n'+'中文进度'.repeat(3000)+'\nTAIL_MARKER');
   const row=monitorsService.create(user,{sessionId:'probe-session',name:'Byte bound',content:'read',intervalMinutes:1,probe:{items:[{type:'file',path:log}]}});
   const event=await runProbe(row); assert.equal(event?.type,'error');
   assert.ok(Buffer.byteLength(event!.delta!,'utf8')<=8192); assert.match(event!.delta!,/HEAD_ERROR/); assert.match(event!.delta!,/TAIL_MARKER/);

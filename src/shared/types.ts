@@ -1642,7 +1642,7 @@ export type PaletteSessionEntry = {
 /** Wall-clock schedule shared by chat creation, dashboard editing and the monitor API. Weekdays use ISO 1–7. */
 export type MonitorCalendarSchedule = {frequency:'daily'|'weekly';time:string;timeZone:string;weekdays?:number[]};
 /** JSON probe configuration shown in the monitor panel and sent to the monitor API. */
-export type MonitorProbeSpec = {intervalMinutes?:number;stallMinutes?:number;heartbeatMinutes?:number;items:Array<Record<string,unknown>>};
+export type MonitorProbeSpec = {suppress?:string[];intervalMinutes?:number;stallMinutes?:number;heartbeatMinutes?:number;items:Array<Record<string,unknown>>};
 /** Persisted monitor fields rendered in the chat panel and global manager; absent schedule_json denotes legacy intervals. */
 export type MonitorTaskRecord = {
   id:string;session_id:string;name:string;content:string;interval_minutes:number;schedule_json?:string|null;

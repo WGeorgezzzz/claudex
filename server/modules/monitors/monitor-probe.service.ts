@@ -2,6 +2,7 @@ import { open, readFile, stat } from 'node:fs/promises';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import path from 'node:path';
+import { createHash } from 'node:crypto';
 
 import type { MonitorProbeEvent, MonitorProbeSpec, MonitorRecord } from '@/shared/types.js';
 import { monitorsDb } from '@/modules/database/index.js';
@@ -12,9 +13,12 @@ const MAX_DELTA = 8192;
 const DEFAULT_INTERVAL = 3;
 const DEFAULT_STALL = 45;
 const DEFAULT_HEARTBEAT = 180;
-const DEFAULT_PATTERNS = ['Traceback', 'ERROR', 'OOM', 'CUDA error', 'EXIT [1-9]', 'Killed', 'FAILED'];
+const DEFAULT_PATTERNS = ['Traceback \\(most recent call last\\):?\\s*$', 'ERROR\\b', 'OOM\\b', 'CUDA error\\b', 'EXIT [1-9]', 'Killed\\b', 'FAILED\\b'];
 
-const itemKey = (item:Record<string,unknown>, index:number) => String(item.id || item.path || item.pid || item.command || `item-${index}`);
+const itemKey = (_item:Record<string,unknown>, index:number) => `p${index}`;
+const fingerprint = (value:unknown) => createHash('sha256').update(JSON.stringify(value)??'').digest('hex').slice(0,24);
+const commandDeltas = new Map<string,{lastModelAt:string;delta:string}>();
+const agentLog = (item:Record<string,unknown>) => /(?:codex[-_]run[^/\\]*\.log|(?:claude|codex)[^/\\]*(?:transcript|session)|(?:transcript|rollout)[^/\\]*\.jsonl|[/\\](?:\.claude[/\\]projects|\.codex[/\\]sessions)[/\\])/i.test(String(item.path||item.file||'')) || item.source==='agent';
 const bounded = (value:string) => {
   const bytes=Buffer.from(value,'utf8'); if(bytes.length<=MAX_DELTA)return value;
   const marker='\n…[中间增量已截断]…\n'; const half=Math.floor((MAX_DELTA-Buffer.byteLength(marker))/2);
@@ -24,16 +28,16 @@ const fieldAt = (value:unknown, field?:unknown):unknown => {
   if(typeof field !== 'string' || !field) return value;
   return field.split('.').reduce((current,key)=>current && typeof current === 'object' ? (current as Record<string,unknown>)[key] : undefined, value);
 };
-async function fileProbe(item:Record<string,unknown>, previous:Record<string,unknown>):Promise<{value:unknown;delta:string;offset:number;done:boolean;mtimeMs?:number;fields?:Record<string,unknown>}> {
-  const filePath=String(item.path||item.file||''); const key=String(itemKey(item,0));
+async function fileProbe(item:Record<string,unknown>, previous:Record<string,unknown>, key:string):Promise<{value:unknown;delta:string;offset:number;done:boolean;mtimeMs?:number;fields?:Record<string,unknown>}> {
+  const filePath=String(item.path||item.file||'');
   try {
     const info=await stat(filePath); const oldOffset=Number(previous[`${key}:offset`]||0); const offset=info.size<oldOffset?0:oldOffset;
-    const old=previous[key] as {value?:unknown;mtimeMs?:number}|undefined;
+    const old=previous[key] as {value?:unknown;fingerprint?:string;mtimeMs?:number;offset?:number}|undefined;
     const doneFile=/(?:^|[-_])done\.json$/i.test(path.basename(filePath));
     const mode=String(item.read||(doneFile?'json':'tail'));
     if(mode==='json') {
       const json=JSON.parse((await readFile(filePath,'utf8')).replace(/^\uFEFF/,'')); const value=fieldAt(json,item.field);
-      const changed=JSON.stringify(value)!==JSON.stringify(old?.value);
+      const changed=fingerprint(value)!==(old?.fingerprint||fingerprint(old?.value));
       const status=String(fieldAt(json,'status')||'');
       const complete=item.doneField?fieldAt(json,item.doneField)===true:doneFile&&(fieldAt(json,'done')===true||/^(completed|succeeded|success|failed|failure)$/.test(status));
       const fields:Record<string,unknown>={};
@@ -45,7 +49,7 @@ async function fileProbe(item:Record<string,unknown>, previous:Record<string,unk
       const available=Math.max(0,info.size-offset); let delta='';
       if(available<=MAX_DELTA){const buffer=Buffer.alloc(available);const result=await handle.read(buffer,0,available,offset);delta=buffer.subarray(0,result.bytesRead).toString('utf8');}
       else {const half=Math.floor(MAX_DELTA/2);const head=Buffer.alloc(half);const tail=Buffer.alloc(half);const first=await handle.read(head,0,half,offset);const last=await handle.read(tail,0,half,info.size-half);delta=head.subarray(0,first.bytesRead).toString('utf8')+'\n…[文件增量中间部分已截断]…\n'+tail.subarray(0,last.bytesRead).toString('utf8');}
-      const done=/^\s*(?:EXIT\s+\d+|(?:status|state)\s*[:=]\s*(?:done|completed|succeeded|failed|failure)|(?:done|completed|success)\s*[:=]\s*(?:true|yes|1))\s*$/im.test(delta);
+      const done=agentLog(item)?/^EXIT\s+\d+\s*$/m.test(delta):/^\s*(?:EXIT\s+\d+|(?:status|state)\s*[:=]\s*(?:done|completed|succeeded|failed|failure)|(?:done|completed|success)\s*[:=]\s*(?:true|yes|1))\s*$/im.test(delta);
       return {value:delta,delta,offset:info.size,done,mtimeMs:info.mtimeMs};
     } finally {await handle.close();}
   } catch(error) { const value=`${filePath}: ${error instanceof Error?error.message:'missing'}`; return {value,delta:(previous[key] as {value?:unknown}|undefined)?.value===value?'':value,offset:0,done:false}; }
@@ -93,7 +97,26 @@ export function normalizeProbe(value:unknown):MonitorProbeSpec|null {
     return source;
   }) as Array<Record<string,unknown>>;
   if(!items.length)return null;
-  return {items,intervalMinutes:Math.min(60,Math.max(1,Number(input.intervalMinutes)||DEFAULT_INTERVAL)),stallMinutes:Math.min(10080,Math.max(1,Number(input.stallMinutes)||DEFAULT_STALL)),heartbeatMinutes:Math.min(10080,Math.max(1,Number(input.heartbeatMinutes)||DEFAULT_HEARTBEAT))};
+  return {items,suppress:Array.isArray(input.suppress)?input.suppress.filter(value=>typeof value==='string').slice(0,16).map(value=>value.slice(0,256)):[],intervalMinutes:Math.min(60,Math.max(1,Number(input.intervalMinutes)||DEFAULT_INTERVAL)),stallMinutes:Math.min(10080,Math.max(1,Number(input.stallMinutes)||DEFAULT_STALL)),heartbeatMinutes:Math.min(10080,Math.max(1,Number(input.heartbeatMinutes)||DEFAULT_HEARTBEAT))};
+}
+
+/** Isolated model rounds reconstruct file increments from durable model offsets; command text stays in bounded memory. */
+export async function hydrateProbeDelta(row:MonitorRecord):Promise<string> {
+  const spec=normalizeProbe(JSON.parse(row.probe_json||'null')); if(!spec)return '';
+  const state=JSON.parse(row.probe_state_json||'{}'); const deltas:string[]=[];
+  for(let index=0;index<spec.items.length;index++) {
+    const item=spec.items[index]; if(item.type!=='file')continue;
+    const key=itemKey(item,index); const old=state.items?.[key]||{};
+    const result=await fileProbe(item,{[key]:{},[`${key}:offset`]:old.modelOffset??0},key);
+    if(result.delta)deltas.push(`[${key}]\n${result.delta}`);
+  }
+  const cached=commandDeltas.get(row.id);
+  if(cached&&cached.lastModelAt===String(state.lastModelAt||''))deltas.push(cached.delta);
+  return bounded(deltas.join('\n'));
+}
+
+function matchesSuppression(suppress:string[],signature:string,text:string):boolean {
+  return suppress.some(value=>{if(value===signature)return true;try{return new RegExp(value,'i').test(text);}catch{return text.includes(value);}});
 }
 
 export async function runProbe(row:MonitorRecord, now=new Date()):Promise<MonitorProbeEvent|null> {
@@ -102,26 +125,31 @@ export async function runProbe(row:MonitorRecord, now=new Date()):Promise<Monito
   const deltas:string[]=[]; const errorDeltas:string[]=[]; const fields:Record<string,unknown>={...previous.lastFields as Record<string,unknown>}; let done=false; let dead=false; let commandError=''; let thresholdEvidence=''; let staleFile='';
   for(let index=0;index<spec.items.length;index++) { const item=spec.items[index]; const key=itemKey(item,index); const type=String(item.type||'file');
     if(type==='file') {
-      const result=await fileProbe(item,(previous.items as Record<string,unknown>)||{});
+      const previousItems=(previous.items as Record<string,unknown>)||{};
+      const legacyKey=String(item.id||item.path||item.pid||item.command||`item-${index}`);
+      const oldItem=(previousItems[key]||previousItems[legacyKey]||{}) as Record<string,unknown>;
+      const result=await fileProbe(item,{...previousItems,[key]:oldItem,[`${key}:offset`]:oldItem.offset??previousItems[`${legacyKey}:offset`]??0},key);
       const old=(previous.items as Record<string,{mtimeMs?:number;lastChangeAt?:string}>|undefined)?.[key];
       const lastChangeAt=result.mtimeMs!==old?.mtimeMs?now.toISOString():old?.lastChangeAt||now.toISOString();
-      state.items[key]={value:result.value,offset:result.offset,mtimeMs:result.mtimeMs,lastChangeAt}; state.items[`${key}:offset`]=result.offset;
+      state.items[key]={fingerprint:fingerprint(result.value),offset:result.offset,modelOffset:oldItem.modelOffset??0,mtimeMs:result.mtimeMs,lastChangeAt};
       if(result.mtimeMs!==undefined&&Date.parse(lastChangeAt)+Number(spec.stallMinutes)*60000<=now.getTime())staleFile=key;
-      if(result.delta){deltas.push(`[${key}]\n${result.delta}`);errorDeltas.push(result.fields?Object.values(result.fields).map(value=>typeof value==='object'?JSON.stringify(value):String(value)).join('\n'):result.delta);}
-      Object.assign(fields,result.fields||parseProbeFields(bounded(result.delta),item.parse));
+      if(result.delta){deltas.push(`[${key}]\n${result.delta}`);if(!agentLog(item))errorDeltas.push(result.fields?Object.values(result.fields).filter(value=>value!==null&&value!==undefined).map(value=>typeof value==='object'?JSON.stringify(value):String(value)).join('\n'):result.delta);}
+      if(result.delta&&!agentLog(item)&&result.fields?.error)errorDeltas.push('ERROR '+JSON.stringify(result.fields.error));
+      if(!agentLog(item))Object.assign(fields,result.fields||parseProbeFields(bounded(result.delta),item.parse));
       if(item.field)fields[String(item.field)]=result.value; done ||= result.done;
     }
-    else if(type==='command') { const result=await commandProbe(item); state.items[key]={value:result.value}; Object.assign(fields,result.fields); if(result.value!==(previous.items as Record<string,{value?:unknown}>|undefined)?.[key]?.value&&result.value){deltas.push(`[${key}]\n${result.value}`);errorDeltas.push(result.value);} commandError ||= result.error||''; }
+    else if(type==='command') { const result=await commandProbe(item); state.items[key]={fingerprint:fingerprint(result.value)}; Object.assign(fields,result.fields); if(fingerprint(result.value)!==(previous.items as Record<string,{fingerprint?:string}>|undefined)?.[key]?.fingerprint&&result.value){deltas.push(`[${key}]\n${result.value}`);errorDeltas.push(result.value);const cached=commandDeltas.get(row.id);commandDeltas.set(row.id,{lastModelAt:String(state.lastModelAt||''),delta:bounded([cached?.lastModelAt===String(state.lastModelAt||'')?cached.delta:'',result.value].join('\n'))});if(commandDeltas.size>256)commandDeltas.delete(commandDeltas.keys().next().value!);} commandError ||= result.error||''; }
     else if(type==='process') { const result=await processProbe(item); state.items[key]={value:result.value,alive:result.alive}; dead ||= !result.alive; }
     else if(type==='patterns') { state.items[key]={patterns:item.patterns||DEFAULT_PATTERNS}; }
     else if(type==='threshold') { const value=fieldAt(fields,item.field); if(thresholdHit(value,item))thresholdEvidence=`${String(item.field||'字段')}=${String(value)}`; }
   }
-  const newDelta=bounded(deltas.join('\n')); const delta=bounded([String(previous.pendingDelta||''),newDelta].filter(Boolean).join('\n')); state.lastDelta=newDelta; state.pendingDelta=delta; state.lastFields=fields; state.previousFields=previous.lastFields||{};
-  state.terminal=done||previous.terminal===true;
+  const delta=bounded(deltas.join('\n')); state.lastFields=fields; state.previousFields=previous.lastFields||{};
+  state.terminal=done||previous.terminal===true||/^(done|completed|success|succeeded|failed|failure)$/i.test(String(fields.status||''));
   const patterns=spec.items.filter(item=>String(item.type)==='patterns').flatMap(item=>Array.isArray(item.patterns)?item.patterns.map(String):DEFAULT_PATTERNS);
   if(!patterns.length) patterns.push(...DEFAULT_PATTERNS);
   const errorDelta=bounded(errorDeltas.join('\n'));
-  const pattern=patterns.find(pattern=>{try{return new RegExp(pattern,'i').test(errorDelta);}catch{return errorDelta.toLowerCase().includes(pattern.toLowerCase());}});
+  const alertLines=errorDelta.split(/\r?\n/).filter(line=>!/^\s*[-+>$]/.test(line));
+  const pattern=patterns.find(pattern=>alertLines.some(line=>{try{return new RegExp(`^(?:${pattern})`,'i').test(line);}catch{return line.toLowerCase().startsWith(pattern.toLowerCase());}}));
   const progress=fields.progress; const previousProgress=previous.progress; if(JSON.stringify(progress)!==JSON.stringify(previousProgress))state.lastProgressAt=now.toISOString(); state.progress=progress;
   let event:MonitorProbeEvent|null=null; const status=String(fields.status||'').toLowerCase();
   if(done || /^(done|completed|success|succeeded|failed|failure)$/.test(status)&&status!==String((previous.lastFields as Record<string,unknown>|undefined)?.status||'').toLowerCase())event={type:'done',at:now.toISOString(),evidence:'探针读取到终止状态或 EXIT 行',delta,fields};
@@ -133,9 +161,28 @@ export async function runProbe(row:MonitorRecord, now=new Date()):Promise<Monito
   else if(Date.parse(state.lastModelAt||now.toISOString())+Number(spec.heartbeatMinutes)*60_000<=now.getTime())event={type:'heartbeat',at:now.toISOString(),evidence:`距上次模型回合已超过 ${spec.heartbeatMinutes} 分钟`,delta,fields};
   if(event?.type==='dead'&&previous.dead===true)event=null;
   state.dead=dead;
-  const eventKey=event?JSON.stringify({type:event.type,evidence:event.evidence,fields:event.type==='dead'?{}:event.fields,delta:event.type==='error'?event.delta:''}):'';
-  if(eventKey && eventKey===String(previous.lastEventKey||'')) event=null;
-  state.lastEventKey=eventKey || (progress!==undefined && JSON.stringify(progress)!==JSON.stringify(previousProgress) ? '' : String(previous.lastEventKey||''));
+  if(event?.type==='done'&&previous.terminal===true)event=null;
+  if(event)event.signature=event.type+':'+fingerprint(event.evidence.replace(/\d+/g,'#'));
+  const terminal=event?.type==='done'||event?.type==='dead';
+  if(event&&!terminal&&matchesSuppression(spec.suppress||[],event.signature!,event.evidence+'\n'+errorDelta))event=null;
+  const pending=previous.pendingEvent as MonitorProbeEvent|undefined;
+  const pendingCounts={...previous.pendingCounts as Record<string,number>};
+  const lastAlertAt=Math.max(Date.parse(String(previous.lastAlertAt||''))||0,row.model_round_count?Date.parse(String(previous.lastModelAt||''))||0:0);
+  const cooling=lastAlertAt>0&&lastAlertAt+Math.max(1,row.interval_minutes||15)*60000>now.getTime();
+  if(event&&!terminal&&cooling) {
+    const signature=event.signature!; const bucket=Object.hasOwn(pendingCounts,signature)||Object.keys(pendingCounts).length<8?signature:'other';
+    pendingCounts[bucket]=(pendingCounts[bucket]||0)+1; state.pendingCounts=pendingCounts;
+    state.pendingEvent={type:event.type,at:event.at,evidence:event.evidence,signature:event.signature,count:(pending&&pending.signature===signature?pending.count||0:0)+1}; event=null;
+  }
+  else if(!event)state.pendingEvent=pending;
+  if(!event&&!cooling&&pending&&!matchesSuppression(spec.suppress||[],pending.signature||'',pending.evidence))event={...pending,at:now.toISOString(),fields,delta};
+  if(event) {
+    if(pending&&pending.signature===event.signature)event.count=pending.count;
+    if(event.count)event.evidence+=`；冷却期同签名累计 ${event.count} 次`;
+    if(Object.keys(pendingCounts).length)event.evidence+=`；冷却计数 ${JSON.stringify(pendingCounts)}`;
+    state.lastEventKey=event.signature; state.lastAlertAt=now.toISOString(); delete state.pendingEvent; delete state.pendingCounts;
+    event.delta=await hydrateProbeDelta({...row,probe_state_json:JSON.stringify(state)});
+  } else { state.lastEventKey=String(previous.lastEventKey||''); state.lastAlertAt=previous.lastAlertAt; if(!state.pendingCounts&&Object.keys(pendingCounts).length)state.pendingCounts=pendingCounts; }
   monitorsDb.saveProbeObservation(row.id,state,event,new Date(now.getTime()+Number(spec.intervalMinutes)*60_000),commandError||null,now);
   if(!event)monitorsDb.recordHeartbeat(row.id,now,`进度 ${JSON.stringify(previousProgress)??'未知'}→${JSON.stringify(progress)??'未知'}，无新事件，未调用模型。`);
   return event;

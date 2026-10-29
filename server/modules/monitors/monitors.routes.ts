@@ -29,7 +29,7 @@ monitorsRoutes.post('/',asyncHandler(async(req,res)=>{
   res.status(201).json(createApiSuccessResponse(monitorsService.create(userId(req),req.body??{})));
 }));
 monitorsRoutes.get('/:id',asyncHandler(async(req,res)=>{
-  res.json(createApiSuccessResponse(monitorsService.require(userId(req),String(req.params.id))));
+  res.json(createApiSuccessResponse(monitorsService.detailView(userId(req),String(req.params.id))));
 }));
 monitorsRoutes.get('/:id/runs',asyncHandler(async(req,res)=>{
   res.json(createApiSuccessResponse(monitorsService.history(userId(req),String(req.params.id))));
@@ -40,6 +40,6 @@ monitorsRoutes.post('/:id/action',asyncHandler(async(req,res)=>{
 monitorsRoutes.patch('/:id',asyncHandler(async(req,res)=>{
   const body=req.body??{};
   res.json(createApiSuccessResponse(monitorsService.update(userId(req),String(req.params.id),{
-    name:body.name,content:body.content,intervalMinutes:body.intervalMinutes,schedule:body.schedule,runMode:body.runMode,probe:body.probe,
+    name:body.name,content:body.content,intervalMinutes:body.intervalMinutes,schedule:body.schedule,runMode:body.runMode,probe:body.probe,suppress:body.suppress,
   })));
 }));

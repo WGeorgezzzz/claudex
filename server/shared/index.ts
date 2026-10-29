@@ -12,6 +12,7 @@ export { createClaudeLaunchEnvironment } from './utils.js';
 export { requireAuthenticatedUserId } from './utils.js';
 export { getCloudCliHomeDir } from './utils.js';
 export { parseMonitorCalendarSchedule, nextMonitorCalendarRun } from './utils.js';
+export { compactMonitorProbeState, summarizeMonitorProbeEvent } from './utils.js';
 export type { MonitorCalendarSchedule } from './types.js';
 // Auth retains the existing platform deployment mode alongside private local identity.
 export { IS_PLATFORM } from './utils.js';
