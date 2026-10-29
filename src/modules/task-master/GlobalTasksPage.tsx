@@ -52,10 +52,14 @@ function useGlobalTasks() {
 export function TasksNavigation() {
   const navigate = useNavigate(), { projects, error, loading } = useGlobalTasks();
   const tasks = projects.flatMap(p => p.tasks).filter(isOpenTask);
-  const high = tasks.filter(t => t.priority === 'high').length;
-  return <button type="button" className="sidebar-nav-action" onClick={() => navigate('/tasks')} aria-label={`任务，${tasks.length} 项未完成`}>
-    <ListTodo size={16}/><span>任务</span><span className="ml-auto text-xs text-muted-foreground">{error ? '连接异常' : loading ? '…' : tasks.length}</span>
-    {high > 0 && <span className="text-xs text-red-600" aria-label={`${high} 项高优先级`}>{high}</span>}
+  // The sidebar uses the same default visibility and attention predicate as the unified task page.
+  const [counts,setCounts]=useState<{attention:number;open:number}|null>(null);
+  useEffect(()=>{if(!inboxTasksApi.intelligence)return;let active=true;const load=async()=>{try{const snapshot=await read(await inboxTasksApi.intelligence());const rows=snapshot.tasks.filter((r:any)=>!r.testSource&&!snapshot.entries[r.id]?.mergedInto&&!['done','cancelled'].includes(r.task.status));if(active)setCounts({open:rows.length,attention:rows.filter((r:any)=>['blocked','review'].includes(r.task.status)||r.task.forMe||snapshot.entries[r.id]?.kind==='todo').length});}catch{/* Keep the last count when offline. */}};void load();const timer=setInterval(()=>void load(),10000);return()=>{active=false;clearInterval(timer);};},[]);
+  const high = counts?.attention??tasks.filter(t => ['blocked','review'].includes(t.status)||t.forMe).length;
+  const openCount=counts?.open??tasks.length;
+  return <button type="button" className="sidebar-nav-action" onClick={() => navigate('/tasks')} title={`需要你处理 ${high} · 未完成 ${openCount}`} aria-label={`任务，需要你处理 ${high} · 未完成 ${openCount}`}>
+    <ListTodo size={16}/><span>任务</span><span className="ml-auto text-xs text-muted-foreground">{error ? '连接异常' : loading ? '…' : high}</span>
+
   </button>;
 }
 
@@ -92,7 +96,7 @@ export function GlobalTasksPage({ onMenuClick }: { onMenuClick: () => void }) {
   // Info-hub views are deterministic client filters over namespaced task tags.
   const [view, setView] = useState<'all' | 'today' | 'mine' | 'explore'>('all');
   // Semantic view is default once a persisted result exists; legacy remains an explicit fallback.
-  const [semantic,setSemantic]=useState(true);
+  const semantic=searchParams.get('view')!=='legacy';
   const [intelligenceReady,setIntelligenceReady]=useState(false);
   const [layout,setLayout]=useState<'tree'|'groups'|'list'|'board'>('tree');
   const [tags,setTags]=useState<string[]>([]);
@@ -126,6 +130,7 @@ export function GlobalTasksPage({ onMenuClick }: { onMenuClick: () => void }) {
     { id: 'in-progress', label: '进行中', count: totals.running, tone: 'text-blue-600 dark:text-blue-400' },
     { id: 'attention', label: '需关注', count: totals.attention, tone: 'text-amber-700 dark:text-amber-400' },
     { id: 'done', label: '已完成', count: totals.done, tone: 'text-emerald-700 dark:text-emerald-400' }];
+  if(semantic)return <IntelligentTasksPanel onReady={setIntelligenceReady} onMenuClick={onMenuClick}/>;
   return <section className="flex h-full min-h-0 flex-col bg-slate-50/70 dark:bg-slate-950/40" aria-label="全局任务">
     <header className="flex min-h-16 shrink-0 items-center gap-3 border-b border-slate-200/80 bg-white/95 px-4 shadow-sm dark:border-slate-800 dark:bg-slate-950/95 md:px-7">
       <button type="button" title="打开侧栏" aria-label="打开侧栏" className="workspace-icon-button md:hidden" onClick={onMenuClick}><Menu size={18}/></button>
@@ -139,8 +144,6 @@ export function GlobalTasksPage({ onMenuClick }: { onMenuClick: () => void }) {
           <select aria-label="新任务优先级" className={control} value={newPriority} onChange={e => setNewPriority(e.target.value)}><option value="high">高优先级</option><option value="medium">普通</option><option value="low">低优先级</option></select>
           <button type="submit" className="min-h-11 rounded-xl bg-slate-900 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-700 disabled:opacity-50 dark:bg-white dark:text-slate-900" disabled={!newTitle.trim() || busy}>新建任务</button>
         </form>
-        <div className="flex flex-wrap gap-2">{semantic&&<select aria-label="任务来源项目" className={control+" max-w-full"} value={projectId} onChange={e=>setProjectId(e.target.value)}><option value="">全部来源项目</option>{projects.map(project=><option key={project.projectId} value={project.projectId}>{project.name}</option>)}</select>}<button className={control} aria-pressed={semantic} onClick={()=>setSemantic(true)}>智能分组（按项目）</button><button className={control} aria-pressed={!semantic} onClick={()=>setSemantic(false)}>旧分组（按来源标签）</button></div>
-        <div hidden={!semantic}><IntelligentTasksPanel onReady={setIntelligenceReady} projectId={projectId}/></div>
         {(!semantic||!intelligenceReady)&&<div className="space-y-5">
         <div className="grid grid-cols-2 gap-3 md:grid-cols-5" aria-label="任务概览">
           {summary.map(item => <button key={item.id} type="button" aria-pressed={status === item.id} onClick={() => setStatus(item.id)} className={`rounded-xl border bg-card px-4 py-3 text-left transition-colors hover:border-primary/40 ${status === item.id ? 'border-primary/50 ring-1 ring-primary/10' : 'border-border'}`}>

@@ -24,3 +24,12 @@ test('late stored settings cannot override a harness or directory the user selec
  expect(screen.getByRole('button',{name:/^DeepSeek Harness/}).getAttribute('aria-pressed')).toBe('true');expect((screen.getByLabelText('执行工作目录') as HTMLInputElement).value).toBe('D:/owned');
  fireEvent.click(screen.getByRole('button',{name:'确认执行并打开对话'}));await waitFor(()=>expect(confirm).toHaveBeenCalledWith(expect.objectContaining({provider:'deepseek-harness',model:'native-model',cwd:'D:/owned'})));
 });
+
+test('cached and server preferences never replace the task directory with an old fixture',async()=>{
+ localStorage.setItem('task-execution-cache-v2',JSON.stringify({settings:{provider:'codex',model:'cached',cwd:'D:/embodied/nexagent-integrate2-20261028/production-project'}}));
+ control.settings=()=>response({provider:'codex',model:'cached',cwd:'D:/embodied/copy-project'});
+ render(<TaskExecutionPanel title="Real task" cwd="D:/embodied" open busy={false} onClose={()=>{}} onConfirm={async()=>{}}/>);
+ expect((screen.getByLabelText('执行工作目录') as HTMLInputElement).value).toBe('D:/embodied');
+ await act(async()=>{await new Promise(resolve=>setTimeout(resolve,20));});
+ expect((screen.getByLabelText('执行工作目录') as HTMLInputElement).value).toBe('D:/embodied');
+});

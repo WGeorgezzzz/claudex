@@ -29,14 +29,14 @@ export function createTaskmasterNativeRouter() {
   router.post('/auto/sessions/:sessionId/undo', action(req => taskmasterAutoService.undo(String(req.params.sessionId), z.string().uuid().parse(req.body.auditId))));
   const root = (req: express.Request) => projectsDb.getProjectPathById(String(req.params.projectId))!;
   router.use('/inbox', requireSharedResourceAdministrator);
-  const executionSettings=z.object({provider:z.enum(['claude','codex','gemini','deepseek-harness']).optional(),model:z.string().max(200).optional(),effort:z.string().max(40).optional(),permissionMode:z.string().max(40).optional(),cwd:z.string().max(4096).optional()}).strict();
+  const executionSettings=z.object({userInput:z.string().max(10000).optional(),provider:z.enum(['claude','codex','gemini','deepseek-harness']).optional(),model:z.string().max(200).optional(),effort:z.string().max(40).optional(),permissionMode:z.string().max(40).optional(),cwd:z.string().max(4096).optional()}).strict();
   const execution = z.object({ projectId: z.string().min(1), taskId: z.string().min(1), option: z.enum(['A', 'B', 'C']).optional(), userInput: z.string().max(10000).optional(),settings:executionSettings.optional() });
   router.post('/inbox/import', action(req => process.env.NEXAGENT_LEGACY_TODO_SYNC==='1'?taskmasterInboxService.import(inboxBatchSchema.parse(req.body)):{disabled:true,tasks:[],auditId:null,note:'飞书桥接待办同步已关闭；请在信息看板整理待办。'}));
   router.post('/inbox/sync',action(()=>taskmasterInboxService.syncInfohub()));
   router.get('/inbox/execution-settings',action(()=>taskmasterInboxService.executionSettings()));
   router.get('/inbox/session-source/:sessionId',action(req=>taskmasterInboxService.sessionSource(String(req.params.sessionId))));
   router.get('/inbox/global', action(() => taskmasterInboxService.global()));
-  router.post('/inbox/intelligence/execute',action(req=>taskIntelligenceService.executeWithContext(z.object({id:z.string().min(1),parent:z.boolean().default(false),settings:executionSettings.optional()}).parse(req.body))));
+  router.post('/inbox/intelligence/execute',action(req=>taskIntelligenceService.executeWithContext(z.object({id:z.string().min(1),parent:z.boolean().default(false),userInput:z.string().max(10000).optional(),settings:executionSettings.optional()}).parse(req.body))));
   router.get('/inbox/intelligence',action(()=>taskIntelligenceService.snapshot()));
   router.post('/inbox/intelligence/refresh',action(req=>taskIntelligenceService.asyncStart(req.body?.force===true)));
   router.post('/inbox/intelligence/correct',action(req=>taskIntelligenceService.correct(req.body)));
