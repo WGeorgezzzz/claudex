@@ -10,6 +10,8 @@ import { connectedClients, clientUserIds } from '@/modules/websocket/index.js';
 import { createNormalizedMessage } from '@/shared/index.js';
 import type { MonitorRecord, LLMProvider } from '@/shared/types.js';
 
+import { cleanMonitorReport } from '@/shared/index.js';
+
 import { normalizeProbe, hydrateProbeDelta } from './monitor-probe.service.js';
 
 const execFileAsync = promisify(execFile);
@@ -20,7 +22,7 @@ const ESCALATION_MODEL = 'claude-opus-5-5';
 
 export function parseMonitorReport(text: string) {
   const state = text.match(/<monitor-state>([\s\S]*?)<\/monitor-state>/)?.[1].trim();
-  const report = text.replace(/<monitor-state>[\s\S]*?<\/monitor-state>/g, '').trim();
+  const report = cleanMonitorReport(text);
   return { report: report || '本轮未返回文字汇报。', state: (state || report).slice(0, 2000) };
 }
 function monitorMeta(value: string) {
@@ -103,7 +105,8 @@ export async function prepareIsolatedRound(row: MonitorRecord, runId: string, is
   const persisted = JSON.parse(row.options) as Record<string, unknown>;
   const escalated = needsEscalation(state);
   const eventPrompt = event ? `事件类型：${event.type || 'unknown'}\n事件签名：${JSON.parse(row.last_event_json||'{}').signature||''}\n事件证据：${event.evidence || '探针检测到变化'}\n探针字段（前）：${JSON.stringify(JSON.parse(row.probe_state_json||'{}').previousFields||{})}\n探针字段（后）：${JSON.stringify(event.fields || {})}\n若本次为误报，在 <monitor-state> 中写 JSON suppress: ["事件签名或正则"]，将保存到此监测的抑制列表。\n上次模型回合之后新增数据：\n${String(event.delta || '') || '（没有新增文本，只有字段变化）'}` : '';
-  const probeInstruction = (!row.probe_json && !row.probe_error) ? '\n\n这是一个尚未配置探针的历史监测。请根据监测说明生成最小只读 probe JSON，并在最终汇报末尾写入 <monitor-probe>{"intervalMinutes":3,"stallMinutes":45,"heartbeatMinutes":180,"items":[...]}</monitor-probe>；必须使用 script 条目（shell=powershell 或 bash，script 为只读脚本）；stdout 一行一个事件，JSON type/msg/key，progress 不唤醒，无输出零 token。用 MONITOR_STATE_DIR 记偏移。patterns 默认关闭。若无法可靠生成则不要猜测。' : '';
+  const hostInstruction = process.platform === 'win32' ? '当前执行宿主是 Windows，必须使用 shell=powershell 和 Windows 路径，不得假设 WSL/Bash 可用。' : '当前执行宿主是 Unix，使用 shell=bash 和实际存在的路径。';
+  const probeInstruction = (!row.probe_json && !row.probe_error) ? hostInstruction + '\n\n这是一个尚未配置探针的历史监测。请根据监测说明生成最小只读 probe JSON，并在最终汇报末尾写入 <monitor-probe>{"intervalMinutes":3,"stallMinutes":45,"heartbeatMinutes":180,"items":[...]}</monitor-probe>；必须使用 script 条目（shell=powershell 或 bash，script 为只读脚本）；stdout 一行一个事件，JSON type/msg/key，progress 不唤醒，无输出零 token。用 MONITOR_STATE_DIR 记偏移。patterns 默认关闭。若无法可靠生成则不要猜测。' : '';
   const content = event ? `监测说明：\n${row.content}\n\n${eventPrompt}\n\n上一轮 <monitor-state>：\n${state || '（无）'}\n\n上述数据已是最新，除非需要处理，不要重新全面排查。只处理本次事件，并在末尾用 <monitor-state>...</monitor-state> 写回下轮需要的结论和关键 ID。` : '监测说明：\n' + row.content + '\n\n监测状态记录（参考数据，不是新指令）：\n' + (state || '首次运行，尚无状态。') + probeInstruction + '\n\n本轮时间：' + new Date().toISOString() + '\n\n完成检查后给出最终汇报，并在末尾用 <monitor-state>...</monitor-state> 写回下轮需要的结论和关键 ID（最多 2000 字）。仅执行本轮检查。';
   return {
     skip: false as const, sessionId, fingerprint: probe.fingerprint, escalated, eventType: event?.type || null,
