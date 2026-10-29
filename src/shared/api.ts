@@ -5,7 +5,7 @@ import {
 } from '@/shared/authToken';
 import { IS_PLATFORM } from '@/shared/utils';
 import { readVoiceConfig, voiceConfigHeaders } from '@/shared/voiceConfig';
-import type { MonitorCalendarSchedule, SessionWorkspaceChange } from '@/shared/types';
+import type { MonitorCalendarSchedule, MonitorProbeSpec, SessionWorkspaceChange } from '@/shared/types';
 
 // Headers are a plain record rather than the full `HeadersInit` union so the
 // defaults below can be merged with a caller's headers by spreading.
@@ -391,7 +391,7 @@ export const api = {
     saveContextSettings: (threshold?: number, percent?:number) => put('/api/monitors/context-settings', { threshold,percent }),
     summaries: () => get('/api/monitors/summaries'),
     capabilities: (options: ApiRequestOptions = {}) => get('/api/monitors/capabilities',options),
-    update: (id: string, input: {name:string;content:string;intervalMinutes:number;schedule?:MonitorCalendarSchedule|null;runMode?:string}) => patch('/api/monitors/' + encodeURIComponent(id), input),
+    update: (id: string, input: {name:string;content:string;intervalMinutes:number;schedule?:MonitorCalendarSchedule|null;runMode?:string;probe?:MonitorProbeSpec|null}) => patch('/api/monitors/' + encodeURIComponent(id), input),
     list: (sessionId?: string,offset=0) => get('/api/monitors?'+new URLSearchParams({...sessionId?{sessionId}:{},...offset?{offset:String(offset)}:{}})),
     create: (input: Record<string, unknown>) => post('/api/monitors', input),
     action: (id: string, action: string) => post('/api/monitors/' + encodeURIComponent(id) + '/action', {action}),

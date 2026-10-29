@@ -2,19 +2,20 @@ import { withUserContext } from '@/modules/auth/index.js';
 import { assertOwnedSession } from '@/modules/access-control/index.js';
 import { monitorsDb } from '@/modules/database/index.js';
 import { sessionsService, providerTokenUsageService } from '@/modules/providers/index.js';
-import { connectedClients, clientUserIds } from '@/modules/websocket/index.js';
+import { chatRunRegistry, connectedClients, clientUserIds, runDetachedChatTurn, type ProviderRuntimeGateway } from '@/modules/websocket/index.js';
 import { createNormalizedMessage } from '@/shared/index.js';
 import type { LLMProvider } from '@/shared/types.js';
-import { chatRunRegistry, runDetachedChatTurn } from '@/modules/websocket/index.js';
-import type { ProviderRuntimeGateway } from '@/modules/websocket/index.js';
+
 import { maintainMonitorContext } from './monitor-context.service.js';
 import { prepareIsolatedRound, finishMonitorReport } from './monitor-isolated.service.js';
+import { pollMonitorProbes } from './monitor-probe.service.js';
 
 let timer: ReturnType<typeof setInterval>|null=null;
 export function shouldIsolateMonitor(runMode:unknown,contextTokens:number):boolean{return runMode!=='original'||contextTokens>120_000;}
 
 /** Used by server startup and monitor tests; claims runs before any provider is awaited. */
 export async function dispatchMonitors(runtime: ProviderRuntimeGateway,now=new Date()): Promise<number> {
+  await pollMonitorProbes(now);
   const due=monitorsDb.due(now);
   if(!due.length)return 0;
   // Include CLI sessions outside this service; a separate terminal may own the same transcript.
@@ -44,6 +45,8 @@ export async function dispatchMonitors(runtime: ProviderRuntimeGateway,now=new D
         }
         const round=await prepareIsolatedRound(row,runId,isolated);
         if(round?.skip){monitorsDb.finishNoChange(row.id,runId);return;}
+        monitorsDb.recordPromptEvidence(row.id,runId,round?.eventType ?? null,round?.content || row.content);
+        monitorsDb.markModelRound(row.id);
         const sessionId=round?.sessionId||await maintainMonitorContext(row,runId,row.session_id);
         let finalText='';
         let providerError: string|null=null;

@@ -40,6 +40,6 @@ monitorsRoutes.post('/:id/action',asyncHandler(async(req,res)=>{
 monitorsRoutes.patch('/:id',asyncHandler(async(req,res)=>{
   const body=req.body??{};
   res.json(createApiSuccessResponse(monitorsService.update(userId(req),String(req.params.id),{
-    name:body.name,content:body.content,intervalMinutes:body.intervalMinutes,schedule:body.schedule,runMode:body.runMode,
+    name:body.name,content:body.content,intervalMinutes:body.intervalMinutes,schedule:body.schedule,runMode:body.runMode,probe:body.probe,
   })));
 }));

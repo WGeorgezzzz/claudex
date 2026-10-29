@@ -22,6 +22,12 @@ const shape={
     z.object({frequency:z.literal('daily'),time:z.string(),timeZone:z.string()}).strict(),
     z.object({frequency:z.literal('weekly'),time:z.string(),timeZone:z.string(),weekdays:z.array(z.number().int().min(1).max(7)).min(1).max(7)}).strict(),
   ]).nullable().optional().describe('Calendar time HH:mm with explicit IANA timeZone. Weekly ISO weekdays: Monday=1, Sunday=7. Null switches back to interval scheduling.'),
+  probe:z.object({
+    intervalMinutes:z.number().int().min(1).max(60).optional(),
+    stallMinutes:z.number().int().min(1).max(10080).optional(),
+    heartbeatMinutes:z.number().int().min(1).max(10080).optional(),
+    items:z.array(z.record(z.string(),z.unknown())).min(1),
+  }).optional().describe('Optional zero-token probe spec. Items point at STATUS.md, DONE.json, codex-run.log, codex.pid, a read-only command or patterns; use command with ssh when the task is remote.'),
 };
 type ToolContext={userId:number;sessionId:string;monitorId?:string;model?:string;effort?:string;permissionMode?:string;readOnly?:boolean};
 
@@ -29,6 +35,8 @@ function visible(row:ReturnType<typeof monitorsService.require>) {
   return {id:row.id,name:row.name,content:row.content,intervalMinutes:row.interval_minutes,status:row.status,
     schedule:row.schedule_json?JSON.parse(row.schedule_json):null,permissionMode:JSON.parse(row.options).permissionMode??'default',
     running:Boolean(row.running_id),nextRunAt:row.status==='active'?row.next_run_at:null,runCount:row.run_count,lastError:row.last_error,
+    mode:row.monitor_mode||'scheduled',probe:row.probe_json?JSON.parse(row.probe_json):null,probeState:row.probe_state_json?JSON.parse(row.probe_state_json):null,
+    lastEvent:row.last_event_json?JSON.parse(row.last_event_json):null,heartbeatCount:row.heartbeat_count||0,modelRoundCount:row.model_round_count||0,probeError:row.probe_error,
     consecutiveFailures:row.consecutive_failures,autoRetry:row.status==='active'&&row.consecutive_failures>0,pauseReason:row.pause_reason};
 }
 
@@ -43,7 +51,7 @@ export function executeMonitorTool(context:ToolContext,input:unknown): unknown {
   // Scheduled turns may inspect/stop themselves but cannot broaden their own schedule.
   if(context.monitorId && !['list','get','history','pause','stop','update'].includes(args.action))
     throw new Error('自动监测期间只能查看、修改自身说明、暂停或停止自身任务；调度修改请由用户在聊天中提出。');
-  if(context.monitorId && args.action==='update' && (args.intervalMinutes!==undefined || args.schedule!==undefined || args.runMode!==undefined))
+  if(context.monitorId && args.action==='update' && (args.intervalMinutes!==undefined || args.schedule!==undefined || args.runMode!==undefined || args.probe!==undefined))
     throw new Error('监测回合只能修改自身 name 和 content；间隔、日历规则和权限模式请由用户在聊天里修改。');
   if(args.action==='list'){const rows=monitorsService.listView(context.userId,undefined,Boolean(args.includeStopped),args.offset??0);return {monitors:rows,nextOffset:rows.length===10?(args.offset??0)+10:null};}
   if(args.action==='create') {
@@ -52,7 +60,7 @@ export function executeMonitorTool(context:ToolContext,input:unknown): unknown {
     const scheduleJson=schedule?JSON.stringify(schedule):null;
     const duplicate=monitorsService.list(context.userId,context.sessionId).find(row=>row.status!=='stopped'&&row.name===args.name!.trim()&&row.content===args.content!.trim()&&row.schedule_json===scheduleJson&&(schedule||row.interval_minutes===args.intervalMinutes)&&(JSON.parse(row.options).runMode||'isolated')===(args.runMode||'isolated'));
     if(duplicate)return {monitor:visible(duplicate),reused:true};
-    const row=monitorsService.create(context.userId,{sessionId:context.sessionId,name:args.name,content:args.content,intervalMinutes:args.intervalMinutes,schedule,
+    const row=monitorsService.create(context.userId,{sessionId:context.sessionId,name:args.name,content:args.content,intervalMinutes:args.intervalMinutes,schedule,probe:args.probe,
       options:{...(args.model?{model:args.model}:{}),effort:args.model?session.effort||context.effort:'medium',permissionMode: context.permissionMode || 'bypassPermissions',...(args.runMode?{runMode:args.runMode}:{})}});
     return {monitor:visible(row),reused:false,permissionMode:JSON.parse(row.options).permissionMode,note:'已保存到本地调度器。权限沿用创建时的会话设置。电脑和本地服务需运行，关闭聊天页面不影响调度。'};
   }
