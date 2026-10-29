@@ -38,6 +38,21 @@ function fakeServer(onRequest: (request: Request, reply: (result: unknown, error
 const THREAD = 'thread-1';
 const TURN = 'turn-1';
 
+test('monitor context uses developer instructions while native user input stays exact',async()=>{
+  for(const context of ['NEW_REPORT',undefined]){
+    const server=fakeServer((request,reply,notify)=>{
+      if(request.method==='thread/start'){assert.equal(request.params?.developerInstructions,context??null);return reply({thread:{id:THREAD}});}
+      reply({});
+      if(request.method==='turn/start'){
+        assert.deepEqual(request.params?.input,[{type:'text',text:'用户原话',text_elements:[]}]);
+        assert.equal(request.params?.collaborationMode.settings.developer_instructions,context??null);
+        notify('turn/completed',{threadId:THREAD,turn:{id:TURN,status:'completed'}});
+      }
+    });
+    for await(const _event of runCodexAppServerTurn({env:{},cwd:process.cwd(),model:'test-model',sandbox:'workspace-write',approvalPolicy:'never',input:'用户原话',monitorReportContext:context,signal:new AbortController().signal,sessionKeys:()=>['context-test'],spawnServer:()=>server.child})){}
+  }
+});
+
 test('monitor rounds disable discovered skills, memory and unrelated MCP only for their thread',async()=>{
   let config:Record<string,any>|undefined;
   const server=fakeServer((request,reply,notify)=>{

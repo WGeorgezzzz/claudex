@@ -16,3 +16,11 @@ export function cleanMonitorReport(text: string): string {
   }
   return (result + strip(text.slice(offset))).trim();
 }
+
+/** Read old prefixed user turns without rewriting the provider's raw evidence. */
+export function cleanLegacyMonitorUserMessage(text:string):string {
+  if(!text.startsWith('最近自动监测汇报（参考资料）：\n'))return text;
+  const separator='\n\n用户消息：\n';
+  const index=text.indexOf(separator);
+  return index<0?text:text.slice(index+separator.length);
+}

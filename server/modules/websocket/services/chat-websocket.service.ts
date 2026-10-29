@@ -1,5 +1,4 @@
 import { randomUUID } from 'node:crypto';
-import { monitorsDb } from '@/modules/database/index.js';
 import { getCurrentUserContext, withUserContext } from '@/modules/auth/index.js';
 import path from 'node:path';
 
@@ -23,6 +22,7 @@ import type {
   ProviderRuntimeWriter,
 } from '@/shared/types.js';
 import { parseIncomingJsonObject } from '@/shared/utils.js';
+import { takeMonitorReportContext } from './monitor-report-context.js';
 
 /**
  * Trust boundary for client-supplied image attachments: chat.send options come
@@ -260,11 +260,9 @@ async function dispatchRun(
     delete clientOptions.cloudcliSupervisorInitialSeq;
     delete clientOptions.cloudcliMonitorReceipt;
     if(ws)delete clientOptions.cloudcliBridgeUserAuthorization;
-    let command = typeof data.content === 'string' ? data.content : '';
-    if(!clientOptions.cloudcliMonitorId&&!clientOptions.bridgeCompact&&!command.trimStart().startsWith('/')){
-      const reports=monitorsDb.reportMessages(sessionId).slice(-3);
-      if(reports.length)command='最近自动监测汇报（参考资料）：\n'+reports.map(r=>r.name+': '+r.report).join('\n').slice(-6000)+'\n\n用户消息：\n'+command;
-    }
+    const command = typeof data.content === 'string' ? data.content : '';
+    // This option is server-owned. The command is always the user's exact text.
+    delete clientOptions.cloudcliMonitorReportContext;
 
     // Record what this turn runs with so reopening the session later restores the
     // same model and reasoning effort, and so the resume path has a
@@ -313,6 +311,9 @@ async function dispatchRun(
     // be taken back. Inside the try so a rewind that throws still releases the
     // run instead of leaving the session processing forever.
     await beforeRun?.(run);
+    if(!clientOptions.cloudcliMonitorId&&!clientOptions.cloudcliBridgeSourceSessionId&&!clientOptions.bridgeCompact){
+      runtimeOptions.cloudcliMonitorReportContext=await takeMonitorReportContext(sessionId,!command.trimStart().startsWith('/')&&(provider==='claude'||provider==='codex'));
+    }
     await dependencies.runtime.run(provider, command, runtimeOptions, run.writer);
   } catch (error) {
     failure = error instanceof Error ? error.message : String(error);

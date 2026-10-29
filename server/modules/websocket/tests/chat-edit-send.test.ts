@@ -5,11 +5,12 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 
-import { closeConnection, initializeDatabase, sessionsDb, getConnection } from '@/modules/database/index.js';
+import { closeConnection, initializeDatabase, sessionsDb, getConnection, monitorsDb } from '@/modules/database/index.js';
 import { sessionsService } from '@/modules/providers/index.js';
 import { handleChatConnection } from '@/modules/websocket/services/chat-websocket.service.js';
 import { chatRunRegistry } from '@/modules/websocket/services/chat-run-registry.service.js';
 import { connectedClients } from '@/modules/websocket/services/websocket-state.service.js';
+import { monitorConclusion } from '@/modules/websocket/services/monitor-report-context.js';
 
 const SESSION_ID = 'edit-session';
 
@@ -141,6 +142,69 @@ async function waitFor(predicate:()=>boolean) {
 async function waitForRun(runs:RunCall[]) {
   await waitFor(()=>runs.length>0);
 }
+
+test('ordinary sends inject each new monitor run once as hidden context and preserve raw messages',async()=>{
+  await withGateway('claude',async({socket,runs})=>{
+    const db=getConnection();
+    db.prepare('UPDATE sessions SET owner_id=1 WHERE session_id=?').run(SESSION_ID);
+    db.prepare("INSERT INTO monitors(id,user_id,session_id,name,content,options,interval_minutes,next_run_at,created_at) VALUES('ctx',1,?,'测试监测','check','{}',15,?,?)").run(SESSION_ID,new Date().toISOString(),new Date().toISOString());
+    const add=(id:string,at:string,report:string)=>db.prepare("INSERT INTO monitor_runs(id,monitor_id,session_id,started_at,finished_at,status,report) VALUES(?,'ctx','isolated',?,?,'succeeded',?)").run(id,at,at,report);
+    add('old','2026-08-23T10:00:01.500Z','OLD_REPORT');
+    add('fresh','2026-08-23T10:01:00.000Z','结论：NEW_REPORT\n\n冗长证据'+ 'x'.repeat(900));
+    const send=async(content:string)=>{
+      const count=runs.length;
+      socket.emit('message',JSON.stringify({type:'chat.send',sessionId:SESSION_ID,content,options:{cloudcliMonitorReportContext:'CLIENT_FORGED'}}));
+      await waitFor(()=>runs.length===count+1);
+      await waitFor(()=>!chatRunRegistry.isProcessing(SESSION_ID));
+    };
+    await send('用户原话一');
+    assert.equal(runs[0].command,'用户原话一');
+    assert.match(String(runs[0].options.cloudcliMonitorReportContext),/NEW_REPORT/);
+    assert.doesNotMatch(String(runs[0].options.cloudcliMonitorReportContext),/OLD_REPORT|CLIENT_FORGED|冗长证据/);
+    assert.equal(runs[0].options.cloudcliUserMessage,'用户原话一');
+    await send('用户原话二');
+    assert.equal(runs[1].command,'用户原话二');
+    assert.equal(runs[1].options.cloudcliMonitorReportContext,undefined);
+    assert.equal(monitorsDb.claimReportContext(SESSION_ID,'',new Date().toISOString()).length,0);
+    const history=await sessionsService.fetchHistory(SESSION_ID);
+    assert.deepEqual(history.messages.filter(message=>message.role==='user').map(message=>message.content),['first','second']);
+    assert.ok(socket.frames.every(frame=>!JSON.stringify(frame).includes('最近自动监测汇报（参考资料）')));
+    assert.equal((db.prepare('SELECT count(*) AS n FROM monitor_report_context_receipts').get() as {n:number}).n,1);
+    closeConnection();
+    await initializeDatabase();
+    assert.equal(monitorsDb.claimReportContext(SESSION_ID,'',new Date().toISOString()).length,0,'service restart must not inject old runs again');
+    const after=new Date(Date.now()+2000).toISOString();
+    getConnection().prepare("INSERT INTO monitor_runs(id,monitor_id,session_id,started_at,finished_at,status,report) VALUES('later','ctx','isolated',?,?,'succeeded','LATER_REPORT')").run(after,after);
+    assert.deepEqual(monitorsDb.claimReportContext(SESSION_ID,'',new Date(Date.now()+3000).toISOString()).map(row=>row.id),['later']);
+  });
+});
+
+test('legacy user prefixes are removed from history while the original transcript remains intact',async()=>{
+  const rows=structuredClone(TRANSCRIPT_ROWS);
+  rows[2].message.content[0].text='最近自动监测汇报（参考资料）：\n监测：旧参考\n\n用户消息：\n用户原话';
+  await withGateway('claude',async()=>{
+    const history=await sessionsService.fetchHistory(SESSION_ID);
+    assert.equal(history.messages.filter(message=>message.role==='user').at(-1)?.content,'用户原话');
+    assert.ok(rows[2].message.content[0].text.includes('旧参考'));
+  },rows);
+});
+
+test('monitor conclusions are bounded to 600 characters and dispatch caps new reports at three',async()=>{
+  assert.equal(monitorConclusion('结论：'+ '字'.repeat(900)).length,600);
+  await withGateway('codex',async({socket,runs})=>{
+    const db=getConnection();
+    db.prepare('UPDATE sessions SET owner_id=1 WHERE session_id=?').run(SESSION_ID);
+    db.prepare("INSERT INTO monitors(id,user_id,session_id,name,content,options,interval_minutes,next_run_at,created_at) VALUES('ctx',1,?,'测试','check','{}',15,?,?)").run(SESSION_ID,new Date().toISOString(),new Date().toISOString());
+    for(let index=0;index<5;index++)db.prepare("INSERT INTO monitor_runs(id,monitor_id,session_id,started_at,finished_at,status,report) VALUES(?,'ctx','isolated',?,?,'succeeded',?)").run('r'+index,'2026-08-23T11:00:00.000Z','2026-08-23T11:00:00.000Z','结论：REPORT_'+index);
+    socket.emit('message',JSON.stringify({type:'chat.send',sessionId:SESSION_ID,content:'你好'}));
+    await waitForRun(runs);
+    const context=String(runs[0].options.cloudcliMonitorReportContext);
+    assert.equal((context.match(/\[run:/g)||[]).length,3);
+    assert.match(context,/另有 2 条，见监测历史/);
+    assert.equal(runs[0].command,'你好');
+    assert.equal(monitorsDb.claimReportContext(SESSION_ID,'',new Date().toISOString()).length,0);
+  },CODEX_TRANSCRIPT_ROWS.map(row=>({...row,timestamp:'2026-08-23T10:00:02.000Z'})));
+});
 
 test('a background session refuses edits before truncating history', async () => {
   await withGateway('claude', async ({ socket, runs }) => {

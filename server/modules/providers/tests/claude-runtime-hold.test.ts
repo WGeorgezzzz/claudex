@@ -32,6 +32,7 @@ type Scripted = {
   stopped: string[];
   prompts: unknown[];
   modes: string[];
+  context: () => Promise<unknown>;
 };
 
 /** A stand-in for the SDK query: yields what the test emits, and reads the held prompt to notice its release. */
@@ -55,9 +56,11 @@ function createScriptedQuery(): { createQuery: NonNullable<ProviderRuntimeContex
     stopped,
     prompts,
     modes,
+    context: async () => ({}),
   };
 
-  const createQuery: NonNullable<ProviderRuntimeContext['createQuery']> = ({ prompt }) => {
+  const createQuery: NonNullable<ProviderRuntimeContext['createQuery']> = ({ prompt, options }) => {
+    script.context = options.hooks!.UserPromptSubmit![0].hooks[0] as never;
     void (async () => {
       for await (const message of prompt) { prompts.push(message); }
       released = true;
@@ -90,6 +93,7 @@ function createScriptedQuery(): { createQuery: NonNullable<ProviderRuntimeContex
 
 async function withRun(
   runTest: (context: { script: Scripted; sent: NormalizedMessage[]; done: Promise<unknown>; continueRun: (writer: unknown, options?: Record<string, unknown>) => Promise<unknown> }) => Promise<void>,
+  initialOptions:Record<string,unknown> = {},
 ): Promise<void> {
   const cwd = await mkdtemp(path.join(os.tmpdir(), 'claude-runtime-hold-'));
   const { createQuery, script } = createScriptedQuery();
@@ -105,7 +109,7 @@ async function withRun(
     createQuery,
   };
 
-  const done = queryClaudeSDK('hello', { sessionId: SESSION_ID, cwd }, writer as never, context);
+  const done = queryClaudeSDK('hello', { sessionId: SESSION_ID, cwd, ...initialOptions }, writer as never, context);
   try {
     await waitFor(() => script.prompts.length === 1);
     await runTest({ script, sent, done, continueRun: (nextWriter, options = {}) => queryClaudeSDK('second prompt', { sessionId: SESSION_ID, cwd, ...options }, nextWriter as never, { ...context, createQuery: () => { throw new Error('must reuse the live query'); } }) });
@@ -119,6 +123,17 @@ async function withRun(
 }
 
 const settle = () => new Promise((resolve) => { setTimeout(resolve, 25); });
+
+test('a fresh Claude prompt receives report context through a one-time hook and keeps the user text',async()=>{
+  await withRun(async({script,done})=>{
+    assert.equal((script.prompts[0] as any).message.content,'hello');
+    assert.deepEqual(await script.context(),{hookSpecificOutput:{hookEventName:'UserPromptSubmit',additionalContext:'NEW_REPORT'}});
+    assert.deepEqual(await script.context(),{});
+    script.emit({type:'result',subtype:'success',session_id:NATIVE_ID,result:'done'});
+    script.end();
+    await done;
+  },{cloudcliMonitorReportContext:'NEW_REPORT'});
+});
 
 test('a native error result cannot report a successful queue completion',async()=>{
   await withRun(async({script,sent,done})=>{
@@ -313,12 +328,15 @@ test('another prompt reuses the live CLI and routes its completion to the new wr
     script.emit(result());
     await waitFor(() => sent.some(m => m.kind === 'complete'));
     const next: NormalizedMessage[] = [];
-    const continued = continueRun({send:(m:NormalizedMessage)=>next.push(m),userId:null},{permissionMode:'plan'});
-    await settle();
+    const continued = continueRun({send:(m:NormalizedMessage)=>next.push(m),userId:null},{permissionMode:'plan',cloudcliMonitorReportContext:'NEW_REPORT'});
+    await waitFor(()=>script.prompts.length===2);
     assert.equal(script.released(),false,'old stdin must remain open');
     assert.deepEqual(script.stopped,[],'no stopTask is sent');
     assert.equal(script.prompts.length,2,'new prompt reaches the same input stream');
     assert.deepEqual(script.modes,['plan'],'permission changes apply to the existing process');
+    assert.deepEqual(await script.context(),{hookSpecificOutput:{hookEventName:'UserPromptSubmit',additionalContext:'NEW_REPORT'}});
+    assert.deepEqual(await script.context(),{},'the report is only added once');
+    assert.equal((script.prompts.at(-1) as any).message.content,'second prompt');
     assert.equal(next.some(m=>m.kind==='complete'),false,'no premature completion');
     script.emit({...result(),user_message_uuid:'unrelated-background-notification'});
     await settle();

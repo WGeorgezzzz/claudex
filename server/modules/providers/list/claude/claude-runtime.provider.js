@@ -1097,6 +1097,16 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
       }]
     };
 
+    // Hook context reaches the model without becoming a user transcript row.
+    // Unlike a startup system prompt, this also works on a retained CLI query.
+    let pendingMonitorReportContext = options.cloudcliMonitorReportContext;
+    const monitorReportContextHook = async () => {
+      const additionalContext = pendingMonitorReportContext;
+      pendingMonitorReportContext = undefined;
+      return additionalContext ? {hookSpecificOutput:{hookEventName:'UserPromptSubmit',additionalContext}} : {};
+    };
+    sdkOptions.hooks.UserPromptSubmit = [{hooks:[monitorReportContextHook]}];
+
     // Interactive tools must retain the user's input surface. The installed
     // CLI was verified to route AskUserQuestion here even in auto mode.
     sdkOptions.canUseTool = async (toolName, input, context) => {
@@ -1267,6 +1277,7 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
       const current = getSession(sessionKey());
       if (current?.instance === queryInstance) current.writer = nextWriter;
       turnCompleteSent = false;
+      pendingMonitorReportContext = nextOptions.cloudcliMonitorReportContext;
       assistantBudgetSent = false;
       heldPrompt.push(messages);
       return completion;

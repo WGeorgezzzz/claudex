@@ -317,7 +317,8 @@ async function queryCodex(
 
   try {
     const env = getCurrentUserContext()?.env ?? process.env;
-    codex = new Codex({ env: Object.fromEntries(Object.entries(env).filter((entry): entry is [string, string] => entry[1] !== undefined)) });
+    codex = new Codex({ env: Object.fromEntries(Object.entries(env).filter((entry): entry is [string, string] => entry[1] !== undefined)),
+      ...(typeof options.cloudcliMonitorReportContext==='string'&&options.cloudcliMonitorReportContext?{config:{developer_instructions:options.cloudcliMonitorReportContext}}:{}) });
 
     const threadOptions: ThreadOptions = {
       workingDirectory,
@@ -379,6 +380,7 @@ async function queryCodex(
         planMode: permissionMode === 'plan',
         dynamicTools: [bridge?.specification,monitor?.specification].filter(Boolean) as any,
         monitorSlim:Boolean(options.monitorSlim),
+        monitorReportContext:typeof options.cloudcliMonitorReportContext==='string'?options.cloudcliMonitorReportContext:undefined,
         onRequest: (message, reply) => {
           if (bridge && message.method === 'item/tool/call' && message.params?.tool === 'claudex_sessions') {
             void bridge.execute(message.params.arguments).then(result => reply({success:true,contentItems:[{type:'inputText',text:JSON.stringify(result)}]}), error => reply({success:false,contentItems:[{type:'inputText',text:String(error.message || error)}]}));

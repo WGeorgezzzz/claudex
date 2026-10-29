@@ -52,6 +52,7 @@ export type CodexAppServerTurnOptions = {
   planMode?: boolean;
   dynamicTools?: AnyRecord[];
   monitorSlim?: boolean;
+  monitorReportContext?: string;
   /** The runtime owns approval UI and clears it when native requests end. */
   onRequest?: (message: AnyRecord, reply: (result: AnyRecord) => void) => boolean;
   onRequestResolved?: (id: string | number) => void;
@@ -321,7 +322,7 @@ export async function* runCodexAppServerTurn(options: CodexAppServerTurnOptions)
   };
   const startTurn=()=>options.compactOnly?call('thread/compact/start',{threadId}):call('turn/start',{
     threadId,input:toUserInput(options.input),...(options.effort?{effort:options.effort}:{}),
-    ...(options.model?{model:options.model,collaborationMode:{mode:options.planMode?'plan':'default',settings:{model:options.model,reasoning_effort:options.effort??null,developer_instructions:null}}}:{}),
+    ...(options.model?{model:options.model,collaborationMode:{mode:options.planMode?'plan':'default',settings:{model:options.model,reasoning_effort:options.effort??null,developer_instructions:options.monitorReportContext??null}}}:{}),
   });
   const consume=async function*(){
     while(true){if(queue.length){yield queue.shift()!;continue;}if(finished)break;await new Promise<void>(resolve=>{wake=resolve;});wake=null;}
@@ -354,6 +355,7 @@ export async function* runCodexAppServerTurn(options: CodexAppServerTurnOptions)
     const threadParams = {
       cwd: options.cwd, model: options.model ?? null,
       sandbox: options.sandbox, approvalPolicy: options.approvalPolicy,
+      developerInstructions:options.monitorReportContext??null,
       ...(options.dynamicTools?.length ? { dynamicTools: options.dynamicTools } : {}),
       ...(monitorConfig?{config:monitorConfig}:{}),
     };
