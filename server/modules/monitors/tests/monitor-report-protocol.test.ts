@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+
 import { parseMonitorReport } from '../monitor-isolated.service.js';
 import { decodeScriptOutput } from '../monitor-script.service.js';
 

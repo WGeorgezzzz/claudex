@@ -3,6 +3,7 @@ import { mkdir, appendFile } from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import { createHash } from 'node:crypto';
+
 import { killProcessTree } from '@/shared/process-tree.js';
 import type { MonitorProbeEvent, MonitorRecord } from '@/shared/types.js';
 

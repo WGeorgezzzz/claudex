@@ -7,10 +7,8 @@ import path from 'node:path';
 import { monitorsDb, sessionsDb } from '@/modules/database/index.js';
 import { sessionsService, providerTokenUsageService } from '@/modules/providers/index.js';
 import { connectedClients, clientUserIds } from '@/modules/websocket/index.js';
-import { createNormalizedMessage } from '@/shared/index.js';
+import { createNormalizedMessage, cleanMonitorReport } from '@/shared/index.js';
 import type { MonitorRecord, LLMProvider } from '@/shared/types.js';
-
-import { cleanMonitorReport } from '@/shared/index.js';
 
 import { normalizeProbe, hydrateProbeDelta } from './monitor-probe.service.js';
 
