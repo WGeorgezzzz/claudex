@@ -159,7 +159,14 @@ export const monitorsDb = {
       AND (last_probe_at IS NULL OR julianday(last_probe_at)+COALESCE(NULLIF(json_extract(probe_json,'$.intervalMinutes'),0),3)/1440.0<=julianday(?))
       ORDER BY COALESCE(last_probe_at,created_at) LIMIT 32`).all(now.toISOString()) as MonitorRecord[];
   },
+  markProbeGenerationFailed(id:string):void {
+    getConnection().prepare("UPDATE monitors SET probe_error='Script generation failed; scheduled fallback' WHERE id=?").run(id);
+  },
   setProbe(userId:number,id:string,probe:MonitorProbeSpec|null): void {
+    const db=getConnection();
+    db.exec('CREATE TABLE IF NOT EXISTS monitor_probe_audit (id INTEGER PRIMARY KEY,monitor_id TEXT,user_id INTEGER,changed_at TEXT,old_probe TEXT,new_probe TEXT)');
+    const old=this.get(userId,id);
+    if(old?.probe_json!==JSON.stringify(probe))db.prepare('INSERT INTO monitor_probe_audit(monitor_id,user_id,changed_at,old_probe,new_probe) VALUES(?,?,?,?,?)').run(id,userId,new Date().toISOString(),old?.probe_json||null,probe?JSON.stringify(probe):null);
     getConnection().prepare("UPDATE monitors SET probe_json=?,probe_state_json=NULL,monitor_mode=?,last_event_json=NULL,last_probe_at=NULL,probe_error=NULL,next_run_at=? WHERE user_id=? AND id=? AND status<>'stopped'")
       .run(probe?JSON.stringify(probe):null,probe?'event':'scheduled',new Date().toISOString(),userId,id);
   },

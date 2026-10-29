@@ -1676,6 +1676,8 @@ export type MonitorCalendarSchedule = {
   frequency: 'daily'|'weekly'; time: string; timeZone: string; weekdays?: number[];
 };
 export type MonitorProbeSpec = {
+  script?: string;
+  shell?: 'powershell'|'bash';
   suppress?: string[];
   intervalMinutes?: number;
   stallMinutes?: number;
@@ -1685,7 +1687,7 @@ export type MonitorProbeSpec = {
 export type MonitorProbeEvent = {
   signature?: string;
   count?: number;
-  type: 'done'|'error'|'stall'|'dead'|'threshold'|'heartbeat';
+  type: 'done'|'error'|'stall'|'dead'|'threshold'|'heartbeat'|'info';
   at: string;
   evidence: string;
   delta?: string;

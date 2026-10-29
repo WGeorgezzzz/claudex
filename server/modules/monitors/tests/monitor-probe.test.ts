@@ -135,3 +135,33 @@ test('Windows BOM JSON reads root status without promoting nested historical com
  const t=new Date();assert.equal(await runProbe(row,t),null);await writeFile(log,'1/4\nERROR quoted failure\n');
  assert.equal(await runProbe(monitorsDb.get(user,row.id)!,new Date(t.getTime()+180000)),null);
 }));
+
+test('script stdout is the only trigger: silence/progress stay token-free even after heartbeat',async()=>fixture(async(user,root)=>{
+  const now=new Date();
+  const row=monitorsService.create(user,{sessionId:'probe-session',name:'Script',content:'script',intervalMinutes:15,probe:{script:'Write-Output \'{"type":"progress","progress":42}\'',heartbeatMinutes:1}});
+  assert.equal(await runProbe(row,now),null);
+  assert.equal(await runProbe(monitorsDb.get(user,row.id)!,new Date(now.getTime()+46*60000)),null);
+  const saved=monitorsDb.get(user,row.id)!;
+  assert.equal(saved.heartbeat_count,2);assert.equal(saved.model_round_count,0);
+  assert.equal(JSON.parse(saved.probe_state_json!).progress,42);
+}));
+
+test('script event keys, multiline queue, cooldown, terminal exceptions and bounded state',async()=>fixture(async(user,root)=>{
+  const row=monitorsService.create(user,{sessionId:'probe-session',name:'Script events',content:'script',intervalMinutes:15,probe:{script:'Write-Output \'{"type":"error","msg":"real failure","key":"error1"}\'; Write-Output \'{"type":"done","msg":"finished","key":"done1"}\''}});
+  const now=new Date();
+  const first=await runProbe(row,now);assert.equal(first?.type,'error');assert.equal(first.signature,'script:error1');assert.match(first.delta||'',/real failure/);
+  const saved=monitorsDb.get(user,row.id)!;
+  assert(Buffer.byteLength(saved.probe_state_json!)<=2048);
+  assert(!saved.probe_state_json!.includes('"delta"'));
+  assert.equal((await runProbe(saved,new Date(now.getTime()+60000)))?.type,'done');
+  const state=JSON.parse(monitorsDb.get(user,row.id)!.probe_state_json!);assert(state.items.p0.eventCount>=2);
+  monitorsDb.setProbe(user,row.id,normalizeProbe({script:'Write-Output \'hello world\''})!);
+  const audit=getConnection().prepare('SELECT * FROM monitor_probe_audit WHERE monitor_id=?').all(row.id);assert.equal(audit.length,1);
+}));
+
+test('script without output never infers errors and stderr is diagnostic only',async()=>fixture(async(user,root)=>{
+  const row=monitorsService.create(user,{sessionId:'probe-session',name:'Silent script',content:'script',intervalMinutes:1,probe:{script:'[Console]::Error.WriteLine("ERROR diagnostic"); exit 2'}});
+  assert.equal(await runProbe(row),null);
+  assert.match(monitorsDb.get(user,row.id)!.probe_error||'',/script exit 2/);
+  assert.equal(normalizeProbe({script:' ',shell:'powershell'}),null);
+}));

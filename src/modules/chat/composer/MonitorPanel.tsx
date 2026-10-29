@@ -65,7 +65,7 @@ export function MonitorPanel({sessionId,draft,options}:{sessionId:string|null;dr
   };
   const parseProbe=(raw:string):MonitorProbeSpec|null=>{
     if(!raw.trim())return null;
-    const parsed=JSON.parse(raw);if(!parsed||!Array.isArray(parsed.items)||parsed.items.length===0)throw new Error('探针 JSON 必须包含 items 数组。');return parsed as MonitorProbeSpec;
+    const parsed=JSON.parse(raw);if(!parsed||(!parsed.script&&(!Array.isArray(parsed.items)||parsed.items.length===0)))throw new Error('探针 JSON 必须包含 script 或 items 数组。');return parsed as MonitorProbeSpec;
   };
   const saveProbe=async(row:Monitor)=>{
     const raw=probeDrafts[row.id]?.trim()||'';
@@ -89,7 +89,7 @@ export function MonitorPanel({sessionId,draft,options}:{sessionId:string|null;dr
             <label className="block text-sm">探针 JSON（可选，零 token）<textarea aria-label="探针 JSON" rows={3} value={probeJson} onChange={event=>setProbeJson(event.target.value)} placeholder={'{"intervalMinutes":3,"items":[{"type":"file","path":"STATUS.md","read":"tail"}]}' } className="mt-1 block w-full rounded border bg-background p-2 font-mono text-xs"/></label>
             <MonitorScheduleFields value={schedule} onChange={setSchedule} minutes={minutes} onMinutesChange={setMinutes} intervalLabel="监测间隔（分钟）" disabled={pending} calendarEnabled={calendarEnabled}/>
             <button disabled={pending} type="submit" className="rounded bg-primary px-3 py-2 text-sm text-primary-foreground disabled:opacity-50">添加监测</button>
-            <p className="text-xs text-muted-foreground">{schedule?'首次时间将在保存后按日历规则显示。':`首次将在 ${Number.isFinite(minutes)?minutes:30} 分钟后执行。`}默认 Sonnet 5.5，沿用当前权限；无变化时跳过模型，最长每 60 分钟真实检查一次。</p>
+            <p className="text-xs text-muted-foreground">{schedule?'首次时间将在保存后按日历规则显示。':`首次将在 ${Number.isFinite(minutes)?minutes:30} 分钟后执行。`}默认 Sonnet 5.5，沿用当前权限；脚本无输出不调用模型；progress 只记心跳。</p>
           </form>
           {rows.length===0&&<p className="text-sm text-muted-foreground">本会话还没有监测任务。</p>}
           <div className="space-y-3">{rows.map(row=><article key={row.id} className="rounded-lg border p-3">
@@ -97,10 +97,11 @@ export function MonitorPanel({sessionId,draft,options}:{sessionId:string|null;dr
             <p className="my-1 whitespace-pre-wrap text-sm">{row.content}</p>
             <p className="text-xs text-muted-foreground">{scheduleLabel(row)}{row.status==='active'&&row.nextRunAt?` · 下次 ${new Date(row.nextRunAt).toLocaleString('zh-CN')}`:''}</p>
              <p className="text-xs text-muted-foreground">模式：{row.mode==='event'?'事件唤醒':'定时'} · 探针：{row.probe?.items?.length??0} 项 · 心跳 {row.heartbeatCount??0} · 模型回合 {row.modelRoundCount??row.lastRun?.count??0}</p>
+             {row.probeState&&<pre aria-label="最近脚本输出与事件计数" className="mt-1 max-h-24 overflow-auto whitespace-pre-wrap text-xs">{JSON.stringify(row.probeState,null,2)}</pre>}
              {row.lastEvent&&<p className="mt-1 break-words text-xs text-amber-600">最近事件：{String(row.lastEvent.type||'unknown')} · {String(row.lastEvent.evidence||'')}</p>}
               {row.probeError&&<p className="mt-1 break-words text-xs text-red-600">探针错误：{row.probeError}</p>}
               {!!row.probe?.suppress?.length&&<ul aria-label={`抑制列表 ${row.name}`} className="mt-1 text-xs">{row.probe.suppress.map(value=><li key={value} className="break-words">{value} <button disabled={pending||row.status==='stopped'} onClick={()=>void perform(async()=>{const detail=await readResult(await api.monitors.get(row.id));await readResult(await api.monitors.update(row.id,{name:detail.name,content:detail.content,intervalMinutes:detail.interval_minutes,suppress:row.probe!.suppress!.filter(item=>item!==value)}));})}>删除抑制</button></li>)}</ul>}
-             <label className="mt-2 block text-xs">探针 JSON（file / process / command / patterns）<textarea aria-label={`探针 JSON ${row.name}`} rows={3} value={probeDrafts[row.id]??''} onChange={event=>setProbeDrafts(previous=>({...previous,[row.id]:event.target.value}))} placeholder={'{"intervalMinutes":3,"items":[{"type":"file","path":"STATUS.md","read":"tail"}]}' } className="mt-1 block w-full rounded border bg-background p-2 font-mono text-xs"/></label>
+             <label className="mt-2 block text-xs">探针 JSON（script / file / process / command，patterns 需显式启用）<textarea aria-label={`探针 JSON ${row.name}`} rows={3} value={probeDrafts[row.id]??''} onChange={event=>setProbeDrafts(previous=>({...previous,[row.id]:event.target.value}))} placeholder={'{"intervalMinutes":3,"items":[{"type":"file","path":"STATUS.md","read":"tail"}]}' } className="mt-1 block w-full rounded border bg-background p-2 font-mono text-xs"/></label>
             {row.lastRun?.error&&<p role="status" className="mt-1 text-xs text-amber-600">{row.lastRun.error}</p>}
             {row.last_error&&<p role="status" className="mt-1 text-xs text-amber-600">{row.last_error}</p>}
             <div className="mt-2 flex flex-wrap gap-2">

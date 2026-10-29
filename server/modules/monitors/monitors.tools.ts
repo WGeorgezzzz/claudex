@@ -23,12 +23,14 @@ const shape={
     z.object({frequency:z.literal('weekly'),time:z.string(),timeZone:z.string(),weekdays:z.array(z.number().int().min(1).max(7)).min(1).max(7)}).strict(),
   ]).nullable().optional().describe('Calendar time HH:mm with explicit IANA timeZone. Weekly ISO weekdays: Monday=1, Sunday=7. Null switches back to interval scheduling.'),
   probe:z.object({
+    script:z.string().min(1).max(32768).optional(),
+    shell:z.enum(['powershell','bash']).optional(),
     suppress:z.array(z.string().max(256)).max(16).optional(),
     intervalMinutes:z.number().int().min(1).max(60).optional(),
     stallMinutes:z.number().int().min(1).max(10080).optional(),
     heartbeatMinutes:z.number().int().min(1).max(10080).optional(),
-    items:z.array(z.record(z.string(),z.unknown())).min(1),
-  }).optional().describe('Optional zero-token probe spec. Items point at STATUS.md, DONE.json, codex-run.log, codex.pid, a read-only command or patterns; use command with ssh when the task is remote. Agent transcripts ignore keywords and only detect stalls/terminal EXIT lines; mark other transcripts source=agent. Task alerts match line starts, ignore diffs/echoes, and obey the monitor interval cooldown. suppress contains false-alert signatures or regexes.'),
+    items:z.array(z.record(z.string(),z.unknown())).min(1).optional(),
+  }).optional().describe('Zero-token polling script: probe.script plus shell=powershell|bash; timeout 60s; MONITOR_STATE_DIR stores offsets. Each stdout line is an event: JSON {type:error|stall|done|dead|info,msg,key} or plain text. progress updates heartbeat only; silence never wakes the model. Supply a script at creation. Templates: (1) codex directory: persist STATUS byte offset, emit new FAILED/blocker lines, DONE true or standalone EXIT n; agent log mtime stall only. (2) remote ledger: ssh -o BatchMode=yes host cat ledger.json, compare accepted, emit stall after 45m without growth. (3) process: Get-Process -Id PID -ErrorAction SilentlyContinue; emit dead once on disappearance. Keywords are opt-in. Legacy probe spec. Items point at STATUS.md, DONE.json, codex-run.log, codex.pid, a read-only command or patterns; use command with ssh when the task is remote. Agent transcripts ignore keywords and only detect stalls/terminal EXIT lines; mark other transcripts source=agent. Task alerts match line starts, ignore diffs/echoes, and obey the monitor interval cooldown. suppress contains false-alert signatures or regexes.'),
   suppress:z.array(z.string().max(256)).max(16).optional().describe('Replace false-alert signatures/regexes without resetting probe cursors; [] clears the list.'),
 };
 type ToolContext={userId:number;sessionId:string;monitorId?:string;model?:string;effort?:string;permissionMode?:string;readOnly?:boolean;authorization?:BridgeUserAuthorization};
