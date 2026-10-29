@@ -5,6 +5,24 @@ import { getSessionOwnerId, messageQueueDb, sessionsDb } from '@/modules/databas
 import { AppError } from '@/shared/utils.js';
 
 const conflict=()=>new AppError('The queued message changed or has already started. Refresh before editing.',{code:'QUEUE_CONFLICT',statusCode:409});
+let wakeup: (() => void) | null = null;
+const changeListeners = new Set<() => void>();
+
+/** Dot receipt delivery subscribes to durable queue transitions instead of polling idle rows. */
+export function subscribeMessageQueueChanges(listener: () => void): () => void {
+  changeListeners.add(listener);
+  return () => { changeListeners.delete(listener); };
+}
+
+/** Queue service and dispatcher announce persisted changes after synchronous transactions complete. */
+export function notifyMessageQueueChanged(): void {
+  for (const listener of changeListeners) listener();
+}
+
+/** The dispatcher registers its enqueue wake hook at server startup and releases it at shutdown. */
+export function registerMessageQueueWakeup(callback: (() => void) | null): void {
+  wakeup = callback;
+}
 
 /** Queue routes validate ownership and immutable request identity through this service. */
 export const messageQueueService = {
@@ -48,7 +66,10 @@ export const messageQueueService = {
     if (messageQueueDb.list(userId,sessionId).filter(row=>row.status==='queued').length>=100) {
       throw new AppError('This conversation already has 100 queued messages.',{statusCode:409});
     }
-    return messageQueueDb.create(userId,sessionId,requestId,hash,content,serialized,delivery);
+    const row = messageQueueDb.create(userId,sessionId,requestId,hash,content,serialized,delivery);
+    wakeup?.();
+    notifyMessageQueueChanged();
+    return row;
   },
   list(userId: number, sessionId: string) {
     if (!sessionId) throw new AppError('A session ID is required.',{statusCode:400});
@@ -75,6 +96,8 @@ export const messageQueueService = {
       if (typeof input.content!=='string' || !input.content.trim() || input.content.length>200_000) throw new AppError('A bounded, non-empty message is required.',{statusCode:400});
       if (!messageQueueDb.edit(userId,id,Number(input.revision),input.content)) throw conflict();
     }
+    wakeup?.();
+    notifyMessageQueueChanged();
     return messageQueueDb.get(userId,id)!;
   },
   attempts(userId: number, id: string) {

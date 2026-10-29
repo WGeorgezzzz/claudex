@@ -44,7 +44,7 @@ export function SessionWorkspaceProvider({activeSessionId,children}:{activeSessi
   useEffect(()=>{
     alive.current=true;void refresh();
     const poll=()=>{if(document.visibilityState!=='hidden')void refresh();};
-    const timer=setInterval(poll,3000);document.addEventListener('visibilitychange',poll);
+    const timer=setInterval(poll,15000);document.addEventListener('visibilitychange',poll);
     return()=>{alive.current=false;sequence.current++;clearInterval(timer);document.removeEventListener('visibilitychange',poll);};
   },[refresh]);
   useEffect(()=>{manualUnread.current.clear();},[activeSessionId]);

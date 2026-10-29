@@ -1502,3 +1502,53 @@ export function nextMonitorCalendarRun(schedule: MonitorCalendarSchedule, after:
   throw new Error('No calendar occurrence found within the next fifteen days');
 }
 // ---------------------------
+
+// ---------------------------
+//----------------- INCREMENTAL SESSION JSONL ------------
+
+/** Indexers capture the last complete line before a full read so concurrent appends cannot be skipped. */
+export async function completeJsonlOffset(filePath: string): Promise<number> {
+  const file = await fs.promises.open(filePath, 'r');
+  try {
+    const size = (await file.stat()).size;
+    let end = size;
+    const buffer = Buffer.alloc(64 * 1024);
+    while (end > 0) {
+      const start = Math.max(0, end - buffer.length);
+      const { bytesRead } = await file.read(buffer, 0, end - start, start);
+      const newline = buffer.subarray(0, bytesRead).lastIndexOf(10);
+      if (newline >= 0) return start + newline + 1;
+      end = start;
+    }
+    return 0;
+  } finally { await file.close(); }
+}
+
+/** Claude and Codex indexers consume complete appended lines, preserving byte offsets across UTF-8 and CRLF. */
+export async function readAppendedJsonl(filePath: string, offset: number): Promise<{
+  records: Record<string, unknown>[];
+  nextOffset: number;
+}> {
+  const fileStat = await stat(filePath);
+  if (fileStat.size < offset) return { records: [], nextOffset: 0 };
+
+  if (fileStat.size === offset) return { records: [], nextOffset: offset };
+  const chunks: Buffer[] = [];
+  for await (const chunk of fs.createReadStream(filePath, { start: offset, end: fileStat.size - 1 })) chunks.push(chunk as Buffer);
+  const bytes = Buffer.concat(chunks);
+  const consumed = bytes.lastIndexOf(10) + 1;
+  const completeText = bytes.subarray(0, consumed).toString('utf8');
+  const records: Record<string, unknown>[] = [];
+  for (const line of completeText.split(/\r?\n/)) {
+    if (!line.trim()) continue;
+    try {
+      const value = JSON.parse(line) as unknown;
+      if (value && typeof value === 'object' && !Array.isArray(value)) records.push(value as Record<string, unknown>);
+    } catch {
+      // A provider may write a malformed or partial line; the next fallback
+      // scan will retry it without making the watcher fail.
+    }
+  }
+
+  return { records, nextOffset: offset + consumed };
+}

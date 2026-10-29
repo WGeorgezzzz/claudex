@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { startVisiblePolling } from '@/shared/utils';
 import { api } from '@/shared/api';
 
 type QuotaWindow = { label: string; remainingPercent?: number | null; remaining?: number; total?: number;
@@ -36,8 +37,8 @@ export function ProviderQuotaPanel() {
         if (!disposed) { setSnapshot(body.data); setError(null); }
       } catch (reason) { if (!disposed) { setSnapshot(null); setError(reason instanceof Error ? reason.message : '读取失败'); } }
     };
-    void refresh(); const timer = setInterval(() => void refresh(), 60000);
-    return () => { disposed = true; clearInterval(timer); };
+    const stop=startVisiblePolling(refresh,60000);
+    return () => { disposed = true; stop(); };
   }, []);
   return <section aria-label="账号剩余用量" className="shrink-0 rounded-xl border border-border bg-muted/20 p-3">
     <div className="flex flex-wrap items-center justify-between gap-2 text-sm font-medium">

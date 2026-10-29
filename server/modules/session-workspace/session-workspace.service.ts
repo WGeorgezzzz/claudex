@@ -3,6 +3,7 @@ import { providerRuntimeService } from '@/modules/providers/index.js';
 import { chatRunRegistry } from '@/modules/websocket/index.js';
 import { withUserContext } from '@/modules/auth/index.js';
 import { AppError } from '@/shared/index.js';
+import { wakeMessageQueue } from '@/modules/message-queue/index.js';
 
 /** Routes expose organization and attention state without mutating provider sessions or interrupting a run. */
 export const sessionWorkspaceService={
@@ -40,6 +41,8 @@ export const sessionWorkspaceService={
       changes.readThrough=input.readThrough===null?null:new Date(String(input.readThrough)).toISOString();
     }
     if(session.isArchived && changes.pinned)throw new AppError('Restore this conversation before pinning it.',{statusCode:409});
-    return sessionWorkspaceDb.update(userId,sessionId,changes);
+    const entry = sessionWorkspaceDb.update(userId,sessionId,changes);
+    if (changes.queuePaused === false) wakeMessageQueue();
+    return entry;
   },
 };

@@ -18,7 +18,7 @@ import type { SessionStore } from '@/modules/chat/hooks/useSessionStore';
 
 type ActivityLog = Array<{ sessionId: string; tasks: BackgroundTaskSummary[] } | { sessionId: string; idle: true }>;
 
-const renderHandlers = () => {
+const renderHandlers = (initialActivity?: SessionActivity) => {
   let listener: ((event: ServerEvent) => void) | null = null;
   const stored: NormalizedMessage[] = [];
   const log: ActivityLog = [];
@@ -26,6 +26,7 @@ const renderHandlers = () => {
   // The activity map as the provider would hold it, so the handler's read of
   // "is this session background-only" sees its own earlier report.
   const activityBySession = new Map<string, SessionActivity>();
+  if (initialActivity) activityBySession.set('viewed-session', initialActivity);
 
   renderHook(() => useChatRealtimeHandlers({
     isActive: true,
@@ -78,6 +79,20 @@ const event = (fields: Record<string, unknown>): ServerEvent => ({
   timestamp: '2026-08-21T10:32:10.000Z',
   ...fields,
 } as unknown as ServerEvent);
+
+test('a transcript upsert refreshes the viewed CLI conversation and leaves other conversations alone', () => {
+  const { dispatch, syncs } = renderHandlers({ startedAt: Date.now(), statusText: 'External CLI', canInterrupt: false });
+  dispatch(event({ kind: 'session_upserted', sessionId: 'other-session' }));
+  assert.deepEqual(syncs, []);
+  dispatch(event({ kind: 'session_upserted' }));
+  assert.deepEqual(syncs, ['viewed-session']);
+});
+
+test('a transcript upsert preserves a locally streaming turn', () => {
+  const { dispatch, syncs } = renderHandlers({ startedAt: Date.now(), statusText: 'Working', canInterrupt: true });
+  dispatch(event({ kind: 'session_upserted' }));
+  assert.deepEqual(syncs, []);
+});
 
 const workflowLaunch = () => [
   event({ kind: 'tool_use', toolId: 'toolu_workflow_1', toolName: 'Workflow', toolInput: { script: '', description: 'Audit the frontend' } }),

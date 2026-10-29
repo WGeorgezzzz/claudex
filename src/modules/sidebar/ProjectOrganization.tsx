@@ -1,3 +1,4 @@
+import { startVisiblePolling } from '@/shared/utils';
 import { useEffect, useRef, useState } from 'react';
 import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Folder, MoreHorizontal, Plus, Settings2, X } from 'lucide-react';
 
@@ -32,8 +33,8 @@ export function ProjectOrganization({props,editorOnly=false,searchQuery=''}:{pro
   const sequence=useRef(0),writing=useRef(false),dragged=useRef<string|null>(null);
   useEffect(()=>{
     let live=true;
-    const load=async()=>{const current=++sequence.current;try{const next=await read(await api.projectOrganization.list());if(live&&current===sequence.current&&!writing.current)setSnapshot(next);}catch{/* Existing sidebar remains usable with an older server. */}};
-    void load();const timer=setInterval(()=>void load(),10000);return()=>{live=false;clearInterval(timer);};
+    const load=async()=>{const current=++sequence.current;try{const next=await read(await api.projectOrganization.list());if(live&&current===sequence.current&&!writing.current)setSnapshot(previous=>JSON.stringify(previous)===JSON.stringify(next)?previous:next);}catch{/* Existing sidebar remains usable with an older server. */}};
+    const stop=startVisiblePolling(load,15000);return()=>{live=false;stop();};
   },[]);
   useEffect(()=>{
     const open=(event:Event)=>{const id=(event as CustomEvent<string>).detail;if(snapshot?.sessions.some(row=>row.id===id))setEditor({kind:'session',id});};

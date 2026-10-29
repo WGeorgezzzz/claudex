@@ -9,8 +9,8 @@ import { chatRunRegistry } from '@/modules/websocket/index.js';
 import type { ProviderRuntimeGateway } from '@/modules/websocket/index.js';
 import { createCompleteMessage } from '@/shared/utils.js';
 import { providerModelsService } from '@/modules/providers/index.js';
-import { messageQueueService } from '@/modules/message-queue/message-queue.service.js';
-import { dispatchMessageQueue, importLegacyQueuedMessages } from '@/modules/message-queue/message-queue.dispatcher.js';
+import { messageQueueService, registerMessageQueueWakeup } from '@/modules/message-queue/message-queue.service.js';
+import { closeMessageQueue, dispatchMessageQueue, importLegacyQueuedMessages, initializeMessageQueue } from '@/modules/message-queue/message-queue.dispatcher.js';
 import { createLiveInputService } from '@/modules/message-queue/live-input.service.js';
 import { providerRuntimeService } from '@/modules/providers/index.js';
 import type { ProviderLiveInputResult } from '@/shared/types.js';
@@ -99,6 +99,35 @@ test('transport retries are idempotent; different input and stale edits are reje
   assert.throws(()=>messageQueueService.update(user+1,first.id,{revision:edited.revision,action:'cancel'}),/not found/);
   const row=messageQueueService.enqueue(user,{sessionId:'queue-session',requestId:'paths',content:'x',options:{cwd:'/override',sessionId:'wrong',permissionMode:'default'}});
   assert.deepEqual(JSON.parse(row.options),{permissionMode:'default'});
+}));
+
+test('enqueue wakes a sleeping dispatcher without changing the durable queue row',()=>fixture(user=>{
+  let wakeups = 0;
+  registerMessageQueueWakeup(() => { wakeups += 1; });
+  try {
+    const row = enqueue(user, 'wake-me');
+    assert.equal(wakeups, 1);
+    assert.equal(messageQueueDb.get(user, row.id)?.status, 'queued');
+  } finally {
+    registerMessageQueueWakeup(null);
+  }
+}));
+
+test('an idle dispatcher delivers a newly enqueued turn without waiting for its fallback timer',()=>fixture(async user=>{
+  let calls=0;
+  initializeMessageQueue(runtime(async(_provider,_content,_options,writer)=>{
+    calls++;
+    writer.send(createCompleteMessage({provider:'claude',exitCode:0}));
+  }));
+  try {
+    await new Promise(resolve=>setTimeout(resolve,50));
+    const row=enqueue(user,'idle-wakeup');
+    const deadline=Date.now()+5000;
+    while(messageQueueDb.get(user,row.id)?.status==='queued'&&Date.now()<deadline) await new Promise(resolve=>setTimeout(resolve,25));
+    assert.equal(messageQueueDb.get(user,row.id)?.status,'succeeded');
+    assert.equal(calls,1);
+    assert.equal(messageQueueDb.attempts(user,row.id).length,1);
+  } finally { closeMessageQueue(); }
 }));
 
 test('FIFO dispatch preserves every entry and confirms completion events',()=>fixture(async user=>{

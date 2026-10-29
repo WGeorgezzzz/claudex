@@ -2193,3 +2193,30 @@ test('synchronizeFile skips non-jsonl files', { concurrency: false }, async () =
     assert.equal(result, null);
   });
 });
+
+test('incremental synchronization reads appended records from the saved file offset', { concurrency: false }, async () => {
+  const tmp = await mkdtemp(path.join(os.tmpdir(), 'claude-sync-incremental-'));
+  const workspacePath = path.join(tmp, 'workspace');
+  await mkdir(workspacePath, { recursive: true });
+  const restoreHomeDir = patchHomeDir(tmp);
+
+  try {
+    const claudeHome = path.join(tmp, '.claude');
+    await mkdir(claudeHome, { recursive: true });
+    await writeFile(path.join(claudeHome, 'history.jsonl'), '', 'utf8');
+    const filePath = await writeSessionJsonl(workspacePath, 'test-session-1.jsonl', []);
+
+    await withIsolatedDatabase(async () => {
+      const synchronizer = new ClaudeSessionSynchronizer();
+      const sessionId = await synchronizer.synchronizeFile(filePath);
+      assert.equal(sessionId, 'test-session-1');
+      await writeFile(filePath, `${await readFile(filePath, 'utf8')}\n${JSON.stringify({ type: 'custom-title', customTitle: 'Appended title', sessionId: 'test-session-1' })}\n`, 'utf8');
+      const updated = await synchronizer.synchronizeFileIncremental(filePath);
+      assert.equal(updated, sessionId);
+      assert.equal(sessionsDb.getSessionById(sessionId!)?.custom_name, 'Appended title');
+    });
+  } finally {
+    restoreHomeDir();
+    await rm(tmp, { recursive: true, force: true });
+  }
+});

@@ -286,3 +286,30 @@ export function readClaudeNextPrompts(text: string, streaming = false): { conten
     return { content: text.slice(0, index).trimEnd(), prompts: [...new Set(parsed.map(value => String(value).trim()))] };
   } catch { return { content: text, prompts: [] }; }
 }
+
+// ---------------------------
+//----------------- VISIBLE PAGE REFRESH ------------
+/** Sidebar, task and quota views pause their refresh timers while hidden and refresh immediately on return. */
+export function startVisiblePolling(refresh: () => void | Promise<unknown>, intervalMs: number): () => void {
+  let timer: ReturnType<typeof setInterval> | undefined;
+  let disposed = false;
+  let inFlight = false;
+  const poll = async () => {
+    if (disposed || inFlight || document.visibilityState === 'hidden') return;
+    inFlight = true;
+    try { await refresh(); }
+    catch (error) { console.error('Visible page refresh failed', error); }
+    finally { inFlight = false; }
+  };
+  const visibility = () => {
+    if (timer) clearInterval(timer);
+    timer = undefined;
+    if (!disposed && document.visibilityState !== 'hidden') {
+      void poll();
+      timer = setInterval(() => void poll(), intervalMs);
+    }
+  };
+  visibility();
+  document.addEventListener('visibilitychange', visibility);
+  return () => { disposed = true; clearInterval(timer); document.removeEventListener('visibilitychange', visibility); };
+}

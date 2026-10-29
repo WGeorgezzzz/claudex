@@ -147,7 +147,12 @@ export function getUserContext(userId: number | string): UserRuntimeContext {
 
 /** Files, runtime and terminal consumers validate real filesystem containment before use. */
 export function assertUserPath(userId: number | string, target: string): string {
-  const context = getUserContext(userId);
+  // Auth has already resolved this request's identity. Rebuilding its full
+  // CLI environment for every checked project path dominates task-list reads.
+  // Different identities and calls outside an authenticated context still
+  // resolve fresh; a new request always enters through withUserContext().
+  const activeContext = getCurrentUserContext();
+  const context = activeContext?.userId === Number(userId) ? activeContext : getUserContext(userId);
   if (context.role === 'admin') return path.resolve(target);
   if (!target || target.includes('\0') || !path.isAbsolute(target)) denied('An absolute user path is required.');
   try {
