@@ -16,6 +16,14 @@ export function decodeScriptOutput(bytes: Buffer): string {
   return bytes.toString(utf16 ? 'utf16le' : 'utf8').replace(/^\uFEFF/, '');
 }
 
+/** PowerShell serializes its error stream as CLIXML even with text stdout. */
+export function decodeScriptDiagnostics(bytes: Buffer): string {
+  const unescape=(text:string)=>text.replace(/_x([0-9a-f]{4})_/gi,(_,hex:string)=>String.fromCharCode(parseInt(hex,16)))
+    .replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&apos;/g,"'").replace(/&amp;/g,'&');
+  return decodeScriptOutput(bytes).replace(/#< CLIXML\s*/g,'').replace(/<Objs\b[^>]*>[\s\S]*?(?:<\/Objs>|$)/g,xml=>
+    [...xml.matchAll(/<S\b[^>]*\bS="Error"[^>]*>([\s\S]*?)<\/S>/g)].map(match=>unescape(match[1])).join('')).trim();
+}
+
 /** Probe service runs bounded polling scripts as the service identity, without elevation.
  * MONITOR_STATE_DIR is private to the owning user and monitor. Only stdout is event input.
  */
@@ -24,9 +32,9 @@ export async function runMonitorScript(row:MonitorRecord,item:Record<string,unkn
   await mkdir(directory,{recursive:true});
   const script=String(item.script||'');
   const shell=item.shell==='bash'?'bash':process.platform==='win32'?'powershell.exe':'pwsh';
-  const prefix=item.shell==='bash'?'ssh() { command ssh -o BatchMode=yes "$@"; };\n':'[Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false); $OutputEncoding = [Console]::OutputEncoding\nfunction ssh { & ssh.exe -o BatchMode=yes @args }\n';
+  const prefix=item.shell==='bash'?'ssh() { command ssh -o BatchMode=yes "$@"; };\n':"$ProgressPreference='SilentlyContinue'; [Console]::OutputEncoding = [Text.UTF8Encoding]::new($false); $OutputEncoding = [Console]::OutputEncoding\nfunction ssh { & ssh.exe -o BatchMode=yes @args }\n";
   const source=prefix+script;
-  const args=item.shell==='bash'?['-c',source]:['-NoLogo','-NoProfile','-NonInteractive','-EncodedCommand',Buffer.from(source,'utf16le').toString('base64')];
+  const args=item.shell==='bash'?['-c',source]:['-NoLogo','-NoProfile','-NonInteractive','-OutputFormat','Text','-EncodedCommand',Buffer.from(source,'utf16le').toString('base64')];
   const hash=createHash('sha256').update(script).digest('hex');
   await appendFile(path.join(directory,'executions.jsonl'),JSON.stringify({at:new Date().toISOString(),hash,shell})+'\n');
   return new Promise<{lines:string[];error:string|null}>(resolve=>{
@@ -37,7 +45,7 @@ export async function runMonitorScript(row:MonitorRecord,item:Record<string,unkn
     child.stdout.on('data',(chunk:Buffer)=>{if(output.length+chunk.length<=256*1024)output=Buffer.concat([output,chunk]);else {failure='script output exceeds 256KB';stop();}});
     child.stderr.on('data',(chunk:Buffer)=>{stderr=Buffer.concat([stderr,chunk]).subarray(0,8192);});
     child.once('error',error=>{clearTimeout(timer);resolve({lines:[],error:error.message});});
-    child.once('close',code=>{clearTimeout(timer);resolve({lines:decodeScriptOutput(output).split(/\r?\n/).filter(line=>line.trim()).map(line=>Buffer.from(line).subarray(0,4096).toString('utf8')),error:failure||(code?`script exit ${code}: ${decodeScriptOutput(stderr).slice(0,1000)}`:null)});});
+    child.once('close',code=>{clearTimeout(timer);resolve({lines:decodeScriptOutput(output).split(/\r?\n/).filter(line=>line.trim()).map(line=>Buffer.from(line).subarray(0,4096).toString('utf8')),error:failure||(code?`script exit ${code}: ${decodeScriptDiagnostics(stderr).slice(0,1000)}`:null)});});
   });
 }
 

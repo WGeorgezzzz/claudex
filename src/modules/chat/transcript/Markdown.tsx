@@ -1,4 +1,4 @@
-import { cleanMonitorReport } from '@/shared/monitorReport';
+import { cleanMonitorReport } from '@/modules/chat/utils/monitorReport';
 import type { Components } from 'react-markdown';
 import React, { createContext, memo, useContext, useMemo, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
