@@ -150,7 +150,7 @@ export class CloudController {
 
   async cloudApi(pathname, options = {}) {
     if (!this.cloudAccount?.apiKey) {
-      throw new Error('Connect your Nexagent account first.');
+      throw new Error('Connect your Drover account first.');
     }
 
     const controller = new AbortController();
@@ -169,7 +169,7 @@ export class CloudController {
       });
     } catch (error) {
       if (error?.name === 'AbortError') {
-        throw new Error(`Nexagent API request timed out after ${Math.round(CLOUD_API_TIMEOUT_MS / 1000)} seconds.`);
+        throw new Error(`Drover API request timed out after ${Math.round(CLOUD_API_TIMEOUT_MS / 1000)} seconds.`);
       }
       throw error;
     } finally {
@@ -181,7 +181,7 @@ export class CloudController {
       if (response.status === 401 || response.status === 403) {
         await this.invalidateCloudAccount();
       }
-      throw new Error(body.error || `Nexagent API request failed: ${response.status}`);
+      throw new Error(body.error || `Drover API request failed: ${response.status}`);
     }
 
     return body;

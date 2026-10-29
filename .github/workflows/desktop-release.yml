@@ -60,13 +60,13 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           VERSION=$(node -p "require('./package.json').version")
-          tar -I 'gzip -1' -cf "release/workbench/Nexagent-$VERSION-linux-x64.tar.gz" -C release/workbench linux-unpacked
+          tar -I 'gzip -1' -cf "release/workbench/Drover-$VERSION-linux-x64.tar.gz" -C release/workbench linux-unpacked
       - name: Install and verify Windows first run
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
-          $installer = (Resolve-Path "release/workbench/Nexagent-$version-win-x64.exe").Path
+          $installer = (Resolve-Path "release/workbench/Drover-$version-win-x64.exe").Path
           $installDir = Join-Path $env:RUNNER_TEMP 'nexagent-installed'
           $process = Start-Process -FilePath $installer -ArgumentList '/S',"/D=$installDir" -WindowStyle Hidden -Wait -PassThru
           if ($process.ExitCode -ne 0) { throw "Installer exited $($process.ExitCode)" }
@@ -123,7 +123,7 @@ jobs:
           RELEASE_TAG: ${{ inputs.tag }}
         run: |
           cd release-assets
-          sha256sum Nexagent-* > SHA256SUMS
+          sha256sum Drover-* > SHA256SUMS
           sha256sum -c SHA256SUMS
           cd ..
           node scripts/release/draft-release.mjs "$RELEASE_TAG"

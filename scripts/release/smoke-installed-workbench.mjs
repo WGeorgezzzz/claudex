@@ -11,7 +11,7 @@ import { pathToFileURL } from 'node:url';
 if (process.platform!=='win32' || process.env.CI!=='true') throw new Error('Run installer acceptance only on a disposable Windows CI runner.');
 const installDirectory=path.resolve(process.argv[2]||'');
 const reportPath=path.resolve(process.argv[3]||'release/workbench/installer-smoke.json');
-const executable=path.join(installDirectory,'Nexagent.exe');
+const executable=path.join(installDirectory,'Drover.exe');
 await fs.access(executable);
 const profileDirectory=await fs.mkdtemp(path.join(os.tmpdir(),'workbench-acceptance-'));
 const sentinelDatabase=path.join(profileDirectory,'existing-service.db');
@@ -111,7 +111,7 @@ try {
     await page.setViewportSize({width:1440,height:1000});
     await page.getByRole('button',{name:'进入工作区',exact:true}).click();
     await page.getByRole('navigation',{name:'首次设置'}).waitFor({state:'hidden'});
-    await page.getByText('正在加载 Nexagent',{exact:true}).waitFor({state:'hidden',timeout:60000});
+    await page.getByText('正在加载 驭手',{exact:true}).waitFor({state:'hidden',timeout:60000});
     await page.getByText('加载项目中...',{exact:true}).waitFor({state:'hidden',timeout:60000});
     await page.waitForTimeout(500);
     await page.screenshot({path:path.join(evidenceDirectory,'first-run-workspace.png')});

@@ -98,7 +98,7 @@
     "openInEditor": "פתיחה בעורך"
   },
   "mainContent": {
-    "loading": "טוען את Nexagent",
+    "loading": "טוען את Drover",
     "settingUpWorkspace": "מכין את סביבת העבודה…",
     "chooseProject": "בחירת פרויקט",
     "selectProjectDescription": "יש לבחור פרויקט בסרגל הצד כדי להתחיל לכתוב קוד עם Claude. כל פרויקט מכיל את סשני הצ'אט ואת היסטוריית הקבצים שלו.",
@@ -454,5 +454,9 @@
     "taskRowNotLoaded": "הופעלה מוקדם יותר בשיחה הזו; לחיצה לטעינה",
     "taskOfAgent": "הופעלה על ידי אחד הסוכנים של הסשן הזה"
   },
-  "cancel": "ביטול"
+  "cancel": "ביטול",
+  "brand": {
+    "name": "Drover",
+    "tagline": "Drive every agent from one place"
+  }
 }

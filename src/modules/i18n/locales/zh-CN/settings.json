@@ -524,7 +524,7 @@
     },
     "managed": {
       "badge": "已托管",
-      "hint": "由 Nexagent 管理。"
+      "hint": "由 驭手 管理。"
     },
     "help": {
       "title": "关于 Codex MCP",
@@ -556,7 +556,7 @@
     "docs": "文档",
     "sections": {
       "officialTitle": "官方插件",
-      "officialDescription": "由 Nexagent 团队维护，可直接安装。",
+      "officialDescription": "由 驭手 团队维护，可直接安装。",
       "unofficialTitle": "其他插件",
       "unofficialDescription": "来自其他用户的非官方插件和集成。安装前请审查源代码。"
     },
@@ -579,9 +579,9 @@
       "install": "安装"
     },
     "prismClaudex": {
-      "name": "PRISM Nexagent",
+      "name": "PRISM 驭手",
       "badge": "非官方",
-      "description": "Nexagent 内的 Claude Code 会话智能分析。无需离开浏览器即可了解会话为何消耗大量 Token。",
+      "description": "驭手 内的 Claude Code 会话智能分析。无需离开浏览器即可了解会话为何消耗大量 Token。",
       "install": "安装"
     },
     "sessionManagerPlugin": {
@@ -635,7 +635,7 @@
     "saved": "操作成功",
     "failed": "账号操作失败",
     "remoteNote": "成员使用用户名和密码登录；管理员远程登录继续使用原账号及动态验证码。改密后需重新登录，重置密码不会修改管理员独立的远程密码和 TOTP。",
-    "description": "管理可以登录 Nexagent 的账号：角色、启用状态、工作根目录和额外授权目录。",
+    "description": "管理可以登录 驭手 的账号：角色、启用状态、工作根目录和额外授权目录。",
     "refresh": "刷新列表",
     "access": "访问范围",
     "actions": "操作",
