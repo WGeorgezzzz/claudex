@@ -37,7 +37,7 @@ export function installProviderProcessTrace(directory: string): void {
     const env = options?.env || process.env;
     const apiBases: Record<string, string> = {};
     for (const key of ['ANTHROPIC_BASE_URL','OPENAI_BASE_URL']) if (env[key]) {
-      try { const url = new URL(env[key]!); apiBases[key] = url.origin + url.pathname; } catch { apiBases[key] = 'invalid/redacted'; }
+      try { const url = new URL(env[key]!); apiBases[key] = url.origin + '/[path-sha256:' + crypto.createHash('sha256').update(url.pathname).digest('hex') + ']'; } catch { apiBases[key] = 'invalid/redacted'; }
     }
     record('spawn', { childPid: child.pid, executable, sha256: sha, cwd: options?.cwd || process.cwd(),
       detached: options?.detached, windowsHide: options?.windowsHide,
