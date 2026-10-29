@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 
 import { withUserContext } from '@/modules/auth/index.js';
 import { getSessionOwnerId, messageQueueDb, sessionsDb } from '@/modules/database/index.js';
+import type { BridgeUserAuthorization } from '@/shared/types.js';
 import { AppError } from '@/shared/utils.js';
 
 const conflict=()=>new AppError('The queued message changed or has already started. Refresh before editing.',{code:'QUEUE_CONFLICT',statusCode:409});
@@ -26,7 +27,7 @@ export function registerMessageQueueWakeup(callback: (() => void) | null): void 
 
 /** Queue routes validate ownership and immutable request identity through this service. */
 export const messageQueueService = {
-  enqueue(userId: number, input: Record<string,unknown>, delivery: 'queued'|'live'='queued', bridgeSourceSessionId?: string) {
+  enqueue(userId: number, input: Record<string,unknown>, delivery: 'queued'|'live'='queued', bridgeSourceSessionId?: string, authorization?:BridgeUserAuthorization) {
     const sessionId=typeof input.sessionId==='string'?input.sessionId:'';
     const requestId=typeof input.requestId==='string'?input.requestId:'';
     const content=typeof input.content==='string'?input.content:'';
@@ -47,6 +48,10 @@ export const messageQueueService = {
     options.permissionMode=mode;
     // Only the internal bridge service supplies provenance; HTTP payloads cannot forge it.
     if (bridgeSourceSessionId) options.cloudcliBridgeSourceSessionId = bridgeSourceSessionId;
+    if(authorization && authorization.sourceSessionId===bridgeSourceSessionId && authorization.sourceUserMessageId && authorization.permissionMode!=='plan') {
+      options.cloudcliBridgeUserAuthorization=authorization;
+      options.permissionMode=authorization.permissionMode;
+    }
     for (const key of ['allowedTools','disallowedTools']) {
       if (Array.isArray(raw[key])) options[key]=(raw[key] as unknown[]).filter(value=>typeof value==='string').slice(0,100);
     }

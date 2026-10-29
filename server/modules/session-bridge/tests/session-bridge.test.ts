@@ -20,6 +20,13 @@ test('cross-session tools bind source identity, preserve queue semantics and rej
     const receipt=sessionBridgeService.send(user,'source',args);assert.equal(receipt.status,'queued');
     assert.equal(sessionBridgeService.send(user,'source',args).id,receipt.id);
     assert.throws(()=>sessionBridgeService.send(user,'source',{...args,content:'different'}),/different/);
+    const authorized=await executeSessionBridgeTool({userId:user,sessionId:'source',autonomous:false,planMode:false,permissionMode:'default',userMessageId:'user-message-123',userMessage:'Please create a monitor in target'},{...args,action:'send',requestId:'authorized-send'}) as {id:string};
+    const provenance=JSON.parse(messageQueueDb.get(user,authorized.id)!.options);
+    assert.equal(provenance.cloudcliBridgeUserAuthorization.sourceUserMessageId,'user-message-123');
+    assert.equal(provenance.cloudcliBridgeUserAuthorization.sourceSessionId,'source');
+    assert.equal(provenance.permissionMode,'default');
+    const automatic=await executeSessionBridgeTool({userId:user,sessionId:'source',autonomous:true,planMode:false,userMessageId:'forged'},{...args,action:'send',requestId:'automatic-send'}) as {id:string};
+    assert.equal(JSON.parse(messageQueueDb.get(user,automatic.id)!.options).cloudcliBridgeUserAuthorization,undefined);
     const options=JSON.parse(messageQueueDb.get(user,receipt.id)!.options);assert.equal(options.permissionMode,'bypassPermissions');assert.equal(options.cloudcliBridgeSourceSessionId,'source');
     assert.throws(()=>sessionBridgeService.status(user+1,'source',receipt.id));assert.throws(()=>sessionBridgeService.status(user,'foreign',receipt.id));
     assert.ok(await executeSessionBridgeTool({userId:user,sessionId:'source',autonomous:true,planMode:false},{...args,action:'send'}));
@@ -27,7 +34,7 @@ test('cross-session tools bind source identity, preserve queue semantics and rej
     assert.throws(()=>sessionBridgeService.send(user,'source',{...args,sessionId:'source'}),/another/);
     const protection=path.join(root,'protected.json');await writeFile(protection,JSON.stringify({sessionIds:['target']}));process.env.CLOUDCLI_PROTECTED_SESSIONS_FILE=protection;
     assert.equal(sessionBridgeService.list('target', 0, user).sessions[0].canSend,false);assert.throws(()=>sessionBridgeService.send(user,'source',{...args,requestId:'send-2'}),/owned/);
-    assert.equal(messageQueueDb.list(user,'target').length,1);
+    assert.equal(messageQueueDb.list(user,'target').length,3);
   } finally {closeConnection();if(old===undefined)delete process.env.DATABASE_PATH;else process.env.DATABASE_PATH=old;if(oldProtected===undefined)delete process.env.CLOUDCLI_PROTECTED_SESSIONS_FILE;else process.env.CLOUDCLI_PROTECTED_SESSIONS_FILE=oldProtected;assert.ok(path.resolve(root).startsWith(path.resolve(os.tmpdir())+path.sep));await rm(root,{recursive:true,force:true});}
 });
 

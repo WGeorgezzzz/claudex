@@ -146,7 +146,6 @@ export async function runProbe(row:MonitorRecord, now=new Date()):Promise<Monito
   const delta=bounded(deltas.join('\n')); state.lastFields=fields; state.previousFields=previous.lastFields||{};
   state.terminal=done||previous.terminal===true||/^(done|completed|success|succeeded|failed|failure)$/i.test(String(fields.status||''));
   const patterns=spec.items.filter(item=>String(item.type)==='patterns').flatMap(item=>Array.isArray(item.patterns)?item.patterns.map(String):DEFAULT_PATTERNS);
-  if(!patterns.length) patterns.push(...DEFAULT_PATTERNS);
   const errorDelta=bounded(errorDeltas.join('\n'));
   const alertLines=errorDelta.split(/\r?\n/).filter(line=>!/^\s*[-+>$]/.test(line));
   const pattern=patterns.find(pattern=>alertLines.some(line=>{try{return new RegExp(`^(?:${pattern})`,'i').test(line);}catch{return line.toLowerCase().startsWith(pattern.toLowerCase());}}));

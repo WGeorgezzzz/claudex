@@ -77,7 +77,7 @@ test('scheduler respects probe interval, records zero-token heartbeats and prese
 
 test('event prompts retain all intervening deltas and clear them only at a model round',async()=>fixture(async(user,root)=>{
   const log=path.join(root,'progress.log'); await writeFile(log,'BASELINE_OLD 1/40 status=running\n');
-  const row=monitorsService.create(user,{sessionId:'probe-session',name:'Incremental regression',content:'read only',intervalMinutes:1,probe:{items:[{type:'file',path:log}]}});
+  const row=monitorsService.create(user,{sessionId:'probe-session',name:'Incremental regression',content:'read only',intervalMinutes:1,probe:{items:[{type:'file',path:log},{type:'patterns',patterns:['ERROR']}]}});
   const now=new Date(); await runProbe(row,now); monitorsDb.markModelRound(row.id);
   await writeFile(log,'BASELINE_OLD 1/40 status=running\nDELTA_ONE 2/40\n');
   await runProbe(monitorsDb.get(user,row.id)!,new Date(now.getTime()+180000));
@@ -111,7 +111,7 @@ test('file-only stalls trigger and process death remains a single event while ot
 
 test('UTF-8 event deltas retain head and tail within 8 KiB',async()=>fixture(async(user,root)=>{
   const log=path.join(root,'large.log'); await writeFile(log,'ERROR HEAD_ERROR\n'+'中文进度'.repeat(3000)+'\nTAIL_MARKER');
-  const row=monitorsService.create(user,{sessionId:'probe-session',name:'Byte bound',content:'read',intervalMinutes:1,probe:{items:[{type:'file',path:log}]}});
+  const row=monitorsService.create(user,{sessionId:'probe-session',name:'Byte bound',content:'read',intervalMinutes:1,probe:{items:[{type:'file',path:log},{type:'patterns',patterns:['ERROR']}]}});
   const event=await runProbe(row); assert.equal(event?.type,'error');
   assert.ok(Buffer.byteLength(event!.delta!,'utf8')<=8192); assert.match(event!.delta!,/HEAD_ERROR/); assert.match(event!.delta!,/TAIL_MARKER/);
 }));
@@ -127,4 +127,11 @@ test('Windows BOM JSON reads root status without promoting nested historical com
   assert.deepEqual(parseProbeFields(JSON.stringify({status:'running',notes:'status=completed 40/40'}),{}),{status:'running',notes:'status=completed 40/40'});
   await writeFile(done,'\uFEFF'+JSON.stringify({done:true,status:'completed'}));
   assert.equal((await runProbe(monitorsDb.get(user,row.id)!))?.type,'done');
+}));
+
+ test('keywords require explicitly configured patterns',async()=>fixture(async(user,root)=>{
+ const log=path.join(root,'task.log');await writeFile(log,'1/4\n');
+ const row=monitorsService.create(user,{sessionId:'probe-session',name:'Explicit patterns',content:'read',intervalMinutes:15,probe:{items:[{type:'file',path:log}]}});
+ const t=new Date();assert.equal(await runProbe(row,t),null);await writeFile(log,'1/4\nERROR quoted failure\n');
+ assert.equal(await runProbe(monitorsDb.get(user,row.id)!,new Date(t.getTime()+180000)),null);
 }));

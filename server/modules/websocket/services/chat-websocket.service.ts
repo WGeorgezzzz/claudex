@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { monitorsDb } from '@/modules/database/index.js';
 import { getCurrentUserContext, withUserContext } from '@/modules/auth/index.js';
 import path from 'node:path';
@@ -253,7 +254,8 @@ async function dispatchRun(
 
   let failure: string | null = null;
   try {
-    const clientOptions = (data.options ?? {}) as AnyRecord;
+    const clientOptions = {...(data.options ?? {})} as AnyRecord;
+    if(ws)delete clientOptions.cloudcliBridgeUserAuthorization;
     let command = typeof data.content === 'string' ? data.content : '';
     if(!clientOptions.cloudcliMonitorId&&!clientOptions.bridgeCompact&&!command.trimStart().startsWith('/')){
       const reports=monitorsDb.reportMessages(sessionId).slice(-3);
@@ -291,6 +293,9 @@ async function dispatchRun(
       ...extraRuntimeOptions,
       // Attachments are re-validated server-side: only direct children of the
       // global upload store may reach provider runtimes or their file tools.
+      // Correlates this ordinary user message with a one-hop bridge receipt. The receipt retains its text.
+      cloudcliUserMessageId: !clientOptions.cloudcliMonitorId&&!clientOptions.cloudcliBridgeSourceSessionId&&!clientOptions.bridgeCompact ? randomUUID():undefined,
+      cloudcliUserMessage: !clientOptions.cloudcliMonitorId&&!clientOptions.cloudcliBridgeSourceSessionId&&!clientOptions.bridgeCompact ? data.content:undefined,
       attachments: uniqueAttachments,
       images: uniqueAttachments.filter(isImageAttachmentDescriptor),
       files: uniqueAttachments.filter((descriptor) => !isImageAttachmentDescriptor(descriptor)),

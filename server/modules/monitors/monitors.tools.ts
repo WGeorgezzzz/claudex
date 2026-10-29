@@ -4,7 +4,7 @@ import { z } from 'zod';
 
 import { sessionsDb } from '@/modules/database/index.js';
 import { monitorsService } from '@/modules/monitors/monitors.service.js';
-import type { ProviderRuntimeContext } from '@/shared/types.js';
+import type { BridgeUserAuthorization, ProviderRuntimeContext } from '@/shared/types.js';
 import { parseMonitorCalendarSchedule, compactMonitorProbeState, summarizeMonitorProbeEvent } from '@/shared/index.js';
 import { assertOwnedSession } from '@/modules/access-control/index.js';
 
@@ -31,10 +31,10 @@ const shape={
   }).optional().describe('Optional zero-token probe spec. Items point at STATUS.md, DONE.json, codex-run.log, codex.pid, a read-only command or patterns; use command with ssh when the task is remote. Agent transcripts ignore keywords and only detect stalls/terminal EXIT lines; mark other transcripts source=agent. Task alerts match line starts, ignore diffs/echoes, and obey the monitor interval cooldown. suppress contains false-alert signatures or regexes.'),
   suppress:z.array(z.string().max(256)).max(16).optional().describe('Replace false-alert signatures/regexes without resetting probe cursors; [] clears the list.'),
 };
-type ToolContext={userId:number;sessionId:string;monitorId?:string;model?:string;effort?:string;permissionMode?:string;readOnly?:boolean};
+type ToolContext={userId:number;sessionId:string;monitorId?:string;model?:string;effort?:string;permissionMode?:string;readOnly?:boolean;authorization?:BridgeUserAuthorization};
 
 function visible(row:ReturnType<typeof monitorsService.require>) {
-  return {id:row.id,name:row.name,content:row.content,intervalMinutes:row.interval_minutes,status:row.status,
+  return {id:row.id,name:row.name,content:row.content,intervalMinutes:row.interval_minutes,status:row.status,createdByUserDelegation:JSON.parse(row.options).createdByUserDelegation,
     schedule:row.schedule_json?JSON.parse(row.schedule_json):null,permissionMode:JSON.parse(row.options).permissionMode??'default',
     running:Boolean(row.running_id),nextRunAt:row.status==='active'?row.next_run_at:null,runCount:row.run_count,lastError:row.last_error,
     mode:row.monitor_mode||'scheduled',probe:row.probe_json?JSON.parse(row.probe_json):null,probeState:row.probe_state_json?compactMonitorProbeState(JSON.parse(row.probe_state_json)):null,
@@ -49,7 +49,7 @@ export function executeMonitorTool(context:ToolContext,input:unknown): unknown {
   assertOwnedSession(context.userId,context.sessionId);
   const session=sessionsDb.getSessionById(context.sessionId);
   if(!session||!['claude','codex','deepseek-harness'].includes(session.provider)||!Number.isInteger(context.userId))throw new Error('当前 Claude 会话或用户无效。');
-  if(context.readOnly&&!['list','get','history','update','pause','stop'].includes(args.action))throw new Error('转发、委派回报和规划回合只能查看监测；修改调度需要用户在普通回合中明确提出。');
+  if(context.readOnly&&!['list','get','history'].includes(args.action))throw new Error('转发、委派回报和规划回合只能查看监测；修改调度需要用户在普通回合中明确提出。');
   // Scheduled turns may inspect/stop themselves but cannot broaden their own schedule.
   if(context.monitorId && !['list','get','history','pause','stop','update'].includes(args.action))
     throw new Error('自动监测期间只能查看、修改自身说明、暂停或停止自身任务；调度修改请由用户在聊天中提出。');
@@ -63,7 +63,7 @@ export function executeMonitorTool(context:ToolContext,input:unknown): unknown {
     const duplicate=monitorsService.list(context.userId,context.sessionId).find(row=>row.status!=='stopped'&&row.name===args.name!.trim()&&row.content===args.content!.trim()&&row.schedule_json===scheduleJson&&(schedule||row.interval_minutes===args.intervalMinutes)&&(JSON.parse(row.options).runMode||'isolated')===(args.runMode||'isolated'));
     if(duplicate)return {monitor:visible(duplicate),reused:true};
     const row=monitorsService.create(context.userId,{sessionId:context.sessionId,name:args.name,content:args.content,intervalMinutes:args.intervalMinutes,schedule,probe:args.probe,
-      options:{...(args.model?{model:args.model}:{}),effort:args.model?session.effort||context.effort:'medium',permissionMode: context.permissionMode || 'bypassPermissions',...(args.runMode?{runMode:args.runMode}:{})}});
+      options:{...(args.model?{model:args.model}:{}),effort:args.model?session.effort||context.effort:'medium',permissionMode: context.authorization?.permissionMode || context.permissionMode || 'bypassPermissions',...(args.runMode?{runMode:args.runMode}:{})}},context.authorization);
     return {monitor:visible(row),reused:false,permissionMode:JSON.parse(row.options).permissionMode,note:'已保存到本地调度器。权限沿用创建时的会话设置。电脑和本地服务需运行，关闭聊天页面不影响调度。'};
   }
   const requested=args.id||context.monitorId;

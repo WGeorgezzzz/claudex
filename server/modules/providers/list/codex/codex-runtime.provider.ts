@@ -364,8 +364,8 @@ async function queryCodex(
     // The app-server transport accepts `turn/steer`, so text typed while the
     // turn runs is folded into it. CLAUDEX_CODEX_TRANSPORT=exec restores the
     // SDK's `codex exec` path, which cannot take input mid-turn.
-    const bridge = ws.userId != null && sessionId ? (await import('@/modules/session-bridge/index.js')).createCodexSessionTool({userId:Number(ws.userId),sessionId,autonomous:Boolean(options.cloudcliMonitorId || options.cloudcliBridgeSourceSessionId),planMode:permissionMode==='plan',permissionMode}) : null;
-    const monitor=ws.userId!=null&&sessionId?(await import('@/modules/monitors/index.js')).createCodexMonitorTool({userId:Number(ws.userId),sessionId,monitorId:options.cloudcliMonitorId,permissionMode}):null;
+    const bridge = ws.userId != null && sessionId ? (await import('@/modules/session-bridge/index.js')).createCodexSessionTool({userId:Number(ws.userId),sessionId,userMessageId:options.cloudcliUserMessageId,userMessage:options.cloudcliUserMessage,autonomous:Boolean(options.cloudcliMonitorId || options.cloudcliBridgeSourceSessionId || options.bridgeCompact),planMode:permissionMode==='plan',permissionMode}) : null;
+    const monitor=ws.userId!=null&&sessionId?(await import('@/modules/monitors/index.js')).createCodexMonitorTool({userId:Number(ws.userId),sessionId,monitorId:options.cloudcliMonitorId,permissionMode,readOnly:(Boolean(options.cloudcliBridgeSourceSessionId)&&!options.cloudcliBridgeUserAuthorization)||permissionMode==='plan',authorization:options.cloudcliBridgeUserAuthorization}):null;
     const events: AsyncIterable<AnyRecord> = process.env.CLAUDEX_CODEX_TRANSPORT === 'exec' && !/^\/compact(?:\s|$)/.test(command.trim())
       ? (await thread.runStreamed(turnInput, { signal: abortController.signal })).events as AsyncIterable<AnyRecord>
       : runCodexAppServerTurn({

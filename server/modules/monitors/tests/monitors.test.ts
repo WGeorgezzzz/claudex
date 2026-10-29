@@ -66,7 +66,15 @@ test('state tags are bounded and removed from the user report',()=>{
   assert.equal(parseMonitorReport('x'.repeat(3000)).state.length,2000);
 });
 
-test('forwarded and planning turns cannot create or change schedules',()=>fixture(user=>{
+test('delegated ordinary user authorization creates monitors with source permissions',()=>fixture(user=>{
+ const authorization={sourceSessionId:'user-source',sourceUserMessageId:'user-message-123',permissionMode:'default'};
+ const result=executeMonitorTool({userId:user,sessionId:'monitor-session',authorization,permissionMode:'bypassPermissions'},{action:'create',name:'Delegated monitor',content:'check task',intervalMinutes:15}) as {monitor:{id:string}};
+ const row=monitorsDb.get(user,result.monitor.id)!;
+ assert.equal(JSON.parse(row.options).permissionMode,'default');
+ assert.deepEqual(JSON.parse(row.options).createdByUserDelegation,authorization);
+ assert.equal(monitorsService.listView(user)[0].createdByUserDelegation.sourceUserMessageId,'user-message-123');
+}));
+ test('forwarded and planning turns cannot create or change schedules',()=>fixture(user=>{
   const context={userId:user,sessionId:'monitor-session',readOnly:true};
   const row=create(user);
   assert.ok(executeMonitorTool(context,{action:'list'}));

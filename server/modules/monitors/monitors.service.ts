@@ -1,3 +1,4 @@
+import type { BridgeUserAuthorization } from '@/shared/types.js';
 import { assertOwnedSession } from '@/modules/access-control/index.js';
 import { monitorsDb, userPreferencesDb } from '@/modules/database/index.js';
 import { AppError } from '@/shared/utils.js';
@@ -11,6 +12,7 @@ export const monitorsService = {
     return this.list(userId,sessionId,includeStopped).slice(offset,offset+10).map(row=>({
       id:row.id,name:row.name,status:row.status,
       intervalMinutes:row.interval_minutes,
+      createdByUserDelegation:JSON.parse(row.options).createdByUserDelegation,
       schedule:row.schedule_json?JSON.parse(row.schedule_json):null,
       nextRunAt:row.status==='active'?row.next_run_at:null,
       lastRun:{count:row.run_count,error:row.last_error?.slice(0,120)??null},
@@ -31,7 +33,7 @@ export const monitorsService = {
     for(const row of monitorsDb.summaries(userId))(sessions[row.session_id]??=[]).push(row);
     return {...sessions};
   },
-  create(userId: number, input: Record<string, unknown>) {
+  create(userId: number, input: Record<string, unknown>, authorization?:BridgeUserAuthorization) {
     const sessionId=typeof input.sessionId==='string'?input.sessionId:'';
     const content=typeof input.content==='string'?input.content.trim():'';
     const name=typeof input.name==='string'?input.name.trim():'';
@@ -49,12 +51,14 @@ export const monitorsService = {
       ? input.options as Record<string,unknown> : {};
     // Only composer choices are persisted; callers cannot override cwd/session or inject runtime control options.
     const safeOptions: Record<string,unknown>={};
+    if(authorization)safeOptions.createdByUserDelegation={sourceSessionId:authorization.sourceSessionId,sourceUserMessageId:authorization.sourceUserMessageId,permissionMode:authorization.permissionMode};
     for(const key of ['model','effort']) if(typeof options[key]==='string') safeOptions[key]=options[key];
     if(safeOptions.model) safeOptions.modelExplicit=true;
     safeOptions.model ??= session.provider==='claude'?'claude-sonnet-5-5':session.model;
     safeOptions.effort ??= 'medium';
     if(['default','acceptEdits','plan','bypassPermissions'].includes(String(options.permissionMode))) safeOptions.permissionMode=options.permissionMode;
     safeOptions.permissionMode ??= 'bypassPermissions';
+    if(authorization)safeOptions.permissionMode=authorization.permissionMode;
     if(options.runMode!==undefined){if(!['isolated','original'].includes(String(options.runMode)))throw new AppError('无效运行方式',{statusCode:400});safeOptions.runMode=options.runMode;}
     const probe=input.probe===undefined?null:normalizeProbe(input.probe);
     if(input.probe!==undefined&&!probe)throw new AppError('探针必须包含至少一个有效条目。',{code:'INVALID_PROBE',statusCode:400});

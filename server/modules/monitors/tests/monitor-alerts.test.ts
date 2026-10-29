@@ -20,7 +20,7 @@ async function fixture(check:(user:number,root:string)=>Promise<void>) {
 test('agent transcripts ignore keyword echoes and only accept terminal EXIT lines',async()=>fixture(async(user,root)=>{
   const file=path.join(root,'codex-run-1.log');
   await writeFile(file,'ERROR quoted from a command\nTraceback (most recent call last):\n+ERROR diff\nstatus=completed\n');
-  const row=monitorsService.create(user,{sessionId:'alerts-session',name:'Agent',content:'read',intervalMinutes:15,probe:{items:[{type:'file',path:file}]}});
+  const row=monitorsService.create(user,{sessionId:'alerts-session',name:'Agent',content:'read',intervalMinutes:15,probe:{items:[{type:'file',path:file},{type:'patterns',patterns:['ERROR','Traceback']}]}});
   const now=new Date(); assert.equal(await runProbe(row,now),null);
   await writeFile(file,'ERROR quoted from a command\nTraceback (most recent call last):\n+ERROR diff\nstatus=completed\nEXIT 1\n');
   assert.equal((await runProbe(monitorsDb.get(user,row.id)!,new Date(now.getTime()+180000)))?.type,'done');
@@ -28,7 +28,7 @@ test('agent transcripts ignore keyword echoes and only accept terminal EXIT line
 
 test('task alerts match line starts and cool down repeated signatures until the monitor interval',async()=>fixture(async(user,root)=>{
   const file=path.join(root,'task.log'); let text='quoted ERROR in a sentence\n+ERROR diff\n-Traceback removed\n> ERROR command echo\n'; await writeFile(file,text);
-  const row=monitorsService.create(user,{sessionId:'alerts-session',name:'Task',content:'read',intervalMinutes:15,probe:{items:[{type:'file',path:file}]}});
+  const row=monitorsService.create(user,{sessionId:'alerts-session',name:'Task',content:'read',intervalMinutes:15,probe:{items:[{type:'file',path:file},{type:'patterns',patterns:['ERROR','Traceback']}]}});
   const now=new Date(); assert.equal(await runProbe(row,now),null);
   text+='ERROR task failed\n'; await writeFile(file,text);
   const first=await runProbe(monitorsDb.get(user,row.id)!,new Date(now.getTime()+180000)); assert.equal(first?.type,'error');
@@ -40,7 +40,7 @@ test('task alerts match line starts and cool down repeated signatures until the 
 
 test('suppression is persisted in probe settings and removable without resetting offsets',async()=>fixture(async(user,root)=>{
   const file=path.join(root,'STATUS.md'); await writeFile(file,'ERROR known harmless case\n');
-  const row=monitorsService.create(user,{sessionId:'alerts-session',name:'Suppress',content:'read',intervalMinutes:15,probe:{suppress:['ERROR'],items:[{type:'file',path:file}]}});
+  const row=monitorsService.create(user,{sessionId:'alerts-session',name:'Suppress',content:'read',intervalMinutes:15,probe:{suppress:['ERROR'],items:[{type:'file',path:file},{type:'patterns',patterns:['ERROR','Traceback']}]}});
   assert.equal(await runProbe(row),null); const before=monitorsDb.get(user,row.id)!.probe_state_json;
   monitorsService.update(user,row.id,{suppress:[]}); assert.equal(monitorsDb.get(user,row.id)!.probe_state_json,before);
   await writeFile(file,'ERROR known harmless case\nERROR new failure\n');
@@ -49,7 +49,7 @@ test('suppression is persisted in probe settings and removable without resetting
 
 test('model feedback adds a suppression signature and legacy API payloads exclude raw deltas',async()=>fixture(async(user,root)=>{
   const file=path.join(root,'STATUS.md'); await writeFile(file,'ERROR known case\n');
-  const row=monitorsService.create(user,{sessionId:'alerts-session',name:'Feedback',content:'read',intervalMinutes:15,probe:{items:[{type:'file',path:file}]}});
+  const row=monitorsService.create(user,{sessionId:'alerts-session',name:'Feedback',content:'read',intervalMinutes:15,probe:{items:[{type:'file',path:file},{type:'patterns',patterns:['ERROR','Traceback']}]}});
   const event=await runProbe(row); assert.ok(event?.signature);
   const runId=monitorsDb.claim(row.id,new Date(Date.now()+1000))!; assert.ok(runId);
   const fetch=sessionsService.fetchHistory,usage=providerTokenUsageService.getSessionTokenUsage;
@@ -67,7 +67,7 @@ test('model feedback adds a suppression signature and legacy API payloads exclud
 
 test('done and dead bypass cooldown while a failed error retry still respects the interval',async()=>fixture(async(user,root)=>{
   const file=path.join(root,'STATUS.md'); await writeFile(file,'ERROR first failure\n');
-  const row=monitorsService.create(user,{sessionId:'alerts-session',name:'Retry',content:'read',intervalMinutes:15,probe:{items:[{type:'file',path:file}]}});
+  const row=monitorsService.create(user,{sessionId:'alerts-session',name:'Retry',content:'read',intervalMinutes:15,probe:{items:[{type:'file',path:file},{type:'patterns',patterns:['ERROR','Traceback']}]}});
   const now=new Date(); assert.equal((await runProbe(row,now))?.type,'error');
   const runId=monitorsDb.claim(row.id,new Date(now.getTime()+1000))!; assert.ok(runId); monitorsDb.markModelRound(row.id); monitorsDb.finish(row.id,runId,'network failed');
   assert.equal(monitorsDb.due(new Date(now.getTime()+3*60000)).some(item=>item.id===row.id),false);

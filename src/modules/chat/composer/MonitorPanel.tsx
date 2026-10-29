@@ -93,7 +93,7 @@ export function MonitorPanel({sessionId,draft,options}:{sessionId:string|null;dr
           </form>
           {rows.length===0&&<p className="text-sm text-muted-foreground">本会话还没有监测任务。</p>}
           <div className="space-y-3">{rows.map(row=><article key={row.id} className="rounded-lg border p-3">
-            <div className="flex justify-between"><strong>{row.name}</strong><span className="text-xs">{statusLabel(row)} · 已执行 {row.lastRun?.count??row.run_count??0} 次</span></div>
+            <div className="flex justify-between"><strong>{row.name}{row.createdByUserDelegation&&<small title={row.createdByUserDelegation.sourceUserMessageId}>{'由会话'} {row.createdByUserDelegation.sourceSessionId} {'代用户创建'}</small>}</strong><span className="text-xs">{statusLabel(row)} · 已执行 {row.lastRun?.count??row.run_count??0} 次</span></div>
             <p className="my-1 whitespace-pre-wrap text-sm">{row.content}</p>
             <p className="text-xs text-muted-foreground">{scheduleLabel(row)}{row.status==='active'&&row.nextRunAt?` · 下次 ${new Date(row.nextRunAt).toLocaleString('zh-CN')}`:''}</p>
              <p className="text-xs text-muted-foreground">模式：{row.mode==='event'?'事件唤醒':'定时'} · 探针：{row.probe?.items?.length??0} 项 · 心跳 {row.heartbeatCount??0} · 模型回合 {row.modelRoundCount??row.lastRun?.count??0}</p>

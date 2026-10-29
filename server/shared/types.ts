@@ -1734,3 +1734,6 @@ export type ProjectOrganizationLayout = {
   threads: Record<string, { projectId: string | null; cwd: string; roots: string[] }>;
   threadOrders: Record<string, string[]>;
 };
+
+/** Server-bound ordinary user turn provenance carried one hop by session-bridge, queue and monitor tools; never accepted from model/HTTP arguments. */
+export type BridgeUserAuthorization = { sourceSessionId:string; sourceUserMessageId:string; permissionMode:string; sourceUserMessage?:string };

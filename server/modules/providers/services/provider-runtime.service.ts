@@ -93,13 +93,14 @@ export function createProviderRuntimeService(
     const userId=Number(writer.userId);
     if(providerName==='claude'&&writer.userId!=null&&Number.isInteger(userId)&&typeof options.sessionId==='string') {
       const monitorQuery=createMonitorQuery({userId,sessionId:options.sessionId,
-        readOnly:Boolean(options.cloudcliBridgeSourceSessionId)||options.permissionMode==='plan',
+        readOnly:(Boolean(options.cloudcliBridgeSourceSessionId)&&!options.cloudcliBridgeUserAuthorization)||options.permissionMode==='plan',
+        authorization:options.cloudcliBridgeUserAuthorization,
         monitorId:typeof options.cloudcliMonitorId==='string'?options.cloudcliMonitorId:undefined,
         model:typeof options.model==='string'?options.model:undefined,
         effort:typeof options.effort==='string'?options.effort:undefined,
         permissionMode:typeof options.permissionMode==='string'?options.permissionMode:undefined});
       context.createQuery=createSessionBridgeQuery({userId,sessionId:options.sessionId,
-        autonomous:Boolean(options.cloudcliMonitorId||options.cloudcliBridgeSourceSessionId),planMode:options.permissionMode==='plan',permissionMode:typeof options.permissionMode==='string'?options.permissionMode:'default'},monitorQuery);
+        userMessageId:options.cloudcliUserMessageId,userMessage:options.cloudcliUserMessage,autonomous:Boolean(options.cloudcliMonitorId||options.cloudcliBridgeSourceSessionId||options.bridgeCompact),planMode:options.permissionMode==='plan',permissionMode:typeof options.permissionMode==='string'?options.permissionMode:'default'},monitorQuery);
     }
     // Durable queue records store explicit allow/deny lists at the top level.
     // Claude's SDK adapter consumes toolsSettings; preserve those choices on queued turns.
