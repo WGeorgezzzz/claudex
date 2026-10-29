@@ -3,7 +3,7 @@ import sharp from 'sharp';
 
 // Review candidates at their actual pixel sizes on both backgrounds.
 const names=['arc-arrow','shepherd-staff','leading-dog'];
-const sizes=[16,32,64,256], width=1320, height=1080;
+const sizes=[16,32,64,256], width=1360, height=1080;
 const layers=[];
 for(const [row,name] of names.entries()){
  const svg=await fs.readFile(`logo-options/drover-${name}.svg`);
