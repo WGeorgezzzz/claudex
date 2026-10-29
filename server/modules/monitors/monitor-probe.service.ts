@@ -159,6 +159,10 @@ export async function runProbe(row:MonitorRecord, now=new Date()):Promise<Monito
   else if(!state.terminal&&Date.parse(state.lastProgressAt||now.toISOString())+Number(spec.stallMinutes)*60_000<=now.getTime() && progress!==undefined)event={type:'stall',at:now.toISOString(),evidence:`progress 已 ${spec.stallMinutes} 分钟未变化`,delta,fields};
   else if(staleFile&&!state.terminal)event={type:'stall',at:now.toISOString(),evidence:`文件已 ${spec.stallMinutes} 分钟未更新：${staleFile}`,delta,fields};
   else if(Date.parse(state.lastModelAt||now.toISOString())+Number(spec.heartbeatMinutes)*60_000<=now.getTime())event={type:'heartbeat',at:now.toISOString(),evidence:`距上次模型回合已超过 ${spec.heartbeatMinutes} 分钟`,delta,fields};
+  const stalled=!state.terminal&&(Boolean(staleFile)||(progress!==undefined&&Date.parse(state.lastProgressAt||now.toISOString())+Number(spec.stallMinutes)*60000<=now.getTime()));
+  state.stallNotified=stalled&&previous.stallNotified===true;
+  if(event?.type==='stall') { if(state.stallNotified)event=null;else state.stallNotified=true; }
+  if(!event&&Date.parse(state.lastModelAt||now.toISOString())+Number(spec.heartbeatMinutes)*60000<=now.getTime())event={type:'heartbeat',at:now.toISOString(),evidence:`距上次模型回合已超过 ${spec.heartbeatMinutes} 分钟`,delta,fields};
   if(event?.type==='dead'&&previous.dead===true)event=null;
   state.dead=dead;
   if(event?.type==='done'&&previous.terminal===true)event=null;

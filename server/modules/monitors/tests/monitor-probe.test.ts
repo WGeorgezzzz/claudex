@@ -96,12 +96,17 @@ test('file-only stalls trigger and process death remains a single event while ot
   const row=monitorsService.create(user,{sessionId:'probe-session',name:'File stall',content:'read',intervalMinutes:1,probe:{stallMinutes:1,items:[{type:'file',path:log}]}});
   const now=new Date(); assert.equal(await runProbe(row,now),null);
   assert.equal((await runProbe(monitorsDb.get(user,row.id)!,new Date(now.getTime()+61000)))?.type,'stall');
+  assert.equal(await runProbe(monitorsDb.get(user,row.id)!,new Date(now.getTime()+121000)),null);
   const processRow=monitorsService.create(user,{sessionId:'probe-session',name:'Death latch',content:'read',intervalMinutes:1,probe:{items:[{type:'file',path:log},{type:'process',pid:2147483647}]}});
   assert.equal((await runProbe(processRow,now))?.type,'dead');
   await writeFile(log,'Working on the task\n2/40 status=running\n');
   assert.equal(await runProbe(monitorsDb.get(user,processRow.id)!,new Date(now.getTime()+61000)),null);
   const heartbeatCount=getConnection().prepare("SELECT COUNT(*) count FROM monitor_runs WHERE monitor_id=? AND status='heartbeat'").get(processRow.id) as {count:number};
   assert.equal(heartbeatCount.count,1);
+  assert.equal(await runProbe(monitorsDb.get(user,row.id)!,new Date(now.getTime()+181000)),null);
+  assert.equal((await runProbe(monitorsDb.get(user,row.id)!,new Date(now.getTime()+242000)))?.type,'stall');
+  assert.equal(await runProbe(monitorsDb.get(user,row.id)!,new Date(now.getTime()+303000)),null);
+  assert.equal((await runProbe(monitorsDb.get(user,row.id)!,new Date(now.getTime()+10801000)))?.type,'heartbeat');
 }));
 
 test('UTF-8 event deltas retain head and tail within 8 KiB',async()=>fixture(async(user,root)=>{
