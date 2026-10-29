@@ -25,7 +25,7 @@ export default function AboutTab() {
       {/* Logo + name + version */}
       <div className="flex items-center gap-3">
         <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-primary/90 shadow-sm">
-          <img src="/nexagent-mark.svg" alt="Nexagent" className="h-10 w-10 rounded-xl" />
+          <img src="/drover-mark.svg" alt={t('common:brand.name')} className="h-10 w-10 rounded-xl" />
         </div>
         <div>
           <div className="flex items-center gap-2">
@@ -33,7 +33,7 @@ export default function AboutTab() {
               className="text-base font-semibold text-foreground"
               style={{ fontFamily: CLOUDCLI_WORDMARK_FONT_FAMILY }}
             >
-              Nexagent
+              {t('common:brand.name')}
             </span>
             <a
               href={releasesUrl}
@@ -56,9 +56,9 @@ export default function AboutTab() {
             )}
           </div>
           <p className="mt-0.5 text-sm text-muted-foreground">
-            Your agents, one workspace.
+            {t('common:brand.tagline')}
           </p>
-          <p className="mt-1 text-xs text-muted-foreground">Your agents, one workspace.</p>
+          <p className="mt-1 text-xs text-muted-foreground">Drover — drive every agent from one place.</p>
         </div>
       </div>
 

@@ -11,8 +11,8 @@ test('launcher keeps local controls without hosted account or environment UI, ev
     dom.window.document.dispatchEvent(new dom.window.Event('DOMContentLoaded'));
     await new Promise(resolve => setTimeout(resolve, 20));
     const body = dom.window.document.body;
-    assert.match(body.textContent, /Nexagent/);
-    assert.match(body.textContent, /Open Local Nexagent/);
+    assert.match(body.textContent, /Drover/);
+    assert.match(body.textContent, /Open Local Drover/);
     assert.doesNotMatch(body.textContent, /Cloud environments|you@example.com|not connected/);
     assert.equal(body.querySelector('[data-cc-action="connect"]'), null);
     assert.equal(body.querySelector('[data-cc-action="logout"]'), null);
@@ -20,7 +20,7 @@ test('launcher keeps local controls without hosted account or environment UI, ev
   } finally { dom.window.close(); }
 });
 
-test('native app and tray menus expose local controls without Nexagent cloud menus', () => {
+test('native app and tray menus expose local controls without Drover cloud menus', () => {
   const menus = [];
   const context = vm.createContext({ process, Menu: {
     buildFromTemplate: template => { menus.push(template); return template; },
@@ -30,7 +30,7 @@ test('native app and tray menus expose local controls without Nexagent cloud men
     .replace(/^import .*;\r?\n/gm, '').replace('export class DesktopWindowManager', 'class DesktopWindowManager');
   vm.runInContext(source + '\nglobalThis.Manager = DesktopWindowManager;', context);
   const manager = Object.create(context.Manager.prototype);
-  Object.assign(manager, { mainWindow: {}, appName: 'Nexagent',
+  Object.assign(manager, { mainWindow: {}, appName: 'Drover',
     tray: { setToolTip: () => {}, setContextMenu: () => {} },
     getLocalState: () => ({ localServerRunning: true, desktopSettings: {} }),
     getCloudState: () => { throw new Error('UI must not read the removed cloud account'); },
@@ -38,6 +38,6 @@ test('native app and tray menus expose local controls without Nexagent cloud men
   });
   manager.buildAppMenu();
   const serialized = JSON.stringify(menus);
-  assert.match(serialized, /Open Local Nexagent/);
+  assert.match(serialized, /Open Local Drover/);
   assert.doesNotMatch(serialized, /cloudcli.ai|Cloud Environments|"Cloud"|Logout|Connect.*Account/);
 });

@@ -88,7 +88,7 @@
     "openInEditor": "Abrir no editor"
   },
   "mainContent": {
-    "loading": "Carregando Nexagent",
+    "loading": "Carregando Drover",
     "settingUpWorkspace": "Configurando seu espaço de trabalho...",
     "chooseProject": "Escolha seu projeto",
     "selectProjectDescription": "Selecione um projeto na barra lateral para começar a codar com o Claude. Cada projeto contém suas sessões de chat e histórico de arquivos.",
@@ -398,5 +398,9 @@
     "taskRowNotLoaded": "Iniciado anteriormente nesta conversa; clique para carregar",
     "taskOfAgent": "Iniciado por um dos agentes desta sessão"
   },
-  "cancel": "Cancelar"
+  "cancel": "Cancelar",
+  "brand": {
+    "name": "Drover",
+    "tagline": "Drive every agent from one place"
+  }
 }

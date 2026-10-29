@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <title>Drover shepherd staff</title>
+  <rect width="512" height="512" rx="112" fill="#203A36"/>
+  <path d="M174 394V178c0-42 28-72 70-72 35 0 62 22 70 54" fill="none" stroke="#F7F1E6" stroke-width="42" stroke-linecap="round"/>
+  <path d="M174 362c36-38 82-51 137-37 29 7 52 24 65 49" fill="none" stroke="#E3D7C3" stroke-width="30" stroke-linecap="round"/>
+  <path d="m252 258 43-43 43 43-43 43z" fill="#F4A7B9"/>
+  <path d="M273 237h44v44h-44z" fill="#203A36"/>
+  <circle cx="145" cy="394" r="18" fill="#F4A7B9"/>
+</svg>

@@ -200,7 +200,7 @@ export function LocalFileLink({ fileReference, directories = [], onPreview, chil
         buttons[next]?.focus();
       }}>
       <button type="button" role="menuitem" className={menuClass} disabled={opening} onClick={() => void openLocally()}><ExternalLink size={15}/>{t('fileLink.openLocally', 'Open locally')}</button>
-      <button type="button" role="menuitem" className={menuClass} onClick={() => { setPosition(null); linkRef.current?.click(); }}><FileText size={15}/>{t('fileLink.preview', 'Preview in Nexagent')}</button>
+      <button type="button" role="menuitem" className={menuClass} onClick={() => { setPosition(null); linkRef.current?.click(); }}><FileText size={15}/>{t('fileLink.preview', 'Preview in Drover')}</button>
       <button type="button" role="menuitem" className={menuClass} onClick={() => void reveal()}>打开所在文件夹</button>
       <button type="button" role="menuitem" className={menuClass} onClick={() => void copyPath(true)}>复制文件夹路径</button>
       <button type="button" role="menuitem" className={menuClass} onClick={() => void copyPath()}><Copy size={15}/>{t('fileLink.copyPath', 'Copy file path')}</button>

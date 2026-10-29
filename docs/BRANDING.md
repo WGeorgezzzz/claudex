@@ -1,8 +1,8 @@
-# Nexagent brand and compatibility
+# Drover brand and compatibility
 
-- Product name: **Nexagent**, without a separate Chinese product name.
-- Tagline: Your agents, one workspace.
-- Canonical mark: `public/nexagent-mark.svg`. Existing `</>` artwork is retained.
+- Product name: **Drover**; the Chinese display name is **驭手**.
+- Tagline: **Drover — drive every agent from one place** / **驭手 Drover — 一处驾驭所有 Agent**.
+- Canonical mark: `public/drover-mark.svg`, selected from `logo-options/` and based on a guiding arc with a leading arrow.
 - Palette: ink `#132B2B`, pale mark `#F7F1E6`, accent `#F4A7B9`.
 - Regenerate icon formats with `node scripts/release/generate-brand-icons.mjs`.
 - WorkBuddy's provider mark remains its original, separately owned artwork.
@@ -25,6 +25,6 @@ Retain app IDs `ai.cloudcli.desktop` and
 namespaces, and persisted storage keys. Compatibility artwork URLs
 `/nexcode-mark.svg`, `/gaci-mark.svg`, and `/claudex-mark.svg` remain available.
 
-Current pages and installers display Nexagent. Preserve LICENSE and NOTICE,
+Current pages and installers display Drover. Preserve LICENSE and NOTICE,
 including their historical upstream names. The GitHub repository is
 `WGeorgezzzz/nexagent`.

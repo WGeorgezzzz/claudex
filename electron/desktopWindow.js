@@ -431,9 +431,9 @@ export class DesktopWindowManager {
           },
           { type: 'separator' },
           {
-            label: 'Open Local Nexagent',
+            label: 'Open Local Drover',
             accelerator: 'CmdOrCtrl+L',
-            click: () => void this.actions.openLocalInDesktop().catch((error) => this.actions.showError('Could not open local Nexagent', error)),
+            click: () => void this.actions.openLocalInDesktop().catch((error) => this.actions.showError('Could not open local Drover', error)),
           },
           {
             label: 'Open Local Web UI in Browser',
@@ -536,8 +536,8 @@ export class DesktopWindowManager {
         label: 'Local',
         submenu: [
           {
-            label: localState.localServerRunning ? 'Open Local in Nexagent' : 'Start Local in Nexagent',
-            click: () => void this.actions.openLocalInDesktop().catch((error) => this.actions.showError('Could not open local Nexagent', error)),
+            label: localState.localServerRunning ? 'Open Local in Drover' : 'Start Local in Drover',
+            click: () => void this.actions.openLocalInDesktop().catch((error) => this.actions.showError('Could not open local Drover', error)),
           },
           {
             label: 'Open Local in Browser',

@@ -88,7 +88,7 @@
     "openInEditor": "エディタで開く"
   },
   "mainContent": {
-    "loading": "Nexagent を読み込んでいます",
+    "loading": "Drover を読み込んでいます",
     "settingUpWorkspace": "ワークスペースを準備しています...",
     "chooseProject": "プロジェクトを選択",
     "selectProjectDescription": "サイドバーからプロジェクトを選択して、Claudeとコーディングを始めましょう。各プロジェクトにはチャットセッションとファイル履歴が含まれています。",
@@ -269,5 +269,9 @@
       "closeSidebar": "サイドバーを閉じる",
       "resizeSidebar": "サイドバーの幅を変更"
     }
+  },
+  "brand": {
+    "name": "Drover",
+    "tagline": "Drive every agent from one place"
   }
 }

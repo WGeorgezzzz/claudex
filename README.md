@@ -1,4 +1,6 @@
-# Nexagent
+# Drover
+
+Drive every agent from one place.
 
 One backend for Claude Code, Codex, Cursor, OpenCode, and WorkBuddy, on your
 desktop, phone, or remote device.
@@ -6,9 +8,9 @@ desktop, phone, or remote device.
 [简体中文](README.zh-CN.md) · [Releases](https://github.com/WGeorgezzzz/nexagent/releases)
 · [Changelog](CHANGELOG.md) · [Contributing](CONTRIBUTING.md)
 
-![Nexagent desktop workspace with fictional demo conversations](public/screenshots/desktop-main.png)
+<img src="public/drover-mark.svg" width="80" alt="Drover guiding arc and leading arrow" />
 
-<img src="public/screenshots/mobile-chat.png" width="260" alt="Nexagent mobile workspace with demo data" />
+<img src="public/screenshots/mobile-chat.png" width="260" alt="Drover mobile workspace with demo data" />
 
 ## What you can do
 
@@ -22,13 +24,13 @@ desktop, phone, or remote device.
   relay account quotas. Credit balance changes and stale data are explicit.
 - Queue prompts, branch side conversations, organize sessions, and schedule monitors.
 - Connect remotely without owning a domain: Dev Tunnels, Tailscale, or a temporary
-  Cloudflare tunnel. Remote requests always require a Nexagent login.
+  Cloudflare tunnel. Remote requests always require a Drover login.
 
 ## Quick start
 
 ### Desktop installers
 
-Get **Nexagent 1.0.0** from [Releases](https://github.com/WGeorgezzzz/nexagent/releases).
+Get **Drover 1.0.0** from [Releases](https://github.com/WGeorgezzzz/nexagent/releases).
 The release is prepared as a **draft** until maintainer review; draft assets are
 visible only to repository maintainers. Compare the download with `SHA256SUMS`.
 
@@ -38,7 +40,7 @@ visible only to repository maintainers. Compare the download with `SHA256SUMS`.
 | macOS Apple silicon | `.dmg` | Unsigned and not notarized |
 | Linux x64 | `.tar.gz` | Extract and run `nexagent`; desktop session required |
 
-On macOS, drag Nexagent into Applications. For a verified download, use
+On macOS, drag Drover into Applications. For a verified download, use
 **System Settings → Privacy & Security → Open Anyway** after the first blocked
 launch. Managed devices may require administrator approval. Do not disable
 Gatekeeper globally. On Windows, inspect the source and checksum before accepting
@@ -110,7 +112,7 @@ may not implement these management and usage APIs. See [quota configuration](doc
 Only administrators can change relay settings or manage tunnels. Relay admin
 credentials stay outside the repository and are bound to their destination URL.
 Claude OAuth credentials are read locally and never refreshed by the dashboard.
-Quota views observe usage; the relay scheduler enforces limits. Nexagent has no
+Quota views observe usage; the relay scheduler enforces limits. Drover has no
 credit-reset action and makes no guarantee that other clients cannot spend credits.
 
 Coding agents and terminals can change host files and execute commands. Share this
@@ -121,7 +123,7 @@ through GitHub's security reporting when available; never post credentials in is
 
 ## Upstream and license
 
-Nexagent is an independently maintained fork of
+Drover is an independently maintained fork of
 [CloudCLI / Claude Code UI](https://github.com/siteboon/claudecodeui), based on
 upstream 1.37.5. It is not an official product of Anthropic, OpenAI, Cursor,
 Microsoft, or the upstream maintainers. Provider trademarks belong to their owners.

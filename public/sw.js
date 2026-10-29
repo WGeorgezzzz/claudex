@@ -1,7 +1,7 @@
-// Service Worker for Nexagent PWA
+// Service Worker for Drover PWA
 // Cache only manifest (needed for PWA install). HTML and JS are never pre-cached
 // so a rebuild + refresh always picks up the latest assets.
-const CACHE_NAME = 'nexagent-v1';
+const CACHE_NAME = 'drover-v1';
 const urlsToCache = [
   '/manifest.json'
 ];
@@ -79,7 +79,7 @@ self.addEventListener('push', event => {
   try {
     payload = event.data.json();
   } catch {
-    payload = { title: 'Nexagent', body: event.data.text() };
+    payload = { title: 'Drover', body: event.data.text() };
   }
 
   const options = {
@@ -92,7 +92,7 @@ self.addEventListener('push', event => {
   };
 
   event.waitUntil(
-    self.registration.showNotification(payload.title || 'Nexagent', options)
+    self.registration.showNotification(payload.title || 'Drover', options)
   );
 });
 

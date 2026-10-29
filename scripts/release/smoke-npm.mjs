@@ -38,7 +38,7 @@ try {
   assert.equal(quota.key.data.mode, 'unconfigured'); assert.equal(quota.key.error, null);
   assert.equal((await fetch(base + '/api/monitors', authorized)).status, 200);
   assert.equal((await fetch(base + '/api/monitors')).status, 401);
-  assert.match(await fetch(base).then(response => response.text()), /Nexagent/);
+  assert.match(await fetch(base).then(response => response.text()), /Drover/);
   const result = { passed: true, package: `${pack.name}@${pack.version}`, shasum: pack.shasum, port, freshSetup: true, adminCreated: true, authenticatedBusinessApi: 200, anonymous: 401, relayUnconfigured: true, npx: '--no-install nexagent start' };
   await fs.writeFile('release/workbench/npm-smoke.json', JSON.stringify(result, null, 2));
   console.log(JSON.stringify(result));

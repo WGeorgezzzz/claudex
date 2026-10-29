@@ -20,7 +20,7 @@
     "runClaudeCli": "כדי להתחיל, יש להריץ את Claude CLI בתיקיית פרויקט"
   },
   "app": {
-    "title": "Nexagent",
+    "title": "Drover",
     "subtitle": "ממשק לעוזר תכנות AI"
   },
   "sessions": {

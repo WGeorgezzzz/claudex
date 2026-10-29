@@ -57,19 +57,19 @@ await fs.writeFile(path.join(stage,'build-provenance.json'),JSON.stringify({
 },null,2));
 await fs.writeFile(path.join(stage,'package.json'),JSON.stringify({
   name:'nexagent-desktop',version:profile.version,productName:profile.productName,
-  description:'Nexagent independent desktop distribution',
+  description:'Drover independent desktop distribution',
   author:sourcePackage.author,license:sourcePackage.license,type:'module',main:'electron/main.js',
   dependencies:sourcePackage.dependencies,optionalDependencies:sourcePackage.optionalDependencies,
   build:{
     appId:profile.appId,productName:profile.productName,asar:false,electronVersion,
     npmRebuild:false,nodeGypRebuild:false,
-    artifactName:'Nexagent-${version}-${os}-${arch}.${ext}',
+    artifactName:'Drover-${version}-${os}-${arch}.${ext}',
     directories:{output:'../../release/workbench'},
     files:['electron/**','public/**','dist/**','server/**','runtime/**','node_modules/**',
       'workbench-profile.json','build-provenance.json','package.json','LICENSE','NOTICE'],
     protocols:[{name:profile.productName,schemes:[profile.protocol]}],
     win:{target:[{target:'nsis',arch:['x64']}],icon:'electron/assets/logo-windows.ico',
-      executableName:'Nexagent',signAndEditExecutable:true},
+      executableName:'Drover',signAndEditExecutable:true},
     mac:{target:[{target:'dmg',arch:['arm64']}],icon:'electron/assets/logo-macos.icns',
       category:'public.app-category.developer-tools',identity:null,notarize:false},
     linux:{target:[{target:'tar.gz',arch:['x64']}],icon:'public/logo-512.png',category:'Development',executableName:'nexagent'},

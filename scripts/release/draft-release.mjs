@@ -29,7 +29,7 @@ if (!notes) throw Error('Missing v1.0.0 release notes.');
 const existing = (await api('/releases?per_page=100')).find(release => release.tag_name === tag);
 if (existing && !existing.draft) throw Error('Refusing to modify a published release.');
 const release = existing || await api('/releases', 'POST', {
-  tag_name: tag, target_commitish: process.env.GITHUB_SHA, name: `Nexagent ${tag}`,
+  tag_name: tag, target_commitish: process.env.GITHUB_SHA, name: `Drover ${tag}`,
   draft: true, body: notes.trim(),
 });
 if (!release.draft) throw Error('Release must remain draft.');

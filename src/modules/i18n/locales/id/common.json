@@ -88,7 +88,7 @@
     "openInEditor": "Buka di Editor"
   },
   "mainContent": {
-    "loading": "Memuat Nexagent",
+    "loading": "Memuat Drover",
     "settingUpWorkspace": "Menyiapkan workspace...",
     "chooseProject": "Pilih Proyek",
     "selectProjectDescription": "Pilih proyek dari sidebar untuk mulai coding dengan Claude. Setiap proyek berisi sesi chat dan riwayat file.",
@@ -351,5 +351,9 @@
     "closeLoginModal": "Tutup modal login",
     "pluginLoadFailed": "Plugin gagal dimuat: {{error}}"
   },
-  "cancel": "Batal"
+  "cancel": "Batal",
+  "brand": {
+    "name": "Drover",
+    "tagline": "Drive every agent from one place"
+  }
 }
