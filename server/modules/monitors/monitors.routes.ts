@@ -19,10 +19,17 @@ monitorsRoutes.get('/capabilities',asyncHandler(async(req,res)=>{
 }));
 monitorsRoutes.get('/summaries',asyncHandler(async(req,res)=>{res.json(createApiSuccessResponse(monitorsService.summaries(userId(req))));}));
 monitorsRoutes.get('/',asyncHandler(async(req,res)=>{
-  res.json(createApiSuccessResponse(monitorsService.list(userId(req),typeof req.query.sessionId==='string'?req.query.sessionId:undefined)));
+  const includeStopped=req.query.includeStopped==='true';
+  const offset=Math.max(0,Math.floor(Number(req.query.offset)||0));
+  const rows=monitorsService.listView(userId(req),typeof req.query.sessionId==='string'?req.query.sessionId:undefined,includeStopped,offset);
+  if(rows.length===10)res.setHeader('X-Next-Offset',String(offset+10));
+  res.json(createApiSuccessResponse(rows));
 }));
 monitorsRoutes.post('/',asyncHandler(async(req,res)=>{
   res.status(201).json(createApiSuccessResponse(monitorsService.create(userId(req),req.body??{})));
+}));
+monitorsRoutes.get('/:id',asyncHandler(async(req,res)=>{
+  res.json(createApiSuccessResponse(monitorsService.require(userId(req),String(req.params.id))));
 }));
 monitorsRoutes.get('/:id/runs',asyncHandler(async(req,res)=>{
   res.json(createApiSuccessResponse(monitorsService.history(userId(req),String(req.params.id))));

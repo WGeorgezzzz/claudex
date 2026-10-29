@@ -51,6 +51,7 @@ export type CodexAppServerTurnOptions = {
   effort?: string | null;
   planMode?: boolean;
   dynamicTools?: AnyRecord[];
+  monitorSlim?: boolean;
   /** The runtime owns approval UI and clears it when native requests end. */
   onRequest?: (message: AnyRecord, reply: (result: AnyRecord) => void) => boolean;
   onRequestResolved?: (id: string | number) => void;
@@ -339,10 +340,22 @@ export async function* runCodexAppServerTurn(options: CodexAppServerTurnOptions)
   try {
     await call('initialize', { clientInfo: { name: 'claudex', title: 'Nexagent', version: '1' }, capabilities: { experimentalApi: true } });
     write({ method: 'initialized', params: {} });
+    let monitorConfig:AnyRecord|undefined;
+    if(options.monitorSlim){
+      const config=await call('config/read',{cwd:options.cwd,includeLayers:false});
+      const listed=await call('skills/list',{cwds:[options.cwd],forceReload:false});
+      const skills=(listed.data??[]).flatMap((entry:AnyRecord)=>entry.skills??[]);
+      monitorConfig={
+        'features.memories':false,'features.skip_host_skill_discovery':true,'features.skill_search':false,
+        'skills.config':skills.map((skill:AnyRecord)=>({path:skill.path,enabled:false})),
+        ...Object.fromEntries(Object.keys(config.config?.mcp_servers??{}).map(name=>['mcp_servers.'+name+'.enabled',false])),
+      };
+    }
     const threadParams = {
       cwd: options.cwd, model: options.model ?? null,
       sandbox: options.sandbox, approvalPolicy: options.approvalPolicy,
       ...(options.dynamicTools?.length ? { dynamicTools: options.dynamicTools } : {}),
+      ...(monitorConfig?{config:monitorConfig}:{}),
     };
     const opened = options.resumeThreadId
       ? await call('thread/resume', { threadId: options.resumeThreadId, ...threadParams, excludeTurns: true })

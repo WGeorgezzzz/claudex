@@ -23,7 +23,7 @@ test('creates the requested interval with model and permissions and preserves th
   fireEvent.change(screen.getByLabelText('监测间隔（分钟）'),{target:{value:'5'}});
   fireEvent.click(screen.getByRole('button',{name:'添加监测'}));
   await waitFor(()=>assert.equal(create.mock.calls.length,1));
-  assert.deepEqual(create.mock.calls[0][0],{sessionId:'session',name:'状态',content:'只读检查',intervalMinutes:5,options:{model:'default',permissionMode:'default'}});
+  assert.deepEqual(create.mock.calls[0][0],{sessionId:'session',name:'状态',content:'只读检查',intervalMinutes:5,options:{model:'claude-sonnet-5-5',permissionMode:'default',effort:'medium'}});
 });
 test('pause action is bound to the displayed task and server errors stay visible',async()=>{
   vi.spyOn(api.monitors,'list').mockResolvedValue(response([{id:'task',name:'检查',content:'status',status:'active',interval_minutes:5,next_run_at:new Date().toISOString(),run_count:0,running_id:null,last_error:null}]));
@@ -49,7 +49,7 @@ test('creates a daily wall-clock task with explicit timezone and unchanged permi
   fireEvent.click(screen.getByRole('button',{name:'添加监测'}));
   await waitFor(()=>assert.equal(create.mock.calls.length,1));
   assert.deepEqual(create.mock.calls[0][0].schedule,{frequency:'daily',time:'09:30',timeZone:'Asia/Shanghai'});
-  assert.deepEqual(create.mock.calls[0][0].options,{permissionMode:'default'});
+  assert.deepEqual(create.mock.calls[0][0].options,{permissionMode:'default',model:'claude-sonnet-5-5',effort:'medium'});
 });
 
 test('legacy server never receives a silently downgraded calendar task',async()=>{

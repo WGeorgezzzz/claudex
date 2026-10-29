@@ -1648,7 +1648,9 @@ export type MonitorTaskRecord = {
   status:'active'|'paused'|'stopped';next_run_at:string;running_id:string|null;run_count:number;last_error:string|null;options?:string;state_record?:string;
 };
 /** A bounded execution receipt displayed by both monitor history views. */
-export type MonitorRunReceipt = {id:string;started_at:string;finished_at?:string|null;status:string;error:string|null;session_id?:string|null;report?:string|null;input_tokens?:number|null;context_tokens?:number|null};
+export type MonitorRunReceipt = {id:string;started_at:string;finished_at?:string|null;status:string;error:string|null;session_id?:string|null;report?:string|null;input_tokens?:number|null;context_tokens?:number|null;output_tokens?:number|null;cache_read_tokens?:number|null;cache_creation_tokens?:number|null;total_tokens?:number|null};
+/** Compact default list payload; full monitor fields are fetched through actions/history. */
+export type MonitorListSummary = {id:string;name:string;status:'active'|'paused'|'stopped';schedule:MonitorCalendarSchedule|null;nextRunAt:string|null;lastRun:{count:number;error:string|null};content:string;run_count?:number;last_error?:string|null};
 
 // ---------------------------
 

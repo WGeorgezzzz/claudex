@@ -38,6 +38,21 @@ function fakeServer(onRequest: (request: Request, reply: (result: unknown, error
 const THREAD = 'thread-1';
 const TURN = 'turn-1';
 
+test('monitor rounds disable discovered skills, memory and unrelated MCP only for their thread',async()=>{
+  let config:Record<string,any>|undefined;
+  const server=fakeServer((request,reply,notify)=>{
+    if(request.method==='config/read')return reply({config:{mcp_servers:{unrelated:{command:'unused'}}}});
+    if(request.method==='skills/list')return reply({data:[{skills:[{path:'C:/test/skill/SKILL.md'}]}]});
+    if(request.method==='thread/start'){config=request.params?.config;return reply({thread:{id:THREAD}});}
+    reply({});
+    if(request.method==='turn/start')notify('turn/completed',{threadId:THREAD,turn:{id:TURN,status:'completed'}});
+  });
+  for await(const _event of runCodexAppServerTurn({env:{},cwd:process.cwd(),sandbox:'workspace-write',approvalPolicy:'never',input:'check',signal:new AbortController().signal,monitorSlim:true,sessionKeys:()=>['monitor-test'],spawnServer:()=>server.child})){}
+  assert.equal(config?.['features.memories'],false);
+  assert.equal(config?.['mcp_servers.unrelated.enabled'],false);
+  assert.deepEqual(config?.['skills.config'],[{path:'C:/test/skill/SKILL.md',enabled:false}]);
+});
+
 test('a running app-server turn accepts steered input and settles it with the turn', async () => {
   let steerParams: Record<string, any> | undefined;
   const server = fakeServer((request, reply, notify) => {

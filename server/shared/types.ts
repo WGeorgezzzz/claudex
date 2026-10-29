@@ -1682,13 +1682,14 @@ export type MonitorRecord = {
   schedule_json: string|null;
   consecutive_failures: number; pause_reason: string|null;
   running_id: string|null; run_count: number; last_error: string|null; created_at: string;
-  state_record?: string;
+  state_record?: string; no_change_count?: number;
 };
 /** One attempted monitor execution. Failures/interruption stay recorded while active monitors retry with backoff. */
 export type MonitorRunRecord = {
   id: string; monitor_id: string; started_at: string; finished_at: string|null;
-  status: 'running'|'succeeded'|'failed'|'interrupted'; error: string|null;
+  status: 'running'|'succeeded'|'failed'|'interrupted'|'skipped'; error: string|null;
   session_id?:string|null;report?:string|null;input_tokens?:number|null;context_tokens?:number|null;
+  output_tokens?:number|null;cache_read_tokens?:number|null;cache_creation_tokens?:number|null;total_tokens?:number|null;
 };
 // ---------------------------
 //----------------- DOT ASSISTANT STATE ------------

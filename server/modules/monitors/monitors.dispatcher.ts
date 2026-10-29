@@ -1,13 +1,17 @@
 import { withUserContext } from '@/modules/auth/index.js';
 import { assertOwnedSession } from '@/modules/access-control/index.js';
 import { monitorsDb } from '@/modules/database/index.js';
-import { sessionsService } from '@/modules/providers/index.js';
+import { sessionsService, providerTokenUsageService } from '@/modules/providers/index.js';
+import { connectedClients, clientUserIds } from '@/modules/websocket/index.js';
+import { createNormalizedMessage } from '@/shared/index.js';
+import type { LLMProvider } from '@/shared/types.js';
 import { chatRunRegistry, runDetachedChatTurn } from '@/modules/websocket/index.js';
 import type { ProviderRuntimeGateway } from '@/modules/websocket/index.js';
 import { maintainMonitorContext } from './monitor-context.service.js';
 import { prepareIsolatedRound, finishMonitorReport } from './monitor-isolated.service.js';
 
 let timer: ReturnType<typeof setInterval>|null=null;
+export function shouldIsolateMonitor(runMode:unknown,contextTokens:number):boolean{return runMode!=='original'||contextTokens>120_000;}
 
 /** Used by server startup and monitor tests; claims runs before any provider is awaited. */
 export async function dispatchMonitors(runtime: ProviderRuntimeGateway,now=new Date()): Promise<number> {
@@ -28,14 +32,23 @@ export async function dispatchMonitors(runtime: ProviderRuntimeGateway,now=new D
       try {
         const session=assertOwnedSession(row.user_id,row.session_id);
         if(!session || session.isArchived) {monitorsDb.pauseUnavailable(row.id);throw new Error('会话已删除或归档，监测已暂停。');}
-        const isolated=JSON.parse(row.options).runMode!=='original';
-        const round=isolated?await prepareIsolatedRound(row,runId):null;
+        const requestedOriginal=JSON.parse(row.options).runMode==='original';
+        const sourceUsage=requestedOriginal?await providerTokenUsageService.getSessionTokenUsage(row.session_id).catch(()=>({used:0})):null;
+        const forcedIsolated=requestedOriginal&&shouldIsolateMonitor('original',sourceUsage?.used??0);
+        const isolated=!requestedOriginal||forcedIsolated;
+        if(forcedIsolated){
+          monitorsDb.setMode(row.user_id,row.id,'isolated');
+          monitorsDb.recordContext(row.user_id,row.id,{action:'isolated',beforeTokens:sourceUsage?.used,reason:'原会话超过 120000 token，保留原会话并切换独立回合'});
+          const notice=createNormalizedMessage({id:'monitor-context-switch:'+runId,kind:'text',role:'assistant',provider:session.provider as LLMProvider,sessionId:row.session_id,timestamp:new Date().toISOString(),content:`监测「${row.name}」原会话上下文已超过 120000 token，本轮自动切换为独立回合以控制上下文成本。`});
+          for(const client of connectedClients)if(client.readyState===1&&clientUserIds.get(client)===row.user_id)client.send(JSON.stringify(notice));
+        }
+        const round=await prepareIsolatedRound(row,runId,isolated);
         if(round?.skip){monitorsDb.finishNoChange(row.id,runId);return;}
         const sessionId=round?.sessionId||await maintainMonitorContext(row,runId,row.session_id);
-        if(!isolated)monitorsDb.attachSession(row.id,runId,sessionId);
         let finalText='';
         let providerError: string|null=null;
         let completed=false;
+        let cumulativeUsage: {inputTokens?:number;outputTokens?:number;cacheReadTokens?:number;cacheCreationTokens?:number;used?:number}|undefined;
         // SDK adapters can report failure as an event without throwing. Keep the
         // normal UI stream intact while retaining that failure in the receipt.
         const observedRuntime: ProviderRuntimeGateway=Object.create(runtime);
@@ -47,6 +60,7 @@ export async function dispatchMonitors(runtime: ProviderRuntimeGateway,now=new D
           send(data) {
             if(data && typeof data==='object') {
               const event=data as Record<string,unknown>;
+              if(event.text==='monitor_usage'&&event.monitorUsage&&typeof event.monitorUsage==='object'){cumulativeUsage=event.monitorUsage;monitorsDb.saveUsage(row.id,runId,cumulativeUsage);}
               if(event.kind==='text'&&event.role==='assistant'&&typeof event.content==='string')finalText=event.content;
               if(event.kind==='error')providerError=String(event.content||'模型执行失败。');
               if(event.kind==='complete') {
@@ -62,7 +76,7 @@ export async function dispatchMonitors(runtime: ProviderRuntimeGateway,now=new D
           options:{...(round?.options||JSON.parse(row.options)),cloudcliMonitorId:row.id},interruptActiveRun:false},{runtime:observedRuntime});
         const failure = providerError || result.error || (!result.started ? '本轮未能启动。' : !completed ? '模型未返回完成确认。' : null);
         const current = monitorsDb.get(row.user_id, row.id);
-        if(!failure)await finishMonitorReport(row,runId,sessionId,finalText,isolated);
+        if(!failure)await finishMonitorReport(row,runId,sessionId,finalText,isolated,round?.fingerprint,cumulativeUsage);
         if (!isolated && !failure && current?.status === 'active') await maintainMonitorContext(current, runId, sessionId);
         monitorsDb.finish(row.id,runId,failure);
       } catch(error) {

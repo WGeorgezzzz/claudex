@@ -101,7 +101,7 @@ export function createProviderRuntimeService(
         permissionMode:typeof options.permissionMode==='string'?options.permissionMode:undefined});
       context.createQuery=createSessionBridgeQuery({userId,sessionId:options.sessionId,
         autonomous:Boolean(options.cloudcliMonitorId||options.cloudcliBridgeSourceSessionId),planMode:options.permissionMode==='plan',permissionMode:typeof options.permissionMode==='string'?options.permissionMode:'default'},monitorQuery);
-      context.createQuery=createDotQuery({userId,sessionId:options.sessionId,
+      if(!options.monitorSlim) context.createQuery=createDotQuery({userId,sessionId:options.sessionId,
         autonomous:Boolean(options.cloudcliMonitorId||options.cloudcliBridgeSourceSessionId),planMode:options.permissionMode==='plan'},context.createQuery);
     }
     // Durable queue records store explicit allow/deny lists at the top level.

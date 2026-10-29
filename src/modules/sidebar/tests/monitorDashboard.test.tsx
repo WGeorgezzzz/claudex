@@ -18,6 +18,7 @@ test('visible entry counts all enabled tasks and edits the selected one',async()
   assert.ok(screen.getByText('Bypass · 全部允许'));
   fireEvent.click(screen.getByRole('button',{name:'调整'}));
   fireEvent.change(screen.getByLabelText('任务间隔分钟'),{target:{value:'60'}});
+  await waitFor(()=>assert.equal(screen.getByRole('button',{name:'保存调整'}).hasAttribute('disabled'),false));
   fireEvent.click(screen.getByRole('button',{name:'保存调整'}));
   await waitFor(()=>assert.equal(update.mock.calls.length,1));
   assert.deepEqual(update.mock.calls[0],['m1',{name:'进度巡检',content:'查看日志',intervalMinutes:60,runMode:'isolated'}]);
@@ -43,6 +44,7 @@ test('daily rule stays intact while editing a name and the displayed permission 
   fireEvent.click(screen.getByRole('button',{name:'调整'}));
   await waitFor(()=>assert.equal((screen.getByRole('option',{name:'每天'}) as HTMLOptionElement).disabled,false));
   fireEvent.change(screen.getByLabelText('任务名称'),{target:{value:'Daily renamed'}});
+  await waitFor(()=>assert.equal(screen.getByRole('button',{name:'保存调整'}).hasAttribute('disabled'),false));
   fireEvent.click(screen.getByRole('button',{name:'保存调整'}));
   await waitFor(()=>assert.equal(update.mock.calls.length,1));
   assert.deepEqual(update.mock.calls[0][1].schedule,schedule);
