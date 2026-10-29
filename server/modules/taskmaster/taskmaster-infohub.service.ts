@@ -1,28 +1,49 @@
 import path from 'node:path';
 import fs from 'node:fs/promises';
+import { readFileSync } from 'node:fs';
+import { createHash,randomUUID } from 'node:crypto';
+
 import { withUserContext } from '@/modules/auth/index.js';
 import { getConnection, projectsDb } from '@/modules/database/index.js';
 import { assertContextPath } from '@/modules/access-control/index.js';
 import { getCloudCliHomeDir } from '@/shared/index.js';
+
 import { taskmasterWorkspace } from './taskmaster-auto.service.js';
 import { infohubRecord, infohubTopics, remoteStatus } from './taskmaster-infohub.model.js';
 import type { InfohubUnit } from './taskmaster-infohub.model.js';
+import { createInfohubLifecycle, launchInfohubProcess } from './taskmaster-infohub-lifecycle.service.js';
 
 type SyncStatus={online:boolean;lastSyncedAt:string|null;error:string|null;imported:number;merged:unknown[];unmatchedLegacy:unknown[];tags:unknown[]};
 const states=new Map<number,SyncStatus>(),pending=new Map<number,Promise<SyncStatus>>();
 const details=new Map<string,InfohubUnit>();
 const topology=new Map<number,string>();
 let timer:ReturnType<typeof setInterval>|undefined;
-export const infohubSyncStatus=(userId:number):SyncStatus=>states.get(userId)||{online:false,lastSyncedAt:null,error:'正在连接信息看板',imported:0,merged:[],unmatchedLegacy:[],tags:[]};
+/** Inbox rendering and sources status restore the last successful reconciliation without contacting or launching info-hub. */
+export const infohubSyncStatus=(userId:number):SyncStatus=>{
+  const current=states.get(userId);if(current)return current;
+  let saved:Partial<SyncStatus>={};try{saved=JSON.parse(readFileSync(syncMetadataPath(userId),'utf8'));}catch{/* No completed synchronization yet. */}
+  const initial={online:false,lastSyncedAt:saved.lastSyncedAt||null,error:null,imported:saved.imported||0,merged:[],unmatchedLegacy:[],tags:[]};states.set(userId,initial);return initial;
+};
+function syncMetadataPath(user:number){return path.join(getCloudCliHomeDir(),'taskmaster','infohub-'+user+'-'+createHash('sha256').update(baseUrl().href).digest('hex').slice(0,12)+'.json');}
 
 function baseUrl(){const base=new URL(process.env.INFOHUB_BASE_URL||'http://127.0.0.1:8765');if(base.protocol!=='http:'||!['127.0.0.1','localhost','[::1]'].includes(base.hostname)||base.username||base.password)throw Error('信息看板仅支持本机连接');return base;}
-export async function infohubRequest(endpoint:string,body?:unknown):Promise<unknown> {
+/** Sources health, evidence retrieval and reconciliation use the authenticated loopback API with bounded waits. */
+export async function infohubRequest(endpoint:string,body?:unknown,timeout=10000):Promise<unknown> {
   let token=process.env.INFOHUB_API_TOKEN;
   if(!token)try{token=JSON.parse(await fs.readFile(path.join(getCloudCliHomeDir(),'secrets','infohub-tasks.json'),'utf8')).token;}catch{/* An unauthenticated local info-hub needs no additional account. */}
-  const response=await fetch(new URL(endpoint,baseUrl()),{method:body?'POST':'GET',headers:{accept:'application/json',...(token?{authorization:'Bearer '+token}:{}),...(body?{'content-type':'application/json'}:{})},body:body?JSON.stringify(body):undefined,signal:AbortSignal.timeout(10000),redirect:'error'});
-  if(!response.ok)throw Error(response.status===401?'信息看板连接未授权':'信息看板请求失败（'+response.status+'）');
+  const response=await fetch(new URL(endpoint,baseUrl()),{method:body?'POST':'GET',headers:{accept:'application/json',...(token?{authorization:'Bearer '+token}:{}),...(body?{'content-type':'application/json'}:{})},body:body?JSON.stringify(body):undefined,signal:AbortSignal.timeout(timeout),redirect:'error'});
+  if(!response.ok)throw Object.assign(Error(response.status===401?'信息看板连接未授权，请配置 INFOHUB_API_TOKEN':'信息看板请求失败（'+response.status+'）'),{statusCode:response.status});
   return response.json();
 }
+
+/** Sources routes explicitly start collection; the automatic reconciler never launches a service. */
+export const infohubLifecycle=createInfohubLifecycle({
+  probe:()=>infohubRequest('/api/health',undefined,1500),
+  launch:launchInfohubProcess,
+  collect:()=>infohubRequest('/api/poll',{},180000),
+  reconcile:syncInfohubTasks,
+  isBusy:()=>pending.size>0,
+});
 
 /** One serial HTTP reconciliation per account; task rendering never waits for this connection. */
 export function syncInfohubTasks(userId:number):Promise<SyncStatus> {
@@ -70,6 +91,7 @@ export function syncInfohubTasks(userId:number):Promise<SyncStatus> {
       }
       if(result.writes.length)result=await taskmasterWorkspace.reconcileInfohub(root,userId,all.map(infohubRecord),infohubTopics([...parents,...all]));
       const next={online:true,lastSyncedAt:new Date().toISOString(),error:null,imported:result.imported,merged:[...previous.merged,...merges],unmatchedLegacy:result.unmatchedLegacy,tags};
+      const file=syncMetadataPath(userId);await fs.mkdir(path.dirname(file),{recursive:true});const temporary=file+'.'+randomUUID()+'.tmp';await fs.writeFile(temporary,JSON.stringify({lastSyncedAt:next.lastSyncedAt,imported:next.imported}));await fs.rename(temporary,file);
       topology.set(userId,graphVersion);states.set(userId,next);return next;
     }catch(error){const next={...previous,online:false,error:error instanceof Error?error.message:'信息看板离线，稍后同步'};states.set(userId,next);return next;}
   }).finally(()=>pending.delete(userId));
@@ -78,8 +100,9 @@ export function syncInfohubTasks(userId:number):Promise<SyncStatus> {
 
 /** The personal local info-hub belongs to the primary administrator, never member accounts. */
 export function initializeInfohubTaskSync(){
-  if(timer)return;
-  const poll=()=>{const admin=getConnection().prepare("SELECT id FROM users WHERE role='admin' AND deleted_at IS NULL ORDER BY id LIMIT 1").get() as {id:number}|undefined;if(admin)void syncInfohubTasks(admin.id).catch(error=>console.warn('[InfoHub tasks]',String(error)));};
-  timer=setInterval(poll,30000);timer.unref();poll();
+  if(timer||process.env.CLAUDEX_PASSIVE_INSTANCE==='1')return;
+  const poll=()=>{if(!infohubLifecycle.active()||infohubLifecycle.busy())return;const admin=getConnection().prepare("SELECT id FROM users WHERE role='admin' AND deleted_at IS NULL ORDER BY id LIMIT 1").get() as {id:number}|undefined;if(admin)void syncInfohubTasks(admin.id).catch(error=>console.warn('[InfoHub tasks]',String(error)));};
+  timer=setInterval(poll,30000);timer.unref();
 }
-export function closeInfohubTaskSync(){clearInterval(timer);timer=undefined;}
+/** Taskmaster shutdown stops polling and signals only an interpreter owned by this server instance. */
+export function closeInfohubTaskSync(){clearInterval(timer);timer=undefined;void infohubLifecycle.stop().catch(error=>console.warn('[InfoHub stop]',String(error)));}

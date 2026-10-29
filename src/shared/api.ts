@@ -72,6 +72,10 @@ export const infoHubApi = { authorize: () => authenticatedFetch('/api/infohub/se
 
 /** Global tasks and the sidebar share the authenticated TaskMaster transport. */
 export const inboxTasksApi = {
+  sources:()=>authenticatedFetch('/api/taskmaster/inbox/sources'),
+  startInfohub:()=>authenticatedFetch('/api/taskmaster/inbox/sources/infohub/start',{method:'POST',body:'{}'}),
+  infohubSettings:()=>authenticatedFetch('/api/taskmaster/inbox/sources/infohub/settings'),
+  saveInfohubSettings:(idleMinutes:number)=>authenticatedFetch('/api/taskmaster/inbox/sources/infohub/settings',{method:'PUT',body:JSON.stringify({idleMinutes})}),
   executeIntelligence:(input:unknown)=>authenticatedFetch('/api/taskmaster/inbox/intelligence/execute',{method:'POST',body:JSON.stringify(input)}),
   intelligence:()=>authenticatedFetch('/api/taskmaster/inbox/intelligence'),
   refreshIntelligence:(force=false)=>authenticatedFetch('/api/taskmaster/inbox/intelligence/refresh',{method:'POST',body:JSON.stringify({force})}),
