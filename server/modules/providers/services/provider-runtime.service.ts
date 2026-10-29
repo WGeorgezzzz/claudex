@@ -88,6 +88,7 @@ export function createProviderRuntimeService(
     options: AnyRecord,
     writer: ProviderRuntimeWriter,
   ): Promise<unknown> => {
+    if (supervision && supervisedRuntimeState.draining) return Promise.reject(new Error('Provider ingress is frozen for restart.'));
     if (supervision && ['codex', 'claude'].includes(providerName) && writer.userId != null && options.sessionId) {
       return import('./provider-supervision-controller.service.js').then(module => module.runSupervised(providerName, command, options, writer));
     }
@@ -119,6 +120,17 @@ export function createProviderRuntimeService(
     }}):writer;
     const execute = async () => {
       agentDiscoveryService.assertEnabled(providerName);
+      if (providerName === 'claude' && process.env.NEXAGENT_PROVIDER_WORKER === '1' && process.platform === 'win32') {
+        const { spawn } = await import('node:child_process');
+        const baseQuery = context.createQuery || (await import('@anthropic-ai/claude-agent-sdk')).query as NonNullable<ProviderRuntimeContext['createQuery']>;
+        // The SDK stays in the supervisor, while its native CLI receives a
+        // separate Windows console/process group with supervisor-owned pipes.
+        context.createQuery = input => baseQuery({ ...input, options: { ...input.options,
+          spawnClaudeCodeProcess: (launch: { command: string; args: string[]; cwd?: string; env: NodeJS.ProcessEnv; signal?: AbortSignal }) =>
+            spawn(launch.command, launch.args, { cwd: launch.cwd, env: launch.env, signal: launch.signal,
+              stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true, detached: true }),
+        } });
+      }
       if (writer.userId != null) {
         for (const candidate of [runtimeOptions.cwd, runtimeOptions.projectPath]) {
           if (candidate != null && candidate !== '') {

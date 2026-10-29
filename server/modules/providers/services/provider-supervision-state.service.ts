@@ -1,4 +1,5 @@
-﻿import type { AnyRecord, LLMProvider } from '@/shared/types.js';
+import type { AnyRecord, LLMProvider } from '@/shared/types.js';
+
 import type { DurableProvider } from './provider-supervisor.service.js';
 
 // Runtime dispatcher reads the cached approval/background surface synchronously;

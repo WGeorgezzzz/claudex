@@ -1,10 +1,23 @@
-﻿import fs from 'node:fs';
+import fs from 'node:fs';
 import path from 'node:path';
 import http from 'node:http';
 import crypto from 'node:crypto';
 import { spawn } from 'node:child_process';
 
 const directory = process.argv[2];
+process.on('exit', code => {
+  try { fs.writeFileSync(path.join(directory, 'worker-exit.json'), JSON.stringify({ code, at: new Date().toISOString() })); } catch { /* Preserve original exit. */ }
+});
+process.on('uncaughtExceptionMonitor', error => {
+  try { fs.writeFileSync(path.join(directory, 'worker-exception.txt'), error.stack || String(error)); } catch { /* Preserve original error. */ }
+});
+// This daemon is stopped through its authenticated control channel. Console
+// group signals from a CLI or a retiring console must not end its SDK owner.
+for (const signal of ['SIGINT', 'SIGTERM', ...(process.platform === 'win32' ? ['SIGBREAK'] : [])] as NodeJS.Signals[]) {
+  process.on(signal, () => {
+    fs.appendFileSync(path.join(directory, 'worker-signals.log'), `${new Date().toISOString()} ${signal}\n`);
+  });
+}
 const spec = JSON.parse(fs.readFileSync(path.join(directory, 'launch.json'), 'utf8'));
 const token = fs.readFileSync(path.join(directory, 'token'), 'utf8');
 const journal = fs.openSync(path.join(directory, 'output.ndjson'), 'ax', 0o600);

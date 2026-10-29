@@ -1,8 +1,9 @@
-﻿import fs from 'node:fs';
+import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
 
 // Runtime adapters and restart recovery use this disk-backed boundary. The
 // worker, never the web server, owns provider stdin, stdout and SDK state.
@@ -15,7 +16,13 @@ export class DurableProvider {
     fs.mkdirSync(directory, { mode: 0o700 });
     fs.writeFileSync(path.join(directory, 'launch.json'), JSON.stringify(spec), { mode: 0o600, flag: 'wx' });
     fs.writeFileSync(path.join(directory, 'token'), crypto.randomBytes(32).toString('hex'), { mode: 0o600, flag: 'wx' });
-    const worker = fileURLToPath(new URL('./provider-supervisor-worker.js', import.meta.url));
+    let worker = fileURLToPath(new URL('./provider-supervisor-worker.js', import.meta.url));
+    const runtimeArguments: string[] = [];
+    if (!fs.existsSync(worker)) {
+      worker = fileURLToPath(new URL('./provider-supervisor-worker.ts', import.meta.url));
+      runtimeArguments.push(createRequire(import.meta.url).resolve('tsx/cli'), '--tsconfig', fileURLToPath(new URL('../../../tsconfig.json', import.meta.url)));
+    }
+    runtimeArguments.push(worker, directory);
     const log = fs.openSync(path.join(directory, 'worker.log'), 'a', 0o600);
     // Windows Task Scheduler is a broker: a separate task owns the supervisor,
     // so stopping the web server's task/job cannot terminate its provider tree.
@@ -27,13 +34,13 @@ export class DurableProvider {
     const environmentFile = path.join(directory, 'environment.json');
     const taskName = 'Nexagent-Provider-' + path.basename(directory);
     if (process.platform === 'win32') fs.writeFileSync(environmentFile, JSON.stringify(env), { mode: 0o600 });
-    const script = `$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$e=Get-Content -Raw -LiteralPath ${quote(environmentFile)}|ConvertFrom-Json;foreach($p in $e.PSObject.Properties){[Environment]::SetEnvironmentVariable($p.Name,[string]$p.Value,'Process')};Remove-Item -LiteralPath ${quote(environmentFile)};& ${quote(process.execPath)} ${quote(worker)} ${quote(directory)} *>> ${quote(path.join(directory, 'worker.log'))}`;
+    const script = `$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$e=Get-Content -Raw -LiteralPath ${quote(environmentFile)}|ConvertFrom-Json;foreach($p in $e.PSObject.Properties){[Environment]::SetEnvironmentVariable($p.Name,[string]$p.Value,'Process')};Remove-Item -LiteralPath ${quote(environmentFile)};& ${quote(process.execPath)} ${runtimeArguments.map(quote).join(' ')} *>> ${quote(path.join(directory, 'worker.log'))}`;
     // conhost can hand off its clients and return. Keep the scheduler's root
     // action waiting on the actual worker, or task completion can reap its job.
-    const broker = `$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';try{Start-Process -WindowStyle Hidden -FilePath ${quote(path.join(process.env.SystemRoot || 'C:/Windows', 'System32/conhost.exe'))} -ArgumentList @('--headless',${quote(powershell)},'-NoProfile','-NonInteractive','-EncodedCommand',${quote(Buffer.from(script, 'utf16le').toString('base64'))});$r=${quote(path.join(directory, 'registry.json'))};for($i=0;$i -lt 300 -and -not(Test-Path -LiteralPath $r);$i++){Start-Sleep -Milliseconds 100};$workerId=(Get-Content -Raw -LiteralPath $r|ConvertFrom-Json).pid;Wait-Process -Id $workerId -ErrorAction SilentlyContinue}finally{Unregister-ScheduledTask -TaskName ${quote(taskName)} -Confirm:$false -ErrorAction SilentlyContinue}`;
+    const broker = `$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$b=${quote(path.join(directory, 'broker.log'))};Add-Content -LiteralPath $b -Value ('start '+$PID);try{Start-Process -WindowStyle Hidden -FilePath ${quote(path.join(process.env.SystemRoot || 'C:/Windows', 'System32/conhost.exe'))} -ArgumentList @('--headless',${quote(powershell)},'-NoProfile','-NonInteractive','-EncodedCommand',${quote(Buffer.from(script, 'utf16le').toString('base64'))});$r=${quote(path.join(directory, 'registry.json'))};for($i=0;$i -lt 300 -and -not(Test-Path -LiteralPath $r);$i++){Start-Sleep -Milliseconds 100};$workerId=(Get-Content -Raw -LiteralPath $r|ConvertFrom-Json).pid;Add-Content -LiteralPath $b -Value ('wait '+$workerId);$p=[Diagnostics.Process]::GetProcessById($workerId);$h=$p.Handle;$p.WaitForExit();Add-Content -LiteralPath $b -Value ('exit '+$p.ExitCode)}catch{Add-Content -LiteralPath $b -Value $_.Exception.Message;throw}finally{Add-Content -LiteralPath $b -Value 'cleanup';Unregister-ScheduledTask -TaskName ${quote(taskName)} -Confirm:$false -ErrorAction SilentlyContinue}`;
     const taskArguments = `-NoProfile -NonInteractive -WindowStyle Hidden -EncodedCommand ${Buffer.from(broker, 'utf16le').toString('base64')}`;
     const bootstrap = `$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$a=New-ScheduledTaskAction -Execute ${quote(powershell)} -Argument ${quote(taskArguments)};Register-ScheduledTask -TaskName ${quote(taskName)} -Action $a -Settings (New-ScheduledTaskSettingsSet -ExecutionTimeLimit ([TimeSpan]::Zero) -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -Hidden) | Out-Null;Start-ScheduledTask -TaskName ${quote(taskName)}`;
-    const args = process.platform === 'win32' ? ['-NoProfile', '-NonInteractive', '-EncodedCommand', Buffer.from(bootstrap, 'utf16le').toString('base64')] : [worker, directory];
+    const args = process.platform === 'win32' ? ['-NoProfile', '-NonInteractive', '-EncodedCommand', Buffer.from(bootstrap, 'utf16le').toString('base64')] : runtimeArguments;
     const child = spawn(command, args, { detached: process.platform !== 'win32', windowsHide: true, stdio: ['ignore', log, log], env });
     let spawnError: Error | undefined;
     child.on('error', error => { spawnError = error; });

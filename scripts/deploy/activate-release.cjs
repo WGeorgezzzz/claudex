@@ -136,11 +136,13 @@ async function interruptManaged(c){
  // The caller may stop only an idle server. Never abort user/provider work.
  const rows=await running(c);assert.equal(rows.length,0,'Sessions became active; activation cancelled');
  const db=new DB(c.database,{readonly:true});try{assert.equal(db.prepare("SELECT COUNT(*) n FROM message_queue WHERE status IN ('running','processing','executing')").get().n,0,'Queue became active; activation cancelled');}finally{db.close();}
+ await forceInterruptManaged(c,true);
 }
 
-async function forceInterruptManaged(c){
+async function forceInterruptManaged(c,allowIdleLegacy=false){
  const token=await login(c);
  const response=await fetch('http://127.0.0.1:3001/api/providers/restart/prepare',{method:'POST',headers:{Authorization:'Bearer '+token},signal:AbortSignal.timeout(60000)});
+ if(response.status===404 && allowIdleLegacy)return;
  assert(response.ok,'Running service cannot hand off providers; wait idle. Legacy turns must not be aborted for deployment.');
  const result=await response.json();assert(result.data?.ready,'Provider handoff not confirmed');
  write(path.join(root,'provider-handoff.json'),result.data);
