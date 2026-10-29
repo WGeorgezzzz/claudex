@@ -2,9 +2,12 @@
  * Fenced examples are documentation, not control messages. Raw provider history is retained.
  */
 export function cleanMonitorReport(text: string): string {
-  const strip = (value: string) => value
-    .replace(/<monitor-(state|probe|meta)>[\s\S]*?(?:<\/monitor-\1>|$)/gi, '')
-    .replace(/<monitor-(?:s(?:t(?:a(?:t(?:e)?)?)?)?|p(?:r(?:o(?:b(?:e)?)?)?)?|m(?:e(?:t(?:a)?)?)?)?$/i, '');
+  const strip = (value: string) => {
+    value=value.replace(/<monitor-(state|probe|meta)>[\s\S]*?(?:<\/monitor-\1>|$)/gi, '');
+    for(const tag of ['<monitor-state>','<monitor-probe>','<monitor-meta>'])
+      for(let n=2;n<tag.length;n++)if(value.toLowerCase().endsWith(tag.slice(0,n)))return value.slice(0,-n);
+    return value;
+  };
   const fences = /^[ \t]*(`{3,}|~{3,})[^\n]*\n[\s\S]*?^[ \t]*\1[ \t]*(?:\n|$)/gm;
   let result = '', offset = 0;
   for (const match of text.matchAll(fences)) {
