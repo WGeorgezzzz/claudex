@@ -15,7 +15,6 @@ import cors from 'cors';
 import { projectOrganizationRoutes } from '@/modules/project-organization/index.js';
 
 import { monitorsRoutes, initializeMonitors, closeMonitors } from '@/modules/monitors/index.js';
-import { dotRoutes, initializeDot, closeDot } from '@/modules/dot/index.js';
 import { accessBoundaryMiddleware, initializeLocalIdentity, withUserContext } from '@/modules/auth/index.js';
 import { sideChatsRoutes } from '@/modules/side-chats/index.js';
 import { messageQueueRoutes, initializeMessageQueue, closeMessageQueue } from '@/modules/message-queue/index.js';
@@ -231,7 +230,6 @@ app.use('/api/browser-use', authenticateToken, browserUseRoutes);
 app.use('/api/providers', authenticateToken, providerRoutes);
 app.use('/api/scheduled-messages', authenticateToken, scheduledMessagesRoutes);
 app.use('/api/monitors', authenticateToken, monitorsRoutes);
-app.use('/api/dot', authenticateToken, dotRoutes);
 app.use('/api/side-chats', authenticateToken, sideChatsRoutes);
 app.use('/api/message-queue', authenticateToken, messageQueueRoutes);
 app.use('/api/session-workspace', authenticateToken, sessionWorkspaceRoutes);
@@ -314,6 +312,9 @@ app.use('/infohub', (req, res, next) => {
     if (body) proxy.write(body);
     proxy.end();
 });
+
+// Unknown API paths must not fall through to the SPA (including removed features).
+app.use('/api', (_req, res) => { res.status(404).json({ error: 'NOT_FOUND' }); });
 
 // Serve public files (like api-docs.html)
 app.use(express.static(path.join(APP_ROOT, 'public')));
@@ -495,7 +496,6 @@ async function startServer() {
             if (!passiveInstance) {
                 initializeScheduledMessageDispatcher(providerRuntimeService);
                 initializeMonitors(providerRuntimeService);
-                initializeDot();
                 initializeInfohubTaskSync();
                 initializeTaskIntelligence();
                 sideChatsDb.recover();
@@ -511,7 +511,6 @@ async function startServer() {
         await closeSessionsWatcher();
         closeScheduledMessageDispatcher();
         closeMonitors();
-        closeDot();
         closeInfohubTaskSync();closeTaskIntelligence();
         closeMessageQueue();
         // Clean up plugin processes on shutdown

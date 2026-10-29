@@ -12,7 +12,6 @@ import { providerModelsService } from '@/modules/providers/services/provider-mod
 import { sessionsService } from '@/modules/providers/services/sessions.service.js';
 import { createMonitorQuery } from '@/modules/monitors/index.js';
 import { createSessionBridgeQuery } from '@/modules/session-bridge/index.js';
-import { createDotQuery } from '@/modules/dot/index.js';
 import type { IProvider } from '@/shared/interfaces.js';
 import type {
   AnyRecord,
@@ -101,8 +100,6 @@ export function createProviderRuntimeService(
         permissionMode:typeof options.permissionMode==='string'?options.permissionMode:undefined});
       context.createQuery=createSessionBridgeQuery({userId,sessionId:options.sessionId,
         autonomous:Boolean(options.cloudcliMonitorId||options.cloudcliBridgeSourceSessionId),planMode:options.permissionMode==='plan',permissionMode:typeof options.permissionMode==='string'?options.permissionMode:'default'},monitorQuery);
-      if(!options.monitorSlim) context.createQuery=createDotQuery({userId,sessionId:options.sessionId,
-        autonomous:Boolean(options.cloudcliMonitorId||options.cloudcliBridgeSourceSessionId),planMode:options.permissionMode==='plan'},context.createQuery);
     }
     // Durable queue records store explicit allow/deny lists at the top level.
     // Claude's SDK adapter consumes toolsSettings; preserve those choices on queued turns.

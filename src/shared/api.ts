@@ -385,13 +385,6 @@ export const api = {
     send: (body: { sourceSessionId: string; sessionId: string; requestId: string; content: string }) => post('/api/session-bridge/send', body),
     status: (sourceSessionId: string, id: string) => get(`/api/session-bridge/receipts/${encodeURIComponent(id)}${query({ sourceSessionId })}`),
   },
-  dot: {
-    snapshot: () => get('/api/dot'),
-    createThread: (title: string) => post('/api/dot/threads', {title}),
-    saveMemory: (body:{content:string;id?:string;revision?:number}) => post('/api/dot/memories',body),
-    forget: (id:string,revision:number) => authenticatedFetch('/api/dot/memories/'+encodeURIComponent(id),{method:'DELETE',body:JSON.stringify({revision})}),
-    cancelTask: (id:string) => post('/api/dot/tasks/'+encodeURIComponent(id)+'/cancel',{}),
-  },
   monitors: {
     get: (id:string) => get('/api/monitors/'+encodeURIComponent(id)),
     contextSettings: () => get('/api/monitors/context-settings'),

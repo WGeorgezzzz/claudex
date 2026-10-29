@@ -1692,14 +1692,6 @@ export type MonitorRunRecord = {
   output_tokens?:number|null;cache_read_tokens?:number|null;cache_creation_tokens?:number|null;total_tokens?:number|null;
 };
 // ---------------------------
-//----------------- DOT ASSISTANT STATE ------------
-/** User-visible persistent memory with revision checks; never interpreted as trusted instructions. */
-export type DotMemory={id:string;content:string;revision:number;createdAt:string;updatedAt:string};
-/** An owned Dot conversation uses the normal provider transcript and an independent personal workspace. */
-export type DotThread={sessionId:string;title:string;createdAt:string};
-/** A delegation preserves its queue receipt, provenance and reporting state; success is a turn result only. */
-export type DotTask={id:string;user_id:number;source_session_id:string;target_session_id:string;queue_id:string;request_id:string;payload_hash:string;reported:number;created_at:string;status:string;error:string|null;revision:number;finished_at:string|null;title?:string;projectPath?:string};
-// ---------------------------
 
 //----------------- USER RUNTIME CONFIGURATION ------------
 /** Auth, provider adapters and shared configuration helpers use this immutable per-run identity.

@@ -6,7 +6,6 @@ import type { SidebarSearchMode } from '@/shared/types';
 import { usePaletteOps } from '@/modules/command-palette';
 import SidebarModeTabs from '@/modules/sidebar/SidebarModeTabs';
 import { MonitorDashboard } from '@/modules/sidebar/MonitorDashboard';
-import { DotDashboard } from '@/modules/dot';
 import { InfoHubNavigation, TasksNavigation } from '@/modules/task-master';
 
 type SidebarHeaderProps = {
@@ -51,7 +50,6 @@ export default function SidebarHeader({isPWA,isMobile,isLoading,projectsCount,ru
       <MonitorDashboard/>
       <TasksNavigation/>
       <InfoHubNavigation/>
-      <DotDashboard/>
     </nav>
     {(searchFilter||searchMode!=='projects')&&<div className="mt-1 flex items-center gap-2 rounded-md bg-muted px-2 py-1.5 text-xs"><span className="min-w-0 flex-1 truncate">{searchFilter||t(`ui.view.${searchMode}`)}</span><button type="button" aria-label={t('tooltips.clearSearch')} onClick={()=>{onClearSearchFilter();onSearchModeChange('projects');}}><X size={12}/></button></div>}
   </div>;

@@ -37,8 +37,6 @@ export { sessionWorkspaceDb } from '@/modules/database/repositories/session-work
 export { workspaceSectionsDb } from '@/modules/database/repositories/workspace-sections.db.js';
 // Session Bridge uses bounded searches over the shared local session index.
 export { sessionBridgeDb } from '@/modules/database/repositories/session-bridge.db.js';
-// Dot uses durable user-scoped memories, conversations and delegated task receipts.
-export { dotDb } from '@/modules/database/repositories/dot.db.js';
 // Auth uses revocable login sessions and a distinct remote credential.
 export { authSessionsDb } from '@/modules/database/repositories/auth-sessions.db.js';
 

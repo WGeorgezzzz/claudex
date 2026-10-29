@@ -8,7 +8,7 @@ const conflict=()=>new AppError('The queued message changed or has already start
 let wakeup: (() => void) | null = null;
 const changeListeners = new Set<() => void>();
 
-/** Dot receipt delivery subscribes to durable queue transitions instead of polling idle rows. */
+/** Queue consumers subscribe to durable queue transitions instead of polling idle rows. */
 export function subscribeMessageQueueChanges(listener: () => void): () => void {
   changeListeners.add(listener);
   return () => { changeListeners.delete(listener); };
