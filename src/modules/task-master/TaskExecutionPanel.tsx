@@ -12,7 +12,7 @@ function executionCacheKey(){try{const payload=JSON.parse(atob((localStorage.get
 let prefetchedUntil=0;
 /** GlobalTasksPage warms independent native catalogs before the user opens the execution picker. */
 export function prefetchTaskExecutionModels(){if(typeof localStorage==='undefined'||Date.now()<prefetchedUntil)return;prefetchedUntil=Date.now()+60000;for(const id of ['claude','codex','deepseek-harness'] as const)void api.providers.models(id).then(value).then(data=>{const key=executionCacheKey();let prior:any={};try{prior=JSON.parse(localStorage.getItem(key)||'{}');}catch{/* Ignore damaged optional cache. */}localStorage.setItem(key,JSON.stringify({...prior,catalogs:{...prior.catalogs,[id]:data.models}}));}).catch(()=>{});}
-export function TaskExecutionPanel({title,cwd,open,onClose,onConfirm,busy,preview=''}:{title:string;cwd:string;preview?:string;open:boolean;onClose:()=>void;onConfirm:(settings:TaskExecutionSettings)=>Promise<void>;busy:boolean}){
+export function TaskExecutionPanel({title,cwd,open,onClose,onConfirm,busy,preview='',errorMessage=''}:{title:string;cwd:string;preview?:string;errorMessage?:string;open:boolean;onClose:()=>void;onConfirm:(settings:TaskExecutionSettings)=>Promise<void>;busy:boolean}){
   const cacheKey=executionCacheKey();
   // Late preferences may initialize the form only until the user edits it.
   const edited=useRef(false);
@@ -57,7 +57,7 @@ export function TaskExecutionPanel({title,cwd,open,onClose,onConfirm,busy,previe
       <label className="block text-xs text-muted-foreground">工作目录<input aria-label="执行工作目录" value={settings.cwd} className={control+' mt-1'} onChange={e=>{edited.current=true;setSettings({...settings,cwd:e.target.value});}}/></label>
     </>
     {Object.keys(failures).length>0&&<button type="button" className="min-h-10 text-sm text-muted-foreground" onClick={()=>setRetry(v=>v+1)}>读取超时 · 重试</button>}
-    {error&&<p role="alert" className="text-sm text-destructive">{error}</p>}
-    <div className="flex justify-end gap-2"><button className="min-h-10 rounded-lg border px-4 text-sm" onClick={onClose}>取消</button><button disabled={busy||agent?.enabled===false||!settings.model||selected?.disabled||!settings.cwd.trim()} className="min-h-10 rounded-lg bg-primary px-4 text-sm text-primary-foreground disabled:opacity-40" onClick={()=>void onConfirm(settings)}>确认执行并打开对话</button></div>
+    {(errorMessage||error)&&<p role="alert" className="text-sm text-destructive">{errorMessage||error}</p>}
+    <div className="flex justify-end gap-2"><button className="min-h-10 rounded-lg border px-4 text-sm" onClick={onClose}>取消</button><button disabled={busy||agent?.enabled===false||!settings.model||selected?.disabled||!settings.cwd.trim()} className="min-h-10 rounded-lg bg-primary px-4 text-sm text-primary-foreground disabled:opacity-40" onClick={()=>void onConfirm({provider:settings.provider,model:settings.model,effort:settings.effort||'',permissionMode:settings.permissionMode,cwd:settings.cwd,userInput:settings.userInput||''})}>确认执行并打开对话</button></div>
   </DialogContent></Dialog>;
 }

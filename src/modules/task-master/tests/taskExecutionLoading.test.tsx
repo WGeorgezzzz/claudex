@@ -33,3 +33,11 @@ test('cached and server preferences never replace the task directory with an old
  await act(async()=>{await new Promise(resolve=>setTimeout(resolve,20));});
  expect((screen.getByLabelText('执行工作目录') as HTMLInputElement).value).toBe('D:/embodied');
 });
+
+test('server preference metadata is never sent back as an execution setting',async()=>{
+ control.settings=()=>response({provider:'codex',model:'cached',cwd:'D:/old-fixture',permissionMode:'bypassPermissions',permissionModeExplicit:true});const confirm=vi.fn(async(_settings:unknown)=>{});
+ render(<TaskExecutionPanel title="Strict route" cwd="D:/embodied" open busy={false} onClose={()=>{}} onConfirm={confirm}/>);
+ await waitFor(()=>expect((screen.getByLabelText('执行模型') as HTMLSelectElement).value).toBe('cached'));
+ fireEvent.click(screen.getByRole('button',{name:'确认执行并打开对话'}));
+ await waitFor(()=>expect(confirm).toHaveBeenCalled());expect(confirm.mock.calls[0][0]).not.toHaveProperty('permissionModeExplicit');
+});
