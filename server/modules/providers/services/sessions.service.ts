@@ -162,7 +162,7 @@ export const sessionsService = {
    * This is intentionally status-only: callers that only need sidebar activity
    * indicators should not attach to chat streams or request replayed messages.
    */
-  async listRunningSessions(fresh = true): Promise<RunningSessionEntry[]> {
+  async listRunningSessions(fresh = true, recoveryCacheMs = fresh ? 0 : 30_000): Promise<RunningSessionEntry[]> {
     // HTTP status reads may share a short snapshot. Dispatchers retain fresh
     // reads and the original asynchronous ordering before making claims.
     if (!fresh) {
@@ -173,7 +173,7 @@ export const sessionsService = {
     if (!cache) { cache = new Map(); runningSessionsCaches.set(connection, cache); }
     const cached = cache.get(owner);
     if (cached && cached.expiresAt > now) return cached.value;
-    const pending = this.listRunningSessions(true);
+    const pending = this.listRunningSessions(true, recoveryCacheMs);
     const entry = { expiresAt: Infinity, value: pending };
     cache.set(owner, entry);
     try { const value = await pending; entry.expiresAt = Date.now() + RUNNING_SESSIONS_CACHE_MS; return value; }
@@ -229,7 +229,7 @@ export const sessionsService = {
     // Share one process-table snapshot across all historical session lookups.
     // Serial scans repeatedly expired the cache and stalled deployment preflight.
     const recoverable=sessionsDb.getAllSessions().filter(session=>session.provider_session_id&&!runningById.has(session.session_id)&&['claude','codex'].includes(session.provider));
-    const recovered=await Promise.all(recoverable.map(async session=>({session,processes:await findResumedProviderProcesses(session.provider_session_id!,session.provider,30_000)})));
+    const recovered=await Promise.all(recoverable.map(async session=>({session,processes:await findResumedProviderProcesses(session.provider_session_id!,session.provider,recoveryCacheMs)})));
     for(const {session,processes} of recovered)if(processes.length)entries.push({sessionId:session.session_id,provider:session.provider as LLMProvider,startedAt:Date.now(),lastSeq:0,canInterrupt:false,statusText:'Recovered CLI process; force stop is available'});
     return entries.filter(entry => sessionsDb.getSessionById(entry.sessionId) !== null);
   },
