@@ -497,7 +497,7 @@ async function startServer() {
             const passiveInstance = process.env.CLAUDEX_PASSIVE_INSTANCE === '1';
             if (!passiveInstance) {
                 initializeScheduledMessageDispatcher(providerRuntimeService);
-                initializeMonitors(providerRuntimeService);
+                initializeMonitors(providerRuntimeService, protectedProviderSessions);
                 initializeInfohubTaskSync();
                 initializeTaskIntelligence();
                 sideChatsDb.recover();

@@ -4,6 +4,7 @@ import crypto from 'node:crypto';
 
 import { getConnection, getSessionOwnerId, messageQueueDb } from '@/modules/database/index.js';
 import { getCloudCliHomeDir } from '@/shared/index.js';
+import { createNormalizedMessage } from '@/shared/utils.js';
 import type { AnyRecord, LLMProvider, ProviderRuntimeWriter, QueuedTurnRecord } from '@/shared/types.js';
 
 import { DurableProvider } from './provider-supervisor.service.js';
@@ -25,6 +26,7 @@ function acknowledge(client: DurableProvider): void {
 }
 async function consume(client: DurableProvider, writer: ProviderRuntimeWriter, spec: AnyRecord, ready?: () => void): Promise<void> {
   let terminal = false;
+  let providerError = false;
   const sessionId = spec.options.sessionId as string;
   const replayBytes = fs.statSync(path.join(client.directory, 'output.ndjson')).size;
   if (!replayBytes) ready?.();
@@ -34,10 +36,19 @@ async function consume(client: DurableProvider, writer: ProviderRuntimeWriter, s
       if (event.kind === 'approvals' && entry) entry.pending = event.data;
       if (event.kind === 'background' && entry) entry.background = Boolean(event.data);
       if (event.kind === 'session') writer.setSessionId?.(event.data);
+      if (event.kind === 'monitor-finalized' && spec.options.cloudcliMonitorReceipt?.isolated && event.data.report) {
+        const receipt = spec.options.cloudcliMonitorReceipt;
+        const { connectedClients, clientUserIds } = await import('@/modules/websocket/index.js');
+        const report = createNormalizedMessage({ id: 'monitor-report:' + receipt.runId, kind: 'text', role: 'assistant',
+          provider: spec.provider, sessionId: receipt.row.session_id, timestamp: event.data.finished_at,
+          content: '**监测「' + receipt.row.name + '」· 第 ' + (event.data.round_number || receipt.row.run_count + 1) + ' 轮**\n\n' + event.data.report + '\n\n[展开本轮会话](/session/' + receipt.sessionId + ')' });
+        for (const client of connectedClients) if (client.readyState === 1 && clientUserIds.get(client) === Number(spec.userId)) client.send(JSON.stringify(report));
+      }
       if (event.kind === 'message') {
+        if (event.data.kind === 'error') providerError = true;
         if (entry && event.data.kind === 'permission_request') entry.pending = [...entry.pending.filter(row => row.requestId !== event.data.requestId), event.data];
         if (entry && ['permission_resolved', 'permission_cancelled'].includes(event.data.kind)) entry.pending = entry.pending.filter(row => row.requestId !== event.data.requestId);
-        if (event.data.kind === 'complete') { terminal = true; finishQueue(spec, event.data); }
+        if (event.data.kind === 'complete') { terminal = true; finishQueue(spec, providerError ? { ...event.data, success: false } : event.data); }
         writer.send({ ...event.data, supervisorRunId: path.basename(client.directory), supervisorSeq: event.seq });
       }
       if (event.kind === 'exit') {
@@ -88,7 +99,21 @@ export async function recoverProviderSupervision(): Promise<string[]> {
     if (getSessionOwnerId(sessionId) !== Number(spec.userId)) continue;
     const journal = fs.readFileSync(path.join(client.directory, 'output.ndjson'), 'utf8').split('\n').filter(Boolean).flatMap(line => { try { return [JSON.parse(line)]; } catch { return []; } });
     const complete = journal.filter(row => row.kind === 'message' && row.data.kind === 'complete').at(-1);
-    if (complete) finishQueue(spec, complete.data);
+    if (complete) finishQueue(spec, journal.some(row => row.kind === 'message' && row.data.kind === 'error') ? { ...complete.data, success: false } : complete.data);
+    if (!adopted && complete && spec.options.cloudcliMonitorReceipt) {
+      const receipt = spec.options.cloudcliMonitorReceipt;
+      if (receipt.row.user_id !== Number(spec.userId) || receipt.sessionId !== sessionId) throw new Error('Monitor receipt ownership mismatch');
+      const outcome: AnyRecord = { finalText: '', providerError: null, completed: false };
+      for (const row of journal) if (row.kind === 'message') {
+        const event = row.data;
+        if (event.text === 'monitor_usage') outcome.usage = event.monitorUsage;
+        if (event.kind === 'text' && event.role === 'assistant') outcome.finalText = event.content;
+        if (event.kind === 'error') outcome.providerError = String(event.content || 'Provider error');
+        if (event.kind === 'complete') { outcome.completed = true; if (event.aborted || event.success === false || (typeof event.exitCode === 'number' && event.exitCode !== 0)) outcome.providerError ||= 'Monitor turn failed or was interrupted'; }
+      }
+      const { finishSupervisedMonitorRound } = await import('@/modules/monitors/index.js');
+      await finishSupervisedMonitorRound(receipt, outcome);
+    }
     if (adopted || complete) {
       if (state.entries.has(sessionId)) throw new Error('Multiple supervised owners for session ' + sessionId);
       const run = chatRunRegistry.startRun({ appSessionId: sessionId, provider: spec.provider, providerSessionId: null, connection: null, userId: spec.userId,

@@ -163,6 +163,7 @@ export function createProviderRuntimeService(
   };
 
   return {
+    supportsSupervision(providerName: string): boolean { return supervision && ['claude', 'codex'].includes(providerName); },
     run,
     /** Message Queue uses this for explicit live additions; unsupported runtimes fail without starting a new run. */
     submitLiveInput(providerName: LLMProvider, sessionId: string, id: string, content: string, settled: (result: ProviderLiveInputResult) => void): void {

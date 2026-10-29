@@ -55,7 +55,9 @@ export async function dispatchMonitors(runtime: ProviderRuntimeGateway,now=new D
         // SDK adapters can report failure as an event without throwing. Keep the
         // normal UI stream intact while retaining that failure in the receipt.
         const observedRuntime: ProviderRuntimeGateway=Object.create(runtime);
-        observedRuntime.run=async(provider,command,options,writer)=>runtime.run(provider,command,options,{
+        observedRuntime.run=async(provider,command,options,writer)=>runtime.run(provider,command,
+          (runtime as ProviderRuntimeGateway & {supportsSupervision?(provider:string):boolean}).supportsSupervision?.(provider)
+            ? {...options,cloudcliMonitorReceipt:{row,runId,sessionId,isolated,fingerprint:round?.fingerprint}} : options,{
           ...writer,
           userId: writer.userId,
           isWebSocketWriter: writer.isWebSocketWriter,
@@ -79,6 +81,7 @@ export async function dispatchMonitors(runtime: ProviderRuntimeGateway,now=new D
           options:{...(round?.options||JSON.parse(row.options)),cloudcliMonitorId:row.id},interruptActiveRun:false},{runtime:observedRuntime});
         const failure = providerError || result.error || (!result.started ? '本轮未能启动。' : !completed ? '模型未返回完成确认。' : null);
         const current = monitorsDb.get(row.user_id, row.id);
+        if (current?.running_id !== runId) return; // Durable worker already finalized this exact receipt.
         if(!failure)await finishMonitorReport(row,runId,sessionId,finalText,isolated,round?.fingerprint,cumulativeUsage);
         if (!isolated && !failure && current?.status === 'active') await maintainMonitorContext(current, runId, sessionId);
         monitorsDb.finish(row.id,runId,failure);
@@ -93,9 +96,9 @@ export async function dispatchMonitors(runtime: ProviderRuntimeGateway,now=new D
 }
 
 /** Used by server startup; persistence survives UI closure and idle server restarts. */
-export function initializeMonitors(runtime: ProviderRuntimeGateway): void {
+export function initializeMonitors(runtime: ProviderRuntimeGateway, protectedSessions: string[] = []): void {
   if(timer) return;
-  monitorsDb.recover();
+  monitorsDb.recover(new Date(), protectedSessions);
   const poll=()=>void dispatchMonitors(runtime).catch(error=>console.error('[Monitors]',error));
   timer=setInterval(poll,15_000);
   timer.unref?.();

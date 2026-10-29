@@ -16,10 +16,16 @@ import {
   getClaudeConfigDir,
 } from '@/shared/utils.js';
 import { resolveClaudeCodeExecutablePath } from '@/shared/claude-cli-path.js';
+import { loadSupervisedClaudeModels } from '../../services/claude-supervised-spawn.service.js';
 
 // Control-only handshake: same executable and auth as chat, without a prompt
 // or a persisted conversation. Concurrent callers share one bounded request.
 async function loadConnectedClaudeModels(): Promise<ModelInfo[]> {
+  if (process.env.NEXAGENT_PROVIDER_WORKER === '1') {
+    const executable = resolveClaudeCodeExecutablePath(process.env.CLAUDE_CLI_PATH);
+    if (!executable) throw new Error('Claude executable is required for supervised control handshake');
+    return loadSupervisedClaudeModels(executable, getClaudeConfigDir());
+  }
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 45000);
   // eslint-disable-next-line require-yield -- deliberately no user prompt

@@ -5,6 +5,10 @@ import crypto from 'node:crypto';
 import { spawn } from 'node:child_process';
 
 const directory = process.argv[2];
+if (process.env.NEXAGENT_PROVIDER_TRACE === '1') {
+  const { installProviderProcessTrace } = await import('./provider-process-trace.service.js');
+  installProviderProcessTrace(directory);
+}
 process.on('exit', code => {
   try { fs.writeFileSync(path.join(directory, 'worker-exit.json'), JSON.stringify({ code, at: new Date().toISOString() })); } catch { /* Preserve original exit. */ }
 });

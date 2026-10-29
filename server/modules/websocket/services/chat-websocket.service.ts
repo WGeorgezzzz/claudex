@@ -258,6 +258,7 @@ async function dispatchRun(
     // Queue attempt identities and replay offsets originate only on the server.
     delete clientOptions.cloudcliQueueAttempt;
     delete clientOptions.cloudcliSupervisorInitialSeq;
+    delete clientOptions.cloudcliMonitorReceipt;
     if(ws)delete clientOptions.cloudcliBridgeUserAuthorization;
     let command = typeof data.content === 'string' ? data.content : '';
     if(!clientOptions.cloudcliMonitorId&&!clientOptions.bridgeCompact&&!command.trimStart().startsWith('/')){
