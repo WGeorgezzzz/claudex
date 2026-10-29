@@ -20,7 +20,7 @@ const fieldAt = (value:unknown, field?:unknown):unknown => {
   return field.split('.').reduce((current,key)=>current && typeof current === 'object' ? (current as Record<string,unknown>)[key] : undefined, value);
 };
 async function fileProbe(item:Record<string,unknown>, previous:Record<string,unknown>):Promise<{value:unknown;delta:string;offset:number;done:boolean}> {
-  const filePath=String(item.path||''); const key=String(itemKey(item,0));
+  const filePath=String(item.path||item.file||''); const key=String(itemKey(item,0));
   try {
     const info=await stat(filePath); const oldOffset=Number(previous[`${key}:offset`]||0); const offset=info.size<oldOffset?0:oldOffset;
     const mode=String(item.read||'tail');
@@ -61,7 +61,18 @@ function thresholdHit(value:unknown,item:Record<string,unknown>):boolean { const
 export function normalizeProbe(value:unknown):MonitorProbeSpec|null {
   if(!value || typeof value!=='object' || Array.isArray(value))return null;
   const input=value as Record<string,unknown>; if(!Array.isArray(input.items)||!input.items.length)return null;
-  const items=input.items.filter(item=>item&&typeof item==='object'&&!Array.isArray(item)) as Array<Record<string,unknown>>;
+  const items=input.items.filter(item=>item&&typeof item==='object'&&!Array.isArray(item)).map(item=>{
+    const source={...(item as Record<string,unknown>)};
+    if(!source.type) {
+      if(source.path!==undefined || source.file!==undefined) source.type='file';
+      else if(source.pid!==undefined || source.processName!==undefined || source.scheduledTask!==undefined) source.type='process';
+      else if(source.command!==undefined) source.type='command';
+      else if(Array.isArray(source.patterns)) source.type='patterns';
+      else if(source.field!==undefined && (source.above!==undefined || source.below!==undefined)) source.type='threshold';
+    }
+    if(source.path===undefined && source.file!==undefined) source.path=source.file;
+    return source;
+  }) as Array<Record<string,unknown>>;
   if(!items.length)return null;
   return {items,intervalMinutes:Math.min(60,Math.max(1,Number(input.intervalMinutes)||DEFAULT_INTERVAL)),stallMinutes:Math.min(10080,Math.max(1,Number(input.stallMinutes)||DEFAULT_STALL)),heartbeatMinutes:Math.min(10080,Math.max(1,Number(input.heartbeatMinutes)||DEFAULT_HEARTBEAT))};
 }
