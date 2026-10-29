@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cleanMonitorReport } from '../../../shared/monitorReport';
+import { cleanMonitorReport } from '@/modules/chat/utils/monitorReport';
 
 describe('monitor protocol visibility during streaming',()=>{
  it('hides every partial prefix and growing protocol payload',()=>{
