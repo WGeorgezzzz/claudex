@@ -59,12 +59,12 @@ function parse(line: string, provider: string, state: State, offset: number): { 
 export async function scanUsageFile(db: Database, file: string, userId: number, provider: string) {
   const stat = await fs.stat(file);
   if (stat.size > 200 * 1024 * 1024) { console.warn('[Usage] Skipping file over 200 MB:', file); return; }
-  const old = db.prepare('SELECT * FROM usage_scan_files WHERE path=?').get(file) as FileRow | undefined;
+  const old = db.prepare('SELECT size,mtime_ms,offset FROM usage_scan_files WHERE path=?').get(file) as Omit<FileRow,'state_json'> | undefined;
   if (old && old.size === stat.size && old.mtime_ms === stat.mtimeMs) return;
   // Session JSONL files are append-only; a timestamp-only touch must not
   // replay a large transcript from the beginning.
   const reset = !old || stat.size < old.size || stat.mtimeMs < old.mtime_ms;
-  const state: State = reset ? { seen: {}, model: 'unknown' } : JSON.parse(old.state_json);
+  const state: State = reset ? { seen: {}, model: 'unknown' } : JSON.parse((db.prepare('SELECT state_json FROM usage_scan_files WHERE path=?').get(file) as Pick<FileRow,'state_json'>).state_json);
   state.seen = Object.assign(Object.create(null), state.seen);
   let offset = reset ? 0 : old.offset;
   // Collapse each file into hourly deltas before touching SQLite: a long transcript
