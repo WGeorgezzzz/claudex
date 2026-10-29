@@ -146,11 +146,15 @@ let processTableCache: { at: number; pending: Promise<string> } | undefined;
 let parsedProcessTable: { text: string; rows: ProcessRow[] } | undefined;
 const registrySnapshots = new WeakMap<Promise<string>, Map<string, Promise<Array<{ pid: number; provider: string; sessionIds?: string[]; startedAt: number }>>>>();
 const providerCandidates = new WeakMap<Promise<string>, Map<string, ProcessRow[]>>();
+const resumedProcessResults = new Map<string, { expiresAt: number; value: ProcessRow[] }>();
 
 type ProcessRow = { pid: number; ppid: number; name: string; command: string; startedAt?: number };
-/** Providers uses exact native IDs and executable names to find recoverable CLI orphans without touching unrelated agents. */
-export async function findResumedProviderProcesses(id: string, provider: string): Promise<ProcessRow[]> {
+/** Providers uses exact native IDs and executable names to find recoverable CLI orphans without touching unrelated agents. The running-session list may pass a short cache window; force-stop callers keep the default fresh lookup. */
+export async function findResumedProviderProcesses(id: string, provider: string, resultCacheMs = 0): Promise<ProcessRow[]> {
   if (!id || !/^[a-zA-Z0-9_-]+$/.test(id)) return [];
+  const resultKey = `${provider}:${id}`;
+  const cachedResult = resultCacheMs > 0 ? resumedProcessResults.get(resultKey) : undefined;
+  if (cachedResult && cachedResult.expiresAt > Date.now()) return cachedResult.value;
   if (!processTableCache || Date.now() - processTableCache.at > 3000) processTableCache = { at: Date.now(), pending: new Promise<string>(resolve => execFile(process.platform === 'win32' ? 'powershell.exe' : 'ps', process.platform === 'win32' ? [
     '-NoProfile', '-NonInteractive', '-Command',
     "@(Get-CimInstance Win32_Process | Where-Object { $_.Name -match 'claude|codex|node' } | ForEach-Object { @{pid=$_.ProcessId;ppid=$_.ParentProcessId;name=$_.Name;command=$_.CommandLine;startedAt=([DateTimeOffset]$_.CreationDate).ToUnixTimeMilliseconds()} }) | ConvertTo-Json -Compress"
@@ -200,5 +204,7 @@ export async function findResumedProviderProcesses(id: string, provider: string)
     candidates = rows.filter(row => row.pid !== process.pid && row.command && executable.test(row.name + ' ' + row.command.split(' ').slice(0, 3).join(' ')));
     candidatesByProvider.set(provider, candidates);
   }
-  return candidates.filter(row => resume.test(row.command) || registered.has(row.pid));
+  const result = candidates.filter(row => resume.test(row.command) || registered.has(row.pid));
+  if (resultCacheMs > 0) resumedProcessResults.set(resultKey, { expiresAt: Date.now() + resultCacheMs, value: result });
+  return result;
 }

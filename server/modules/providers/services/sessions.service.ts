@@ -229,7 +229,7 @@ export const sessionsService = {
     // Share one process-table snapshot across all historical session lookups.
     // Serial scans repeatedly expired the cache and stalled deployment preflight.
     const recoverable=sessionsDb.getAllSessions().filter(session=>session.provider_session_id&&!runningById.has(session.session_id)&&['claude','codex'].includes(session.provider));
-    const recovered=await Promise.all(recoverable.map(async session=>({session,processes:await findResumedProviderProcesses(session.provider_session_id!,session.provider)})));
+    const recovered=await Promise.all(recoverable.map(async session=>({session,processes:await findResumedProviderProcesses(session.provider_session_id!,session.provider,30_000)})));
     for(const {session,processes} of recovered)if(processes.length)entries.push({sessionId:session.session_id,provider:session.provider as LLMProvider,startedAt:Date.now(),lastSeq:0,canInterrupt:false,statusText:'Recovered CLI process; force stop is available'});
     return entries.filter(entry => sessionsDb.getSessionById(entry.sessionId) !== null);
   },
