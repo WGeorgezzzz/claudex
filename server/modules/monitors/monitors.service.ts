@@ -5,6 +5,15 @@ import { parseMonitorCalendarSchedule } from '@/shared/index.js';
 
 /** Used by monitor HTTP routes for validation and lifecycle changes. */
 export const monitorsService = {
+  listView(userId:number,sessionId?:string,includeStopped=false,offset=0) {
+    return this.list(userId,sessionId,includeStopped).slice(offset,offset+10).map(row=>({
+      id:row.id,name:row.name,status:row.status,
+      schedule:row.schedule_json?JSON.parse(row.schedule_json):null,
+      nextRunAt:row.status==='active'?row.next_run_at:null,
+      lastRun:{count:row.run_count,error:row.last_error?.slice(0,120)??null},
+      content:row.content.slice(0,200),
+    }));
+  },
   contextSettings(userId: number) { const prefs=userPreferencesDb.getPreferences(userId);return { threshold:Number(prefs.monitorContextThreshold??300000),percent:Number(prefs.monitorContextPercent??40) }; },
   saveContextSettings(userId: number, value: unknown, percent?:unknown) {
     if(percent!==undefined){if(typeof percent!=='number'||!Number.isFinite(percent)||percent<5||percent>80)throw new AppError('窗口比例应为 5–80%',{statusCode:400});userPreferencesDb.savePreferences(userId,{monitorContextPercent:percent});if(value===undefined)return this.contextSettings(userId);}
@@ -36,12 +45,15 @@ export const monitorsService = {
     // Only composer choices are persisted; callers cannot override cwd/session or inject runtime control options.
     const safeOptions: Record<string,unknown>={};
     for(const key of ['model','effort']) if(typeof options[key]==='string') safeOptions[key]=options[key];
+    if(safeOptions.model) safeOptions.modelExplicit=true;
+    safeOptions.model ??= session.provider==='claude'?'claude-sonnet-5-5':session.model;
+    safeOptions.effort ??= 'medium';
     if(['default','acceptEdits','plan','bypassPermissions'].includes(String(options.permissionMode))) safeOptions.permissionMode=options.permissionMode;
     safeOptions.permissionMode ??= 'bypassPermissions';
     if(options.runMode!==undefined){if(!['isolated','original'].includes(String(options.runMode)))throw new AppError('无效运行方式',{statusCode:400});safeOptions.runMode=options.runMode;}
     return monitorsDb.create({userId,sessionId,name,content,intervalMinutes,schedule,options:safeOptions});
   },
-  list(userId: number,sessionId?: string) {if(sessionId) assertOwnedSession(userId,sessionId); return monitorsDb.list(userId,sessionId);},
+  list(userId: number,sessionId?: string,includeStopped=false) {if(sessionId) assertOwnedSession(userId,sessionId); return monitorsDb.list(userId,sessionId,includeStopped);},
   update(userId: number,id: string,input: Record<string,unknown>) {
     const row=this.require(userId,id);
     if(row.status==='stopped')throw new AppError('已停止的监测不能修改。',{code:'MONITOR_CONFLICT',statusCode:409});

@@ -9,10 +9,13 @@ import { parseMonitorCalendarSchedule } from '@/shared/index.js';
 import { assertOwnedSession } from '@/modules/access-control/index.js';
 
 const shape={
-  action:z.enum(['list','create','update','pause','resume','stop','run_now','history']),
+  action:z.enum(['list','get','create','update','pause','resume','stop','run_now','history']),
+  includeStopped:z.boolean().optional().describe('Include stopped monitors in list output. Defaults to false.'),
+  offset:z.number().int().min(0).optional().describe('List offset. Default pages contain at most 10 summaries; request the next offset to continue.'),
   id:z.string().optional().describe('Existing monitor id returned by list/create. Required except for list/create.'),
   name:z.string().min(1).max(120).optional(),
   content:z.string().min(1).max(20000).optional().describe('Instructions for each check, including scope, reporting rule and stop condition requested by the user.'),
+  model:z.string().optional().describe('Optional explicit model for new monitor; defaults to Sonnet.'),
   runMode:z.enum(['isolated','original']).optional().describe('Default isolated: a new short conversation per round. original: run in the original conversation.'),
   intervalMinutes:z.number().int().min(1).max(10080).optional().describe('Minutes after each completed check. Required for interval scheduling.'),
   schedule:z.discriminatedUnion('frequency',[
@@ -36,13 +39,13 @@ export function executeMonitorTool(context:ToolContext,input:unknown): unknown {
   assertOwnedSession(context.userId,context.sessionId);
   const session=sessionsDb.getSessionById(context.sessionId);
   if(!session||!['claude','codex','deepseek-harness'].includes(session.provider)||!Number.isInteger(context.userId))throw new Error('当前 Claude 会话或用户无效。');
-  if(context.readOnly&&!['list','history','update','pause','stop'].includes(args.action))throw new Error('转发、委派回报和规划回合只能查看监测；修改调度需要用户在普通回合中明确提出。');
+  if(context.readOnly&&!['list','get','history','update','pause','stop'].includes(args.action))throw new Error('转发、委派回报和规划回合只能查看监测；修改调度需要用户在普通回合中明确提出。');
   // Scheduled turns may inspect/stop themselves but cannot broaden their own schedule.
-  if(context.monitorId && !['list','history','pause','stop','update'].includes(args.action))
+  if(context.monitorId && !['list','get','history','pause','stop','update'].includes(args.action))
     throw new Error('自动监测期间只能查看、修改自身说明、暂停或停止自身任务；调度修改请由用户在聊天中提出。');
   if(context.monitorId && args.action==='update' && (args.intervalMinutes!==undefined || args.schedule!==undefined || args.runMode!==undefined))
     throw new Error('监测回合只能修改自身 name 和 content；间隔、日历规则和权限模式请由用户在聊天里修改。');
-  if(args.action==='list')return {monitors:monitorsService.list(context.userId).map(visible)};
+  if(args.action==='list'){const rows=monitorsService.listView(context.userId,undefined,Boolean(args.includeStopped),args.offset??0);return {monitors:rows,nextOffset:rows.length===10?(args.offset??0)+10:null};}
   if(args.action==='create') {
     const schedule=parseMonitorCalendarSchedule(args.schedule);
     if(!args.name||!args.content||(!args.intervalMinutes&&!schedule))throw new Error('创建必须提供名称、检查内容，以及间隔或日历规则。');
@@ -50,16 +53,17 @@ export function executeMonitorTool(context:ToolContext,input:unknown): unknown {
     const duplicate=monitorsService.list(context.userId,context.sessionId).find(row=>row.status!=='stopped'&&row.name===args.name!.trim()&&row.content===args.content!.trim()&&row.schedule_json===scheduleJson&&(schedule||row.interval_minutes===args.intervalMinutes)&&(JSON.parse(row.options).runMode||'isolated')===(args.runMode||'isolated'));
     if(duplicate)return {monitor:visible(duplicate),reused:true};
     const row=monitorsService.create(context.userId,{sessionId:context.sessionId,name:args.name,content:args.content,intervalMinutes:args.intervalMinutes,schedule,
-      options:{model:session.model||context.model,effort:session.effort||context.effort,permissionMode: context.permissionMode || 'bypassPermissions',...(args.runMode?{runMode:args.runMode}:{})}});
+      options:{...(args.model?{model:args.model}:{}),effort:args.model?session.effort||context.effort:'medium',permissionMode: context.permissionMode || 'bypassPermissions',...(args.runMode?{runMode:args.runMode}:{})}});
     return {monitor:visible(row),reused:false,permissionMode:JSON.parse(row.options).permissionMode,note:'已保存到本地调度器。权限沿用创建时的会话设置。电脑和本地服务需运行，关闭聊天页面不影响调度。'};
   }
   const requested=args.id||context.monitorId;
   if(requested && requested.length<8)throw new Error('监测 ID 前缀至少需要 8 位。');
-  const matches=requested?monitorsService.list(context.userId).filter(row=>row.id===requested||row.id.startsWith(requested)):[];
+  const matches=requested?monitorsService.list(context.userId,undefined,true).filter(row=>row.id===requested||row.id.startsWith(requested)):[];
   if(matches.length>1)throw new Error('监测前缀不唯一：'+matches.map(row=>row.id+' '+row.name).join('；'));
   const id=matches[0]?.id;
   if(!id)throw new Error('监测任务不存在或不属于当前账号；请 list 查看自己的监测（支持至少8位唯一前缀）。');
   monitorsService.require(context.userId,id);
+  if(args.action==='get')return {monitor:visible(monitorsService.require(context.userId,id))};
   if(args.action==='history')return {id,runs:monitorsService.history(context.userId,id)};
   if(args.action==='update')return {monitor:visible(monitorsService.update(context.userId,id,args))};
   return {monitor:visible(monitorsService.action(context.userId,id,args.action==='run_now'?'run-now':args.action)!),note:'暂停或停止不会强制中断已开始的一轮。'};

@@ -31,7 +31,15 @@ export function initializeMonitorTables(db: Database.Database): void {
   if(!columns.some(column=>column.name==='state_record')) db.exec("ALTER TABLE monitors ADD COLUMN state_record TEXT NOT NULL DEFAULT ''");
   if(!columns.some(column=>column.name==='no_change_count')) db.exec("ALTER TABLE monitors ADD COLUMN no_change_count INTEGER NOT NULL DEFAULT 0");
   const runColumns=db.prepare('PRAGMA table_info(monitor_runs)').all() as {name:string}[];
-  for(const [name,type] of Object.entries({session_id:'TEXT',report:'TEXT',input_tokens:'INTEGER',context_tokens:'INTEGER',round_number:'INTEGER'})) if(!runColumns.some(c=>c.name===name)) db.exec(`ALTER TABLE monitor_runs ADD COLUMN ${name} ${type}`);
+  for(const [name,type] of Object.entries({session_id:'TEXT',report:'TEXT',input_tokens:'INTEGER',context_tokens:'INTEGER',output_tokens:'INTEGER',cache_read_tokens:'INTEGER',cache_creation_tokens:'INTEGER',total_tokens:'INTEGER',round_number:'INTEGER'})) if(!runColumns.some(c=>c.name===name)) db.exec(`ALTER TABLE monitor_runs ADD COLUMN ${name} ${type}`);
+  // Keep a rollback copy before changing inherited Opus monitor defaults. The
+  // table is durable and the INSERT is idempotent across restarts.
+  db.exec(`CREATE TABLE IF NOT EXISTS monitor_model_migration_backup_20261029 (id TEXT PRIMARY KEY,user_id INTEGER NOT NULL,options TEXT NOT NULL)`);
+  db.exec(`INSERT OR IGNORE INTO monitor_model_migration_backup_20261029(id,user_id,options)
+    SELECT id,user_id,options FROM monitors
+    WHERE status IN ('active','paused') AND COALESCE(json_extract(options,'$.modelExplicit'),0)=0 AND session_id IN (SELECT session_id FROM sessions WHERE provider='claude') AND lower(COALESCE(json_extract(options,'$.model'),'')) IN ('opus','opus[1m]','claude-opus-5-5','claude-opus-5-5[1m]')`);
+  db.exec(`UPDATE monitors SET options=json_set(options,'$.model','claude-sonnet-5-5','$.effort','medium')
+    WHERE status IN ('active','paused') AND COALESCE(json_extract(options,'$.modelExplicit'),0)=0 AND session_id IN (SELECT session_id FROM sessions WHERE provider='claude') AND lower(COALESCE(json_extract(options,'$.model'),'')) IN ('opus','opus[1m]','claude-opus-5-5','claude-opus-5-5[1m]')`);
 }
 
 // Retry transport/model failures without tight loops: 1, 2, 4, 8, 16, then 30 minutes.
@@ -52,15 +60,27 @@ export const monitorsDb = {
   attachSession(id:string,runId:string,sessionId:string) {
     getConnection().prepare('UPDATE monitor_runs SET session_id=?,round_number=(SELECT run_count+1 FROM monitors WHERE id=monitor_id) WHERE id=? AND monitor_id=?').run(sessionId,runId,id);
   },
-  saveReport(userId:number,id:string,runId:string,report:string,state:string,usage:{inputTokens?:number;used?:number}) {
+  saveUsage(id:string,runId:string,usage:{inputTokens?:number;used?:number;outputTokens?:number;cacheReadTokens?:number;cacheCreationTokens?:number}) {
+    const input=usage.inputTokens===undefined?null:Math.max(0,usage.inputTokens-(usage.cacheReadTokens??0)-(usage.cacheCreationTokens??0));
+    getConnection().prepare("UPDATE monitor_runs SET input_tokens=?,output_tokens=?,cache_read_tokens=?,cache_creation_tokens=?,total_tokens=? WHERE id=? AND monitor_id=? AND status='running'")
+      .run(input,usage.outputTokens??null,usage.cacheReadTokens??null,usage.cacheCreationTokens??null,usage.used??null,runId,id);
+  },
+  saveReport(userId:number,id:string,runId:string,report:string,state:string,usage:{inputTokens?:number;used?:number;outputTokens?:number;cacheReadTokens?:number;cacheCreationTokens?:number;contextTokens?:number},fingerprint?:string) {
     const db=getConnection();db.transaction(()=>{
       const row=this.get(userId,id);if(!row||row.running_id!==runId)throw new Error('Monitor run changed');
-      db.prepare('UPDATE monitor_runs SET report=?,input_tokens=?,context_tokens=? WHERE id=? AND monitor_id=?').run(report.slice(0,20000),usage.inputTokens??null,usage.used??null,runId,id);
-      db.prepare('UPDATE monitors SET state_record=? WHERE id=? AND user_id=?').run(state.slice(0,2000),id,userId);
+      const directInput=usage.inputTokens===undefined?null:Math.max(0,usage.inputTokens-(usage.cacheReadTokens??0)-(usage.cacheCreationTokens??0));
+      db.prepare('UPDATE monitor_runs SET report=?,input_tokens=?,context_tokens=?,output_tokens=?,cache_read_tokens=?,cache_creation_tokens=?,total_tokens=? WHERE id=? AND monitor_id=?').run(report.slice(0,20000),directInput,usage.contextTokens??null,usage.outputTokens??null,usage.cacheReadTokens??null,usage.cacheCreationTokens??null,usage.used??null,runId,id);
+      const meta=fingerprint?`\n<monitor-meta>${JSON.stringify({fingerprint,capturedAt:new Date().toISOString()})}</monitor-meta>`:'';
+      const stateLimit=Math.max(0,2000-meta.length);
+      db.prepare('UPDATE monitors SET state_record=? WHERE id=? AND user_id=?').run(state.slice(0,stateLimit)+meta,id,userId);
     })();
   },
   reportMessages(sessionId:string) {
-    return getConnection().prepare(`SELECT r.id,r.report,r.session_id,COALESCE(r.finished_at,r.started_at) AS started_at,r.round_number,m.name,m.id AS monitor_id FROM monitor_runs r JOIN monitors m ON m.id=r.monitor_id JOIN sessions s ON s.session_id=m.session_id WHERE m.session_id=? AND r.session_id<>m.session_id AND r.report IS NOT NULL AND s.owner_id=m.user_id ORDER BY r.started_at,r.rowid`).all(sessionId) as {id:string;report:string;session_id:string;started_at:string;name:string;monitor_id:string;round_number:number|null}[];
+    return getConnection().prepare(`SELECT r.id,r.report,r.session_id,COALESCE(r.finished_at,r.started_at) AS started_at,r.round_number,m.name,m.id AS monitor_id FROM monitor_runs r JOIN monitors m ON m.id=r.monitor_id JOIN sessions s ON s.session_id=m.session_id WHERE m.session_id=? AND (r.session_id<>m.session_id OR r.error LIKE '上下文维护：%') AND r.report IS NOT NULL AND s.owner_id=m.user_id ORDER BY r.started_at,r.rowid`).all(sessionId) as {id:string;report:string;session_id:string;started_at:string;name:string;monitor_id:string;round_number:number|null}[];
+  },
+  lastModelRunAt(id:string): string|null {
+    const row=getConnection().prepare("SELECT finished_at FROM monitor_runs WHERE monitor_id=? AND status IN ('succeeded','failed','interrupted') AND (error IS NULL OR (error<>'无变化，未调用模型。' AND error NOT LIKE '上下文维护：%')) ORDER BY finished_at DESC LIMIT 1").get(id) as {finished_at:string|null}|undefined;
+    return row?.finished_at??null;
   },
   isRunSession(userId:number,id:string,sessionId:string) {
     return !!getConnection().prepare('SELECT 1 FROM monitor_runs r JOIN monitors m ON m.id=r.monitor_id WHERE m.id=? AND m.user_id=? AND r.id=m.running_id AND r.session_id=?').get(id,userId,sessionId);
@@ -71,10 +91,11 @@ export const monitorsDb = {
   },
   /** Monitor lifecycle records compaction receipts alongside the normal run history. */
   recordContext(userId: number, id: string, detail: Record<string, unknown>): void {
-    if (!this.get(userId, id)) throw new Error('Monitor not found');
+    const row=this.get(userId,id);
+    if (!row) throw new Error('Monitor not found');
     const now = new Date().toISOString();
-    getConnection().prepare("INSERT INTO monitor_runs(id,monitor_id,started_at,finished_at,status,error) VALUES(?,?,?,?,?,?)")
-      .run(randomUUID(), id, now, now, detail.action === 'migration-failed' ? 'failed' : 'succeeded', '上下文维护：' + JSON.stringify(detail));
+    getConnection().prepare("INSERT INTO monitor_runs(id,monitor_id,started_at,finished_at,status,error,session_id,report) VALUES(?,?,?,?,?,?,?,?)")
+      .run(randomUUID(), id, now, now, detail.action === 'migration-failed' ? 'failed' : 'succeeded', '上下文维护：' + JSON.stringify(detail),row.session_id,detail.action==='isolated'?'原会话上下文超过 120000 token，监测已自动切换为独立回合，原会话保留。':null);
   },
   /** Compare the claimed run before moving its monitor; preserve all previous session IDs in options. */
   migrateSession(userId: number, id: string, runId: string, previousSessionId: string, sessionId: string): void {
@@ -97,8 +118,8 @@ export const monitorsDb = {
   get(userId: number, id: string): MonitorRecord | undefined {
     return getConnection().prepare('SELECT * FROM monitors WHERE user_id=? AND id=?').get(userId,id) as MonitorRecord | undefined;
   },
-  list(userId: number, sessionId?: string): MonitorRecord[] {
-    return getConnection().prepare(`SELECT * FROM monitors WHERE user_id=?${sessionId ? ' AND session_id=?' : ''} ORDER BY created_at DESC`)
+  list(userId: number, sessionId?: string, includeStopped=false): MonitorRecord[] {
+    return getConnection().prepare(`SELECT * FROM monitors WHERE user_id=?${sessionId ? ' AND session_id=?' : ''}${includeStopped ? '' : " AND status IN ('active','paused')"} ORDER BY created_at DESC`)
       .all(...(sessionId ? [userId,sessionId] : [userId])) as MonitorRecord[];
   },
   summaries(userId: number) {
@@ -149,9 +170,11 @@ export const monitorsDb = {
       const row=db.prepare('SELECT * FROM monitors WHERE id=? AND running_id=?').get(id,runId) as (MonitorRecord&{no_change_count?:number})|undefined;
       if(!row)return;
       const count=(row.no_change_count??0)+1;
-      const minutes=count>=2?60:30;
-      db.prepare("UPDATE monitor_runs SET status='succeeded',error=?,finished_at=? WHERE id=? AND status='running'").run('无变化，未调用模型。',now.toISOString(),runId);
-      db.prepare('UPDATE monitors SET running_id=NULL,run_count=run_count+1,last_error=?,next_run_at=?,consecutive_failures=0,no_change_count=? WHERE id=? AND running_id=?').run('无变化，未调用模型。',new Date(now.getTime()+minutes*60000).toISOString(),count,id,runId);
+      const minutes=count>=3?60:count===2?30:15;
+      const lastReal=this.lastModelRunAt(id);
+      const nextAt=lastReal?Math.min(now.getTime()+minutes*60000,Math.max(now.getTime()+1000,Date.parse(lastReal)+60*60000)):now.getTime()+minutes*60000;
+      db.prepare("UPDATE monitor_runs SET status='skipped',report='无变化，未调用模型',input_tokens=0,output_tokens=0,cache_read_tokens=0,cache_creation_tokens=0,total_tokens=0,context_tokens=0,error=?,finished_at=? WHERE id=? AND status='running'").run('无变化，未调用模型。',now.toISOString(),runId);
+      db.prepare('UPDATE monitors SET running_id=NULL,run_count=run_count+1,last_error=?,next_run_at=?,consecutive_failures=0,no_change_count=? WHERE id=? AND running_id=?').run('无变化，未调用模型。',new Date(nextAt).toISOString(),count,id,runId);
     })();
   },
   action(userId: number,id: string,action: 'pause'|'resume'|'stop'|'run-now'): void {

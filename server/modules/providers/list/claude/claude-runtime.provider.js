@@ -231,7 +231,7 @@ function matchesToolPermission(entry, toolName, input) {
 }
 
 function mapCliOptionsToSDK(options = {}) {
-  const { providerSessionId, cwd, toolsSettings, permissionMode, effort, resumeAnchorId, resumeFromScratch } = options;
+  const { providerSessionId, cwd, toolsSettings, permissionMode, effort, resumeAnchorId, resumeFromScratch, monitorSlim } = options;
 
   const sdkOptions = {};
 
@@ -303,7 +303,17 @@ function mapCliOptionsToSDK(options = {}) {
     preset: 'claude_code'
   };
 
-  sdkOptions.settingSources = ['project', 'user', 'local'];
+  // Isolated monitor rounds keep project instructions but exclude user/local
+  // settings, auto-memory indexes, skills and unrelated MCP configuration.
+  sdkOptions.settingSources = monitorSlim ? ['project'] : ['project', 'user', 'local'];
+  if (monitorSlim) {
+    sdkOptions.skills = [];
+    sdkOptions.strictMcpConfig = true;
+    sdkOptions.settings = {autoMemoryEnabled:false};
+    sdkOptions.extraArgs = {'disable-slash-commands':null};
+    sdkOptions.tools = ['Read','Bash','Glob','Grep','Edit','Write'];
+    sdkOptions.systemPrompt = 'You perform one bounded monitoring check. Follow project instructions, inspect current evidence with tools, report facts and failures accurately, and return <monitor-state> with concise state. Set escalate: true only when the next round needs non-routine work. Never start recurring background agents.';
+  }
 
   // The SDK resumes with the provider-native session id, never the app id.
   // `resumeFromScratch` is set when the very first prompt of a conversation was
@@ -1047,10 +1057,18 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
       model: resolvedModel || options.model,
       effortModels,
     });
+    if(options.monitorSlim){
+      const instructions=[];
+      let directory=path.resolve(options.cwd||process.cwd());
+      while(true){for(const name of ['AGENTS.md','CLAUDE.md']){try{instructions.unshift(await fs.readFile(path.join(directory,name),'utf8'));}catch{}} const parent=path.dirname(directory);if(parent===directory)break;directory=parent;}
+      sdkOptions.systemPrompt += '\nProject instructions:\n'+instructions.join('\n');
+      // The instructions above replace filesystem discovery; avoid duplicate CLAUDE.md.
+      sdkOptions.settingSources=[];
+    }
 
-    const mcpServers = await loadMcpConfig(options.cwd);
-    if (mcpServers) {
-      sdkOptions.mcpServers = mcpServers;
+    if (!options.monitorSlim) {
+      const mcpServers = await loadMcpConfig(options.cwd);
+      if (mcpServers) sdkOptions.mcpServers = mcpServers;
     }
 
     // Every turn uses streaming input so stdin stays open past the turn's
@@ -1375,6 +1393,10 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
       }
 
       if (message.type === 'result') {
+        if(options.cloudcliMonitorId){
+          const cumulative=extractCumulativeTokenBudget(message,reportedContextWindow);
+          if(cumulative)ws.send({kind:'status',provider:'claude',sessionId:sessionId||capturedSessionId,text:'monitor_usage',monitorUsage:cumulative});
+        }
         const answeredPrompts = message.user_message_uuids ?? [message.user_message_uuid];
         if (answeredPrompts.includes(promptMessages[0].uuid)) supportsTurnCorrelation = true;
         const answersContinuation = !pendingContinuation

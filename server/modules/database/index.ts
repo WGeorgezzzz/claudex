@@ -27,7 +27,7 @@ export { scheduledMessagesDb } from './repositories/scheduled-messages.db.js';
 export type { ScheduledMessageRow, ScheduledMessageStatus } from './repositories/scheduled-messages.db.js';
 
 // Monitors uses this repository for durable schedules and execution receipts.
-export { monitorsDb } from '@/modules/database/repositories/monitors.db.js';
+export { monitorsDb, initializeMonitorTables } from '@/modules/database/repositories/monitors.db.js';
 // Workbench lifecycle modules own side-chat relationships and durable FIFO submissions.
 export { sideChatsDb } from '@/modules/database/repositories/side-chats.db.js';
 export { messageQueueDb } from '@/modules/database/repositories/message-queue.db.js';

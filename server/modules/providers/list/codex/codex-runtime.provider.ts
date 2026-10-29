@@ -378,6 +378,7 @@ async function queryCodex(
         effort: resolvedEffort,
         planMode: permissionMode === 'plan',
         dynamicTools: [bridge?.specification,monitor?.specification].filter(Boolean) as any,
+        monitorSlim:Boolean(options.monitorSlim),
         onRequest: (message, reply) => {
           if (bridge && message.method === 'item/tool/call' && message.params?.tool === 'claudex_sessions') {
             void bridge.execute(message.params.arguments).then(result => reply({success:true,contentItems:[{type:'inputText',text:JSON.stringify(result)}]}), error => reply({success:false,contentItems:[{type:'inputText',text:String(error.message || error)}]}));
@@ -472,6 +473,7 @@ async function queryCodex(
       if (event.type === 'turn.completed') {
         const tokenBudget = extractCodexTokenBudget(event);
         if (tokenBudget) {
+          if(options.cloudcliMonitorId)sendMessage(ws,{kind:'status',text:'monitor_usage',monitorUsage:tokenBudget,sessionId:sessionId||capturedSessionId,provider:'codex'});
           sendMessage(ws, createNormalizedMessage({ kind: 'status', text: 'token_budget', tokenBudget, sessionId: capturedSessionId || sessionId || null, provider: 'codex' }));
         }
       }

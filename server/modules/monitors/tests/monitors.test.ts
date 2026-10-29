@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
@@ -41,6 +41,8 @@ test('monitor ID prefixes reject ambiguity and support lifecycle/history across 
 
 test('isolated rounds bound state, preserve permissions and tools, retain reports in the original history',()=>fixture(async user=>{
   const row=create(user),seen:string[]=[],prompts:string[]=[];
+  const probe=path.join(tmpdir(),'monitor-round-probe.txt');await writeFile(probe,'0');
+  getConnection().prepare('UPDATE monitors SET content=? WHERE id=?').run('Read '+probe,row.id);
   const rt=runtime(async(_p,command,options,writer)=>{
     const id=String(options.sessionId);seen.push(id);prompts.push(command);
     assert.notEqual(id,row.session_id);assert.equal(options.permissionMode,'default');
@@ -49,7 +51,7 @@ test('isolated rounds bound state, preserve permissions and tools, retain report
     writer.send({kind:'text',role:'assistant',content:'ROUND '+seen.length+'<monitor-state>key-'+seen.length+' '+ 'a'.repeat(4000)+'</monitor-state>'});
     writer.send(createCompleteMessage({provider:'claude',sessionId:id,exitCode:0}));
   });
-  for(let i=0;i<11;i++)await dispatchMonitors(rt,new Date(Date.now()+86400000));
+  for(let i=0;i<11;i++){await dispatchMonitors(rt,new Date(Date.now()+86400000));await writeFile(probe,String(i));}
   assert.equal(new Set(seen).size,11);
   assert.ok(prompts.slice(1).every(p=>p.length<2500));
   assert.ok(prompts[10].includes('key-10'));assert.ok(!prompts[10].includes('key-1 '));
@@ -95,7 +97,7 @@ test('monitor creation preserves explicit permissions without silently elevating
   executeMonitorTool(context,{action:'create',name:'Authorized job',content:'Check status',intervalMinutes:30});
   assert.equal(JSON.parse(monitorsDb.list(user)[0].options).permissionMode,'bypassPermissions');
   const row=monitorsService.create(user,{sessionId:'monitor-session',name:'Invalid mode',content:'Check',intervalMinutes:1,options:{permissionMode:'invalid',cwd:'/override',sessionId:'override'}});
-  assert.deepEqual(JSON.parse(row.options),{permissionMode:'bypassPermissions'});
+  assert.deepEqual(JSON.parse(row.options),{model:'claude-sonnet-5-5',effort:'medium',permissionMode:'bypassPermissions'});
 }));
 test('chat tools cannot cross user/session scope or accept scope overrides',()=>fixture(user=>{
   sessionsDb.createAppSession('other-claude','claude',tmpdir(),'Other');const row=create(user);
@@ -122,7 +124,7 @@ test('recurs after completion with one receipt per execution and catches up once
   assert.equal(monitorsDb.get(user,row.id)?.run_count,1);
   assert.equal(await dispatchMonitors(rt),0);
   assert.equal(await dispatchMonitors(rt,new Date(Date.now()+120000)),1);
-  assert.deepEqual(monitorsDb.history(user,row.id).map(r=>r.status),['succeeded','succeeded']);
+  assert.deepEqual(monitorsDb.history(user,row.id).map(r=>r.status).sort(),['skipped','succeeded']);
 }));
 test('busy/background session is deferred without aborting or recording a false run',()=>fixture(async user=>{
   const row=create(user);
