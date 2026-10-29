@@ -2,10 +2,10 @@ import { assertOwnedSession } from '@/modules/access-control/index.js';
 import { createSdkMcpServer, tool } from '@anthropic-ai/claude-agent-sdk';
 import { z } from 'zod';
 
-import type { ProviderRuntimeContext } from '@/shared/types.js';
+import type { BridgeUserAuthorization, ProviderRuntimeContext } from '@/shared/types.js';
 import { sessionBridgeService } from '@/modules/session-bridge/session-bridge.service.js';
 
-type BridgeContext = { userId: number; sessionId: string; autonomous: boolean; planMode: boolean; permissionMode?: string };
+type BridgeContext = { userId: number; sessionId: string; autonomous: boolean; planMode: boolean; permissionMode?: string; userMessageId?:string; userMessage?:string };
 const turnSends=new WeakMap<BridgeContext,Map<string,unknown>>();
 const shape = { action: z.enum(['list', 'read', 'send', 'status', 'create', 'fork', 'handoff', 'wait', 'compact', 'archive', 'unarchive', 'rename']), query: z.string().max(200).optional(), offset: z.number().int().min(0).max(100000).optional(),
   sessionId: z.string().optional(), content: z.string().max(20000).optional(), prompt: z.string().max(20000).optional(), requestId: z.string().regex(/^[\w:-]{1,128}$/).optional(), receiptId: z.string().optional(),
@@ -29,8 +29,9 @@ export async function executeSessionBridgeTool(context: BridgeContext, input: un
     if(sent.size>=5)throw new Error('每轮跨会话 send 最多 5 次，已停止以避免监测循环。');
     const result=sessionBridgeService.send(context.userId,context.sessionId,{...args,sessionId:target.sessionId},context.permissionMode);sent.set(target.sessionId,result);return result;
   }
-  if (args.action === 'send') return sessionBridgeService.send(context.userId, context.sessionId, args,context.permissionMode);
-  if (args.action === 'create') return sessionBridgeService.create(context.userId, context.sessionId, { provider: args.provider, projectId: args.projectId, cwd: args.cwd, model: args.model, effort: args.effort, title: args.title, prompt: args.prompt ?? '', requestId: args.requestId ?? '' },context.permissionMode);
+  const authorization:BridgeUserAuthorization|undefined=!context.autonomous&&!context.planMode&&context.userMessageId?{sourceSessionId:context.sessionId,sourceUserMessageId:context.userMessageId,permissionMode:context.permissionMode||'default',sourceUserMessage:context.userMessage}:undefined;
+  if (args.action === 'send') return sessionBridgeService.send(context.userId, context.sessionId, args,context.permissionMode,authorization);
+  if (args.action === 'create') return sessionBridgeService.create(context.userId, context.sessionId, { provider: args.provider, projectId: args.projectId, cwd: args.cwd, model: args.model, effort: args.effort, title: args.title, prompt: args.prompt ?? '', requestId: args.requestId ?? '' },context.permissionMode,authorization);
   if ((args.action === 'fork' || args.action === 'handoff')) return sessionBridgeService.fork(context.userId, args.sessionId || context.sessionId, { mode: args.action==='handoff'?'handoff':args.mode, title: args.title, prompt: args.prompt, requestId: args.requestId ?? '',handoffPath:args.handoffPath },context.permissionMode);
   if (args.action === 'compact') return sessionBridgeService.compact(context.userId, context.sessionId, { sessionId: args.sessionId, instruction: args.instruction, requestId: args.requestId ?? '' },context.permissionMode);
   if (args.action === 'rename') return sessionBridgeService.rename(context.userId, args.sessionId ?? '', args.title ?? '');

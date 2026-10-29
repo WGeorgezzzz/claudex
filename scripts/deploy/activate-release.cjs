@@ -1,5 +1,6 @@
 'use strict';
 const {partitionDeploymentSessions}=require('./running-session-ownership.cjs');
+const {drainManagedSessions}=require('./drain-managed-sessions.cjs');
 // Prepared only. No production mutation occurs without an explicit --activate or --rollback argument.
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict'),crypto=require('node:crypto'),{execFileSync}=require('node:child_process'),{createRequire}=require('node:module');
 const arg=name=>process.argv.includes(name)?process.argv[process.argv.indexOf(name)+1]:undefined,source=path.resolve(arg('--source')||process.cwd()),target=path.resolve(arg('--release')||path.join(source,'../release-1')),root=path.dirname(target),req=createRequire(path.join(target,'package.json')),DB=req('better-sqlite3');
@@ -138,20 +139,18 @@ async function interruptManaged(c){
 }
 
 async function forceInterruptManaged(c){
- const rows=await running(c),token=await login(c),WS=req('ws');
+ const token=await login(c),WS=req('ws');
  // Only sessions reported by this production server are addressed; no host-wide process kill.
- for(const row of rows)await new Promise((resolve,reject)=>{
+ await drainManagedSessions({list:()=>running(c),record:rows=>write(path.join(root,'evidence/force-drain-sessions.json'),{at:new Date().toISOString(),sessions:rows}),interrupt:row=>new Promise((resolve,reject)=>{
   const ws=new WS('ws://127.0.0.1:3001/ws?token='+encodeURIComponent(token));
   let poll;const finish=error=>{clearTimeout(timer);clearInterval(poll);ws.close();error?reject(error):resolve();};
   const timer=setTimeout(()=>finish(Error('Session interruption timed out: '+row.sessionId)),600000);
   ws.on('open',()=>{
-   if(row.tasks?.length)for(const task of row.tasks)ws.send(JSON.stringify({type:'chat.stop-task',sessionId:row.sessionId,taskId:task.taskId}));
-   else ws.send(JSON.stringify({type:'chat.abort',sessionId:row.sessionId,force:false}));
+   ws.send(JSON.stringify({type:'chat.abort',sessionId:row.sessionId,force:true}));
    let checking=false;poll=setInterval(()=>{if(checking)return;checking=true;void running(c).then(current=>{if(!current.some(item=>item.sessionId===row.sessionId))finish();},finish).finally(()=>{checking=false;});},1000);
   });
   ws.on('error',finish);
- });
- const remaining=await running(c);assert.equal(remaining.length,0,'Managed sessions must be interrupted before stopping the server');
+ })});
 }
 async function main(){
  const lock=path.join(path.dirname(cfgPath),'nexagent-deploy.lock');

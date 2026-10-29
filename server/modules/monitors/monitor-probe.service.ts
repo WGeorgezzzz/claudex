@@ -5,6 +5,7 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 
 import type { MonitorProbeEvent, MonitorProbeSpec, MonitorRecord } from '@/shared/types.js';
+import { runMonitorScript, parseScriptLine } from './monitor-script.service.js';
 import { monitorsDb } from '@/modules/database/index.js';
 
 const execFileAsync = promisify(execFile);
@@ -83,11 +84,12 @@ function thresholdHit(value:unknown,item:Record<string,unknown>):boolean { const
 
 export function normalizeProbe(value:unknown):MonitorProbeSpec|null {
   if(!value || typeof value!=='object' || Array.isArray(value))return null;
-  const input=value as Record<string,unknown>; if(!Array.isArray(input.items)||!input.items.length)return null;
+  const input={...(value as Record<string,unknown>)}; if(input.script)input.items=[{type:'script',script:input.script,shell:input.shell||'powershell'}]; if(!Array.isArray(input.items)||!input.items.length)return null;
   const items=input.items.filter(item=>item&&typeof item==='object'&&!Array.isArray(item)).map(item=>{
     const source={...(item as Record<string,unknown>)};
     if(!source.type) {
-      if(source.path!==undefined || source.file!==undefined) source.type='file';
+      if(source.script!==undefined) source.type='script';
+      else if(source.path!==undefined || source.file!==undefined) source.type='file';
       else if(source.pid!==undefined || source.processName!==undefined || source.scheduledTask!==undefined) source.type='process';
       else if(source.command!==undefined) source.type='command';
       else if(Array.isArray(source.patterns)) source.type='patterns';
@@ -96,7 +98,7 @@ export function normalizeProbe(value:unknown):MonitorProbeSpec|null {
     if(source.path===undefined && source.file!==undefined) source.path=source.file;
     return source;
   }) as Array<Record<string,unknown>>;
-  if(!items.length)return null;
+  if(!items.length||items.some(item=>item.type==='script'&&(typeof item.script!=='string'||!item.script.trim()||item.script.length>32768||item.shell!==undefined&&!['powershell','bash'].includes(String(item.shell)))))return null;
   return {items,suppress:Array.isArray(input.suppress)?input.suppress.filter(value=>typeof value==='string').slice(0,16).map(value=>value.slice(0,256)):[],intervalMinutes:Math.min(60,Math.max(1,Number(input.intervalMinutes)||DEFAULT_INTERVAL)),stallMinutes:Math.min(10080,Math.max(1,Number(input.stallMinutes)||DEFAULT_STALL)),heartbeatMinutes:Math.min(10080,Math.max(1,Number(input.heartbeatMinutes)||DEFAULT_HEARTBEAT))};
 }
 
@@ -122,9 +124,17 @@ function matchesSuppression(suppress:string[],signature:string,text:string):bool
 export async function runProbe(row:MonitorRecord, now=new Date()):Promise<MonitorProbeEvent|null> {
   const spec=normalizeProbe(row.probe_json?JSON.parse(row.probe_json):null); if(!spec)return null;
   const previous=row.probe_state_json?JSON.parse(row.probe_state_json) as Record<string,unknown>:{}; const state:Record<string,unknown> & {items:Record<string,unknown>;lastProgressAt?:string;lastModelAt?:string;progress?:unknown;lastEventKey?:string;lastDelta?:string;lastFields?:Record<string,unknown>}={items:{},lastProgressAt:String(previous.lastProgressAt||now.toISOString()),lastModelAt:String(previous.lastModelAt||monitorsDb.lastModelRunAt(row.id)||now.toISOString())};
+  const scripted=spec.items.some(item=>item.type==='script');
+  const scriptEvents:MonitorProbeEvent[]=[]; let scriptError:string|null=null;
   const deltas:string[]=[]; const errorDeltas:string[]=[]; const fields:Record<string,unknown>={...previous.lastFields as Record<string,unknown>}; let done=false; let dead=false; let commandError=''; let thresholdEvidence=''; let staleFile='';
   for(let index=0;index<spec.items.length;index++) { const item=spec.items[index]; const key=itemKey(item,index); const type=String(item.type||'file');
-    if(type==='file') {
+    if(type==='script') {
+      const result=await runMonitorScript(row,item); scriptError ||= result.error;
+      state.items[key]={lastOutput:result.lines.at(-1)?.slice(0,240)||'',eventCount:Number((previous.items as Record<string,Record<string,unknown>>)?.[key]?.eventCount||0)};
+      for(const line of result.lines){const parsed=parseScriptLine(line,now);if(parsed.progress!==undefined)fields.progress=parsed.progress;if(parsed.event){scriptEvents.push(parsed.event);(state.items[key] as Record<string,unknown>).eventCount=Number((state.items[key] as Record<string,unknown>).eventCount)+1;}}
+      const cached=commandDeltas.get(row.id);commandDeltas.set(row.id,{lastModelAt:String(state.lastModelAt||''),delta:bounded([cached?.lastModelAt===String(state.lastModelAt||'')?cached.delta:'',...result.lines].join('\n'))});
+    }
+    else if(type==='file') {
       const previousItems=(previous.items as Record<string,unknown>)||{};
       const legacyKey=String(item.id||item.path||item.pid||item.command||`item-${index}`);
       const oldItem=(previousItems[key]||previousItems[legacyKey]||{}) as Record<string,unknown>;
@@ -146,12 +156,12 @@ export async function runProbe(row:MonitorRecord, now=new Date()):Promise<Monito
   const delta=bounded(deltas.join('\n')); state.lastFields=fields; state.previousFields=previous.lastFields||{};
   state.terminal=done||previous.terminal===true||/^(done|completed|success|succeeded|failed|failure)$/i.test(String(fields.status||''));
   const patterns=spec.items.filter(item=>String(item.type)==='patterns').flatMap(item=>Array.isArray(item.patterns)?item.patterns.map(String):DEFAULT_PATTERNS);
-  if(!patterns.length) patterns.push(...DEFAULT_PATTERNS);
   const errorDelta=bounded(errorDeltas.join('\n'));
   const alertLines=errorDelta.split(/\r?\n/).filter(line=>!/^\s*[-+>$]/.test(line));
   const pattern=patterns.find(pattern=>alertLines.some(line=>{try{return new RegExp(`^(?:${pattern})`,'i').test(line);}catch{return line.toLowerCase().startsWith(pattern.toLowerCase());}}));
   const progress=fields.progress; const previousProgress=previous.progress; if(JSON.stringify(progress)!==JSON.stringify(previousProgress))state.lastProgressAt=now.toISOString(); state.progress=progress;
   let event:MonitorProbeEvent|null=null; const status=String(fields.status||'').toLowerCase();
+  if(!scripted) {
   if(done || /^(done|completed|success|succeeded|failed|failure)$/.test(status)&&status!==String((previous.lastFields as Record<string,unknown>|undefined)?.status||'').toLowerCase())event={type:'done',at:now.toISOString(),evidence:'探针读取到终止状态或 EXIT 行',delta,fields};
   else if(pattern || commandError)event={type:'error',at:now.toISOString(),evidence:pattern?`新增内容命中 ${pattern}`:commandError,delta,fields};
   else if(thresholdEvidence)event={type:'threshold',at:now.toISOString(),evidence:`字段超过用户设定阈值：${thresholdEvidence}`,delta,fields};
@@ -166,11 +176,31 @@ export async function runProbe(row:MonitorRecord, now=new Date()):Promise<Monito
   if(event?.type==='dead'&&previous.dead===true)event=null;
   state.dead=dead;
   if(event?.type==='done'&&previous.terminal===true)event=null;
-  if(event)event.signature=event.type+':'+fingerprint(event.evidence.replace(/\d+/g,'#'));
+  }
+  if(scripted) {
+    const seen={...previous.scriptSeen as Record<string,string>};
+    const duplicates={...previous.pendingCounts as Record<string,number>};
+    const queue:MonitorProbeEvent[]=[];
+    for(const candidate of [...((previous.scriptQueue||[]) as MonitorProbeEvent[]),...scriptEvents]) {
+      if(queue.some(item=>item.signature===candidate.signature))continue;
+      const last=Date.parse(seen[candidate.signature!]||'')||0;
+      if(last&&last+Math.max(1,row.interval_minutes)*60000>now.getTime()){
+        const key=Object.hasOwn(duplicates,candidate.signature!)||Object.keys(duplicates).length<8?candidate.signature!:'other';
+        duplicates[key]=(duplicates[key]||0)+1;
+        continue;
+      }
+      queue.push(candidate);
+    }
+    event=queue.shift()||null;
+    state.scriptSeen=seen;
+    state.pendingCounts=duplicates;
+    state.scriptQueue=queue.slice(0,8).map(({type,at,evidence,signature})=>({type,at,evidence:evidence.slice(0,160),signature}));
+  }
+  if(event&&!event.signature)event.signature=event.type+':'+fingerprint(event.evidence.replace(/\d+/g,'#'));
   const terminal=event?.type==='done'||event?.type==='dead';
   if(event&&!terminal&&matchesSuppression(spec.suppress||[],event.signature!,event.evidence+'\n'+errorDelta))event=null;
   const pending=previous.pendingEvent as MonitorProbeEvent|undefined;
-  const pendingCounts={...previous.pendingCounts as Record<string,number>};
+  const pendingCounts={...(state.pendingCounts||previous.pendingCounts) as Record<string,number>};
   const lastAlertAt=Math.max(Date.parse(String(previous.lastAlertAt||''))||0,row.model_round_count?Date.parse(String(previous.lastModelAt||''))||0:0);
   const cooling=lastAlertAt>0&&lastAlertAt+Math.max(1,row.interval_minutes||15)*60000>now.getTime();
   if(event&&!terminal&&cooling) {
@@ -184,10 +214,11 @@ export async function runProbe(row:MonitorRecord, now=new Date()):Promise<Monito
     if(pending&&pending.signature===event.signature)event.count=pending.count;
     if(event.count)event.evidence+=`；冷却期同签名累计 ${event.count} 次`;
     if(Object.keys(pendingCounts).length)event.evidence+=`；冷却计数 ${JSON.stringify(pendingCounts)}`;
+    if(scripted){const seen=state.scriptSeen as Record<string,string>;seen[event.signature!]=now.toISOString();state.scriptSeen=Object.fromEntries(Object.entries(seen).slice(-8));}
     state.lastEventKey=event.signature; state.lastAlertAt=now.toISOString(); delete state.pendingEvent; delete state.pendingCounts;
     event.delta=await hydrateProbeDelta({...row,probe_state_json:JSON.stringify(state)});
   } else { state.lastEventKey=String(previous.lastEventKey||''); state.lastAlertAt=previous.lastAlertAt; if(!state.pendingCounts&&Object.keys(pendingCounts).length)state.pendingCounts=pendingCounts; }
-  monitorsDb.saveProbeObservation(row.id,state,event,new Date(now.getTime()+Number(spec.intervalMinutes)*60_000),commandError||null,now);
+  monitorsDb.saveProbeObservation(row.id,state,event,new Date(now.getTime()+Number(spec.intervalMinutes)*60_000),scriptError||commandError||null,now);
   if(!event)monitorsDb.recordHeartbeat(row.id,now,`进度 ${JSON.stringify(previousProgress)??'未知'}→${JSON.stringify(progress)??'未知'}，无新事件，未调用模型。`);
   return event;
 }

@@ -91,3 +91,9 @@ test('native time input remains selected after changing a weekly checkbox',async
   await waitFor(()=>assert.equal(create.mock.calls.length,1));
   assert.equal((create.mock.calls[0][0].schedule as {time:string}).time,'09:15');
 });
+
+test('delegated monitors show the source session and source user message',async()=>{
+ vi.spyOn(api.monitors,'list').mockResolvedValue(response([{id:'delegated',name:'Delegated',content:'status',status:'active',createdByUserDelegation:{sourceSessionId:'source-123',sourceUserMessageId:'user-456'}}]));
+ render(<MonitorPanel sessionId="session" draft="" options={{}}/>);fireEvent.click(screen.getByRole('button',{name:'\u5b9a\u671f\u76d1\u6d4b'}));
+ await waitFor(()=>assert.ok(screen.getByTitle('user-456').textContent?.includes('source-123')));
+});

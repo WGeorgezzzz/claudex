@@ -1562,7 +1562,7 @@ export function compactMonitorProbeState(input:Record<string,unknown>):Record<st
   for(const [key,value] of Object.entries((state.items||{}) as Record<string,unknown>)) {
     if(!value||typeof value!=='object')continue;
     const item=value as Record<string,unknown>;
-    items[key]=Object.fromEntries(['offset','modelOffset','mtimeMs','lastChangeAt','fingerprint','alive'].filter(name=>item[name]!==undefined).map(name=>[name,item[name]]));
+    items[key]=Object.fromEntries(['offset','modelOffset','mtimeMs','lastChangeAt','fingerprint','alive','lastOutput','eventCount'].filter(name=>item[name]!==undefined).map(name=>[name,item[name]]));
   }
   state.items=items;
   const small=(value:unknown,depth=0):unknown=>{

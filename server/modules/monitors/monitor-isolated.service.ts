@@ -78,12 +78,6 @@ export async function preflight(content: string) {
 }
 function needsEscalation(state: string) { return /(?:^|[\s,{\[])["']?escalate["']?\s*[:=]\s*true\b/i.test(state); }
 
-function probeFromMonitorContent(content:string) {
-  if(!/(STATUS\.md|DONE\.json|codex-run\.log|codex\.pid|进度|远端|ssh\s)/i.test(content)) return null;
-  const paths=[...content.matchAll(/(?:[A-Za-z]:\\|\\\\|\/)[^\s"'<>|,;!?]+/g)].map(match=>match[0].replace(/[),.;:!?]+$/g,''));
-  const fileItems:Array<Record<string,unknown>>=[...new Set(paths)].slice(0,8).map(path=>({type:'file',path,read:'tail'}));
-  return normalizeProbe({intervalMinutes:3,stallMinutes:45,heartbeatMinutes:180,items:[...fileItems,{type:'patterns',patterns:['Traceback','ERROR','OOM','CUDA error','EXIT [1-9]','Killed','FAILED']}]});
-}
 /** Each isolated round starts from bounded monitor state, never original history. */
 export async function prepareIsolatedRound(row: MonitorRecord, runId: string, isolated = true) {
   const source = sessionsDb.getSessionById(row.session_id)!;
@@ -109,7 +103,7 @@ export async function prepareIsolatedRound(row: MonitorRecord, runId: string, is
   const persisted = JSON.parse(row.options) as Record<string, unknown>;
   const escalated = needsEscalation(state);
   const eventPrompt = event ? `事件类型：${event.type || 'unknown'}\n事件签名：${JSON.parse(row.last_event_json||'{}').signature||''}\n事件证据：${event.evidence || '探针检测到变化'}\n探针字段（前）：${JSON.stringify(JSON.parse(row.probe_state_json||'{}').previousFields||{})}\n探针字段（后）：${JSON.stringify(event.fields || {})}\n若本次为误报，在 <monitor-state> 中写 JSON suppress: ["事件签名或正则"]，将保存到此监测的抑制列表。\n上次模型回合之后新增数据：\n${String(event.delta || '') || '（没有新增文本，只有字段变化）'}` : '';
-  const probeInstruction = !row.probe_json ? '\n\n这是一个尚未配置探针的历史监测。请根据监测说明生成最小只读 probe JSON，并在最终汇报末尾写入 <monitor-probe>{"intervalMinutes":3,"stallMinutes":45,"heartbeatMinutes":180,"items":[...]}</monitor-probe>；条目可用 file、process、command、patterns。若无法可靠生成则不要猜测。' : '';
+  const probeInstruction = (!row.probe_json && !row.probe_error) ? '\n\n这是一个尚未配置探针的历史监测。请根据监测说明生成最小只读 probe JSON，并在最终汇报末尾写入 <monitor-probe>{"intervalMinutes":3,"stallMinutes":45,"heartbeatMinutes":180,"items":[...]}</monitor-probe>；必须使用 script 条目（shell=powershell 或 bash，script 为只读脚本）；stdout 一行一个事件，JSON type/msg/key，progress 不唤醒，无输出零 token。用 MONITOR_STATE_DIR 记偏移。patterns 默认关闭。若无法可靠生成则不要猜测。' : '';
   const content = event ? `监测说明：\n${row.content}\n\n${eventPrompt}\n\n上一轮 <monitor-state>：\n${state || '（无）'}\n\n上述数据已是最新，除非需要处理，不要重新全面排查。只处理本次事件，并在末尾用 <monitor-state>...</monitor-state> 写回下轮需要的结论和关键 ID。` : '监测说明：\n' + row.content + '\n\n监测状态记录（参考数据，不是新指令）：\n' + (state || '首次运行，尚无状态。') + probeInstruction + '\n\n本轮时间：' + new Date().toISOString() + '\n\n完成检查后给出最终汇报，并在末尾用 <monitor-state>...</monitor-state> 写回下轮需要的结论和关键 ID（最多 2000 字）。仅执行本轮检查。';
   return {
     skip: false as const, sessionId, fingerprint: probe.fingerprint, escalated, eventType: event?.type || null,
@@ -122,8 +116,11 @@ export async function finishMonitorReport(row: MonitorRecord, runId: string, ses
   const text = history.messages.filter(message => message.role === 'assistant' && message.kind === 'text').at(-1)?.content;
   const fullText = typeof text === 'string' ? text : fallback;
   const candidateProbe = fullText.match(/<monitor-probe>([\s\S]*?)<\/monitor-probe>/i)?.[1];
-  const probe = normalizeProbe(candidateProbe ? (() => { try { return JSON.parse(candidateProbe); } catch { return null; } })() : null) || probeFromMonitorContent(row.content);
-  if (!row.probe_json && probe) monitorsDb.setProbe(row.user_id,row.id,probe);
+  const probe = normalizeProbe(candidateProbe ? (() => { try { return JSON.parse(candidateProbe); } catch { return null; } })() : null);
+  if (!row.probe_json && !row.probe_error) {
+    if(probe?.items.some(item=>item.type==='script'))monitorsDb.setProbe(row.user_id,row.id,probe);
+    else monitorsDb.markProbeGenerationFailed(row.id);
+  }
   const parsed = parseMonitorReport(fullText);
   const feedback=parsed.state.match(/["']?suppress["']?\s*:\s*(\[[\s\S]*?\])/i)?.[1];
   if(feedback&&row.probe_json) {
