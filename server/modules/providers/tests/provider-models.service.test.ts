@@ -400,7 +400,7 @@ test('allowed effort levels come from the provider, not from the built-in models
   // weakest first, and an empty list where effort is unsupported.
   const expectedLevels: Record<LLMProvider, string[]> = {
     gemini: [],
-    'deepseek-harness': [],
+    'deepseek-harness': ['off', 'high'],
     workbuddy: [],
     claude: ['low', 'medium', 'high', 'xhigh', 'max', 'ultracode'],
     codex: ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'],
