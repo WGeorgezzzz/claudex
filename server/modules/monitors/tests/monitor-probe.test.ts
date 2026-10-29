@@ -113,7 +113,7 @@ test('UTF-8 event deltas retain head and tail within 8 KiB',async()=>fixture(asy
 
 test('Windows BOM JSON reads root status without promoting nested historical completion',async()=>fixture(async(user,root)=>{
   const done=path.join(root,'DONE.json');
-  await writeFile(done,'\uFEFF'+JSON.stringify({done:false,status:'running',history:[{status:'completed'}],notes:'An earlier check used status=completed 40/40'}));
+  await writeFile(done,'\uFEFF'+JSON.stringify({done:false,status:'running',error:null,history:[{status:'completed',error:'ERROR from an old attempt'}],notes:'An earlier check used status=completed 40/40'}));
   const row=monitorsService.create(user,{sessionId:'probe-session',name:'Windows JSON',content:'read',intervalMinutes:1,probe:{items:[{file:done}]}});
   assert.equal(await runProbe(row),null);
   const state=JSON.parse(monitorsDb.get(user,row.id)!.probe_state_json!);

@@ -38,7 +38,7 @@ async function fileProbe(item:Record<string,unknown>, previous:Record<string,unk
       const complete=item.doneField?fieldAt(json,item.doneField)===true:doneFile&&(fieldAt(json,'done')===true||/^(completed|succeeded|success|failed|failure)$/.test(status));
       const fields:Record<string,unknown>={};
       if(item.field)fields[String(item.field)]=value;
-      else for(const name of ['progress','status','done'])if(fieldAt(json,name)!==undefined)fields[name]=fieldAt(json,name);
+      else for(const name of ['progress','status','done','error','message'])if(fieldAt(json,name)!==undefined)fields[name]=fieldAt(json,name);
       return {value,delta:changed?JSON.stringify(value):'',offset:info.size,done:Boolean(complete),mtimeMs:info.mtimeMs,fields};
     }
     const handle=await open(filePath,'r'); try {
@@ -99,7 +99,7 @@ export function normalizeProbe(value:unknown):MonitorProbeSpec|null {
 export async function runProbe(row:MonitorRecord, now=new Date()):Promise<MonitorProbeEvent|null> {
   const spec=normalizeProbe(row.probe_json?JSON.parse(row.probe_json):null); if(!spec)return null;
   const previous=row.probe_state_json?JSON.parse(row.probe_state_json) as Record<string,unknown>:{}; const state:Record<string,unknown> & {items:Record<string,unknown>;lastProgressAt?:string;lastModelAt?:string;progress?:unknown;lastEventKey?:string;lastDelta?:string;lastFields?:Record<string,unknown>}={items:{},lastProgressAt:String(previous.lastProgressAt||now.toISOString()),lastModelAt:String(previous.lastModelAt||monitorsDb.lastModelRunAt(row.id)||now.toISOString())};
-  const deltas:string[]=[]; const fields:Record<string,unknown>={...previous.lastFields as Record<string,unknown>}; let done=false; let dead=false; let commandError=''; let thresholdEvidence=''; let staleFile='';
+  const deltas:string[]=[]; const errorDeltas:string[]=[]; const fields:Record<string,unknown>={...previous.lastFields as Record<string,unknown>}; let done=false; let dead=false; let commandError=''; let thresholdEvidence=''; let staleFile='';
   for(let index=0;index<spec.items.length;index++) { const item=spec.items[index]; const key=itemKey(item,index); const type=String(item.type||'file');
     if(type==='file') {
       const result=await fileProbe(item,(previous.items as Record<string,unknown>)||{});
@@ -107,11 +107,11 @@ export async function runProbe(row:MonitorRecord, now=new Date()):Promise<Monito
       const lastChangeAt=result.mtimeMs!==old?.mtimeMs?now.toISOString():old?.lastChangeAt||now.toISOString();
       state.items[key]={value:result.value,offset:result.offset,mtimeMs:result.mtimeMs,lastChangeAt}; state.items[`${key}:offset`]=result.offset;
       if(result.mtimeMs!==undefined&&Date.parse(lastChangeAt)+Number(spec.stallMinutes)*60000<=now.getTime())staleFile=key;
-      if(result.delta)deltas.push(`[${key}]\n${result.delta}`);
+      if(result.delta){deltas.push(`[${key}]\n${result.delta}`);errorDeltas.push(result.fields?Object.values(result.fields).map(value=>typeof value==='object'?JSON.stringify(value):String(value)).join('\n'):result.delta);}
       Object.assign(fields,result.fields||parseProbeFields(bounded(result.delta),item.parse));
       if(item.field)fields[String(item.field)]=result.value; done ||= result.done;
     }
-    else if(type==='command') { const result=await commandProbe(item); state.items[key]={value:result.value}; Object.assign(fields,result.fields); if(result.value!==(previous.items as Record<string,{value?:unknown}>|undefined)?.[key]?.value&&result.value)deltas.push(`[${key}]\n${result.value}`); commandError ||= result.error||''; }
+    else if(type==='command') { const result=await commandProbe(item); state.items[key]={value:result.value}; Object.assign(fields,result.fields); if(result.value!==(previous.items as Record<string,{value?:unknown}>|undefined)?.[key]?.value&&result.value){deltas.push(`[${key}]\n${result.value}`);errorDeltas.push(result.value);} commandError ||= result.error||''; }
     else if(type==='process') { const result=await processProbe(item); state.items[key]={value:result.value,alive:result.alive}; dead ||= !result.alive; }
     else if(type==='patterns') { state.items[key]={patterns:item.patterns||DEFAULT_PATTERNS}; }
     else if(type==='threshold') { const value=fieldAt(fields,item.field); if(thresholdHit(value,item))thresholdEvidence=`${String(item.field||'字段')}=${String(value)}`; }
@@ -120,7 +120,8 @@ export async function runProbe(row:MonitorRecord, now=new Date()):Promise<Monito
   state.terminal=done||previous.terminal===true;
   const patterns=spec.items.filter(item=>String(item.type)==='patterns').flatMap(item=>Array.isArray(item.patterns)?item.patterns.map(String):DEFAULT_PATTERNS);
   if(!patterns.length) patterns.push(...DEFAULT_PATTERNS);
-  const pattern=patterns.find(pattern=>{try{return new RegExp(pattern,'i').test(newDelta);}catch{return newDelta.toLowerCase().includes(pattern.toLowerCase());}});
+  const errorDelta=bounded(errorDeltas.join('\n'));
+  const pattern=patterns.find(pattern=>{try{return new RegExp(pattern,'i').test(errorDelta);}catch{return errorDelta.toLowerCase().includes(pattern.toLowerCase());}});
   const progress=fields.progress; const previousProgress=previous.progress; if(JSON.stringify(progress)!==JSON.stringify(previousProgress))state.lastProgressAt=now.toISOString(); state.progress=progress;
   let event:MonitorProbeEvent|null=null; const status=String(fields.status||'').toLowerCase();
   if(done || /^(done|completed|success|succeeded|failed|failure)$/.test(status)&&status!==String((previous.lastFields as Record<string,unknown>|undefined)?.status||'').toLowerCase())event={type:'done',at:now.toISOString(),evidence:'探针读取到终止状态或 EXIT 行',delta,fields};
