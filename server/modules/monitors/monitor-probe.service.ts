@@ -24,7 +24,7 @@ const fieldAt = (value:unknown, field?:unknown):unknown => {
   if(typeof field !== 'string' || !field) return value;
   return field.split('.').reduce((current,key)=>current && typeof current === 'object' ? (current as Record<string,unknown>)[key] : undefined, value);
 };
-async function fileProbe(item:Record<string,unknown>, previous:Record<string,unknown>):Promise<{value:unknown;delta:string;offset:number;done:boolean;mtimeMs?:number}> {
+async function fileProbe(item:Record<string,unknown>, previous:Record<string,unknown>):Promise<{value:unknown;delta:string;offset:number;done:boolean;mtimeMs?:number;fields?:Record<string,unknown>}> {
   const filePath=String(item.path||item.file||''); const key=String(itemKey(item,0));
   try {
     const info=await stat(filePath); const oldOffset=Number(previous[`${key}:offset`]||0); const offset=info.size<oldOffset?0:oldOffset;
@@ -32,11 +32,14 @@ async function fileProbe(item:Record<string,unknown>, previous:Record<string,unk
     const doneFile=/(?:^|[-_])done\.json$/i.test(path.basename(filePath));
     const mode=String(item.read||(doneFile?'json':'tail'));
     if(mode==='json') {
-      const json=JSON.parse(await readFile(filePath,'utf8')); const value=fieldAt(json,item.field);
+      const json=JSON.parse((await readFile(filePath,'utf8')).replace(/^\uFEFF/,'')); const value=fieldAt(json,item.field);
       const changed=JSON.stringify(value)!==JSON.stringify(old?.value);
       const status=String(fieldAt(json,'status')||'');
       const complete=item.doneField?fieldAt(json,item.doneField)===true:doneFile&&(fieldAt(json,'done')===true||/^(completed|succeeded|success|failed|failure)$/.test(status));
-      return {value,delta:changed?JSON.stringify(value):'',offset:info.size,done:Boolean(complete),mtimeMs:info.mtimeMs};
+      const fields:Record<string,unknown>={};
+      if(item.field)fields[String(item.field)]=value;
+      else for(const name of ['progress','status','done'])if(fieldAt(json,name)!==undefined)fields[name]=fieldAt(json,name);
+      return {value,delta:changed?JSON.stringify(value):'',offset:info.size,done:Boolean(complete),mtimeMs:info.mtimeMs,fields};
     }
     const handle=await open(filePath,'r'); try {
       const available=Math.max(0,info.size-offset); let delta='';
@@ -58,8 +61,10 @@ export function parseProbeFields(output:string, parse:unknown):Record<string,unk
   let json:unknown; try { json=JSON.parse(output); } catch { /* regex parser below */ }
   const fields:Record<string,unknown>={}; if(json && typeof json==='object')Object.assign(fields,json);
   const config=parse&&typeof parse==='object'?parse as Record<string,unknown>:{ };
-  const progress=[...output.matchAll(/(\d+)\s*\/\s*(\d+)/g)].at(-1); if(progress)fields.progress={current:Number(progress[1]),total:Number(progress[2])};
-  const status=[...output.matchAll(/(?:status|state)\s*[:=]\s*["']?([A-Za-z_-]+)/ig)].at(-1); if(status)fields.status=status[1];
+  if(!json||typeof json!=='object') {
+    const progress=[...output.matchAll(/(\d+)\s*\/\s*(\d+)/g)].at(-1); if(progress)fields.progress={current:Number(progress[1]),total:Number(progress[2])};
+    const status=[...output.matchAll(/(?:status|state)\s*[:=]\s*["']?([A-Za-z_-]+)/ig)].at(-1); if(status)fields.status=status[1];
+  }
   if(typeof config.progressRegex==='string') { const match=output.match(new RegExp(config.progressRegex)); if(match)fields.progress=match[1]??match[0]; }
   if(typeof config.statusRegex==='string') { const match=output.match(new RegExp(config.statusRegex)); if(match)fields.status=match[1]??match[0]; }
   return fields;
@@ -102,7 +107,8 @@ export async function runProbe(row:MonitorRecord, now=new Date()):Promise<Monito
       const lastChangeAt=result.mtimeMs!==old?.mtimeMs?now.toISOString():old?.lastChangeAt||now.toISOString();
       state.items[key]={value:result.value,offset:result.offset,mtimeMs:result.mtimeMs,lastChangeAt}; state.items[`${key}:offset`]=result.offset;
       if(result.mtimeMs!==undefined&&Date.parse(lastChangeAt)+Number(spec.stallMinutes)*60000<=now.getTime())staleFile=key;
-      if(result.delta){deltas.push(`[${key}]\n${result.delta}`);Object.assign(fields,parseProbeFields(bounded(result.delta),item.parse));}
+      if(result.delta)deltas.push(`[${key}]\n${result.delta}`);
+      Object.assign(fields,result.fields||parseProbeFields(bounded(result.delta),item.parse));
       if(item.field)fields[String(item.field)]=result.value; done ||= result.done;
     }
     else if(type==='command') { const result=await commandProbe(item); state.items[key]={value:result.value}; Object.assign(fields,result.fields); if(result.value!==(previous.items as Record<string,{value?:unknown}>|undefined)?.[key]?.value&&result.value)deltas.push(`[${key}]\n${result.value}`); commandError ||= result.error||''; }

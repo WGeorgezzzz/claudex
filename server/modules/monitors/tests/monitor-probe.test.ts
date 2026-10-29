@@ -110,3 +110,16 @@ test('UTF-8 event deltas retain head and tail within 8 KiB',async()=>fixture(asy
   const event=await runProbe(row); assert.equal(event?.type,'error');
   assert.ok(Buffer.byteLength(event!.delta!,'utf8')<=8192); assert.match(event!.delta!,/HEAD_ERROR/); assert.match(event!.delta!,/TAIL_MARKER/);
 }));
+
+test('Windows BOM JSON reads root status without promoting nested historical completion',async()=>fixture(async(user,root)=>{
+  const done=path.join(root,'DONE.json');
+  await writeFile(done,'\uFEFF'+JSON.stringify({done:false,status:'running',history:[{status:'completed'}],notes:'An earlier check used status=completed 40/40'}));
+  const row=monitorsService.create(user,{sessionId:'probe-session',name:'Windows JSON',content:'read',intervalMinutes:1,probe:{items:[{file:done}]}});
+  assert.equal(await runProbe(row),null);
+  const state=JSON.parse(monitorsDb.get(user,row.id)!.probe_state_json!);
+  assert.equal(state.lastFields.status,'running'); assert.equal(state.lastFields.done,false);
+  assert.equal(state.lastFields.progress,undefined); assert.equal(state.lastFields.history,undefined);
+  assert.deepEqual(parseProbeFields(JSON.stringify({status:'running',notes:'status=completed 40/40'}),{}),{status:'running',notes:'status=completed 40/40'});
+  await writeFile(done,'\uFEFF'+JSON.stringify({done:true,status:'completed'}));
+  assert.equal((await runProbe(monitorsDb.get(user,row.id)!))?.type,'done');
+}));
