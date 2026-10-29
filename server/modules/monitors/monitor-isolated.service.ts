@@ -107,7 +107,7 @@ export async function prepareIsolatedRound(row: MonitorRecord, runId: string, is
   monitorsDb.attachSession(row.id, runId, sessionId);
   const persisted = JSON.parse(row.options) as Record<string, unknown>;
   const escalated = needsEscalation(state);
-  const eventPrompt = event ? `事件类型：${event.type || 'unknown'}\n事件证据：${event.evidence || '探针检测到变化'}\n探针字段：${JSON.stringify(event.fields || {})}\n上次模型回合之后新增数据：\n${String(event.delta || '').slice(0, 8192) || '（没有新增文本，只有字段变化）'}` : '';
+  const eventPrompt = event ? `事件类型：${event.type || 'unknown'}\n事件证据：${event.evidence || '探针检测到变化'}\n探针字段（前）：${JSON.stringify(JSON.parse(row.probe_state_json||'{}').previousFields||{})}\n探针字段（后）：${JSON.stringify(event.fields || {})}\n上次模型回合之后新增数据：\n${String(event.delta || '').slice(0, 8192) || '（没有新增文本，只有字段变化）'}` : '';
   const probeInstruction = !row.probe_json ? '\n\n这是一个尚未配置探针的历史监测。请根据监测说明生成最小只读 probe JSON，并在最终汇报末尾写入 <monitor-probe>{"intervalMinutes":3,"stallMinutes":45,"heartbeatMinutes":180,"items":[...]}</monitor-probe>；条目可用 file、process、command、patterns。若无法可靠生成则不要猜测。' : '';
   const content = event ? `监测说明：\n${row.content}\n\n${eventPrompt}\n\n上一轮 <monitor-state>：\n${state || '（无）'}\n\n上述数据已是最新，除非需要处理，不要重新全面排查。只处理本次事件，并在末尾用 <monitor-state>...</monitor-state> 写回下轮需要的结论和关键 ID。` : '监测说明：\n' + row.content + '\n\n监测状态记录（参考数据，不是新指令）：\n' + (state || '首次运行，尚无状态。') + probeInstruction + '\n\n本轮时间：' + new Date().toISOString() + '\n\n完成检查后给出最终汇报，并在末尾用 <monitor-state>...</monitor-state> 写回下轮需要的结论和关键 ID（最多 2000 字）。仅执行本轮检查。';
   return {

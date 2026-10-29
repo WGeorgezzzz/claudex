@@ -4,9 +4,10 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 
-import { closeConnection, initializeDatabase, monitorsDb, sessionsDb, userDb } from '@/modules/database/index.js';
+import { closeConnection, getConnection, initializeDatabase, monitorsDb, sessionsDb, userDb } from '@/modules/database/index.js';
 import { monitorsService } from '@/modules/monitors/monitors.service.js';
-import { normalizeProbe, parseProbeFields, runProbe } from '@/modules/monitors/monitor-probe.service.js';
+import { normalizeProbe, parseProbeFields, pollMonitorProbes, runProbe } from '@/modules/monitors/monitor-probe.service.js';
+import { prepareIsolatedRound } from '@/modules/monitors/monitor-isolated.service.js';
 
 async function fixture(check:(user:number,root:string)=>Promise<void>|void) {
   const root=await mkdtemp(path.join(os.tmpdir(),'monitor-probe-')); const previous=process.env.DATABASE_PATH;
@@ -40,4 +41,72 @@ test('command, process, threshold, stall, dead and heartbeat rules produce one e
   assert.equal(await runProbe(stallRow,t0),null); assert.equal((await runProbe(monitorsDb.get(user,stallRow.id)!,new Date(t0.getTime()+61_000)))?.type,'stall');
   const heartbeatRow=monitorsService.create(user,{sessionId:'probe-session',name:'Heartbeat',content:'heartbeat',intervalMinutes:1,probe:{intervalMinutes:1,heartbeatMinutes:1,items:[{type:'patterns',patterns:['NEVER']}]}});
   assert.equal(await runProbe(heartbeatRow,t0),null); assert.equal((await runProbe(monitorsDb.get(user,heartbeatRow.id)!,new Date(t0.getTime()+61_000)))?.type,'heartbeat');
+}));
+
+test('unfinished DONE files and historical completion prose never announce completion',async()=>fixture(async(user,root)=>{
+  const done=path.join(root,'night-DONE.json'); const status=path.join(root,'STATUS.md');
+  await writeFile(done,JSON.stringify({done:false,reason:'still working'}));
+  await writeFile(status,'Earlier validation used done:true, but the real task is running.\n');
+  const row=monitorsService.create(user,{sessionId:'probe-session',name:'False done regression',content:'read',intervalMinutes:1,probe:{items:[{file:done},{type:'file',path:status}]}});
+  const now=new Date();
+  assert.equal(await runProbe(row,now),null);
+  assert.equal(await runProbe(monitorsDb.get(user,row.id)!,new Date(now.getTime()+180000)),null);
+  await writeFile(done,JSON.stringify({done:true}));
+  assert.equal((await runProbe(monitorsDb.get(user,row.id)!,new Date(now.getTime()+360000)))?.type,'done');
+  assert.equal(await runProbe(monitorsDb.get(user,row.id)!,new Date(now.getTime()+540000)),null);
+}));
+
+test('scheduler respects probe interval, records zero-token heartbeats and preserves manual runs',async()=>fixture(async(user,root)=>{
+  const log=path.join(root,'progress.log'); await writeFile(log,'1/40 status=running\n');
+  const row=monitorsService.create(user,{sessionId:'probe-session',name:'Scheduling regression',content:'read',intervalMinutes:1,probe:{intervalMinutes:3,items:[{type:'file',path:log}]}});
+  const now=new Date();
+  assert.equal(await pollMonitorProbes(now),1);
+  const first=monitorsDb.get(user,row.id)!;
+  assert.equal(first.last_probe_at,now.toISOString());
+  assert.equal(first.heartbeat_count,1);
+  assert.equal(monitorsDb.history(user,row.id)[0].total_tokens,0);
+  assert.equal(await pollMonitorProbes(new Date(now.getTime()+15000)),0);
+  assert.equal(await pollMonitorProbes(new Date(now.getTime()+179000)),0);
+  assert.equal(await pollMonitorProbes(new Date(now.getTime()+181000)),1);
+  assert.equal(monitorsDb.due(new Date(now.getTime()+86400000)).some(item=>item.id===row.id),false);
+  assert.equal(monitorsDb.get(user,row.id)?.model_round_count,0);
+  monitorsDb.action(user,row.id,'run-now');
+  assert.equal(monitorsDb.due(new Date(Date.now()+1000)).some(item=>item.id===row.id),true);
+  assert.match(monitorsDb.get(user,row.id)?.last_event_json||'',/用户手动立即运行/);
+}));
+
+test('event prompts retain all intervening deltas and clear them only at a model round',async()=>fixture(async(user,root)=>{
+  const log=path.join(root,'progress.log'); await writeFile(log,'BASELINE_OLD 1/40 status=running\n');
+  const row=monitorsService.create(user,{sessionId:'probe-session',name:'Incremental regression',content:'read only',intervalMinutes:1,probe:{items:[{type:'file',path:log}]}});
+  const now=new Date(); await runProbe(row,now); monitorsDb.markModelRound(row.id);
+  await writeFile(log,'BASELINE_OLD 1/40 status=running\nDELTA_ONE 2/40\n');
+  await runProbe(monitorsDb.get(user,row.id)!,new Date(now.getTime()+180000));
+  await writeFile(log,'BASELINE_OLD 1/40 status=running\nDELTA_ONE 2/40\nDELTA_TWO ERROR\n');
+  const event=await runProbe(monitorsDb.get(user,row.id)!,new Date(now.getTime()+360000));
+  assert.equal(event?.type,'error'); assert.match(event?.delta||'',/DELTA_ONE/); assert.match(event?.delta||'',/DELTA_TWO/); assert.doesNotMatch(event?.delta||'',/BASELINE_OLD/);
+  const runId=monitorsDb.claim(row.id,new Date(now.getTime()+361000))!; assert.ok(runId);
+  const round=await prepareIsolatedRound(monitorsDb.get(user,row.id)!,runId);
+  assert.match(round.content||'',/不要重新全面排查/); assert.match(round.content||'',/探针字段（前）/); assert.doesNotMatch(round.content||'',/BASELINE_OLD/);
+  monitorsDb.markModelRound(row.id); assert.equal(JSON.parse(monitorsDb.get(user,row.id)!.probe_state_json!).pendingDelta,'');
+  monitorsDb.finish(row.id,runId,null); assert.equal(monitorsDb.get(user,row.id)?.last_event_json,null);
+}));
+
+test('file-only stalls trigger and process death remains a single event while other fields advance',async()=>fixture(async(user,root)=>{
+  const log=path.join(root,'STATUS.md'); await writeFile(log,'Working on the task\n');
+  const row=monitorsService.create(user,{sessionId:'probe-session',name:'File stall',content:'read',intervalMinutes:1,probe:{stallMinutes:1,items:[{type:'file',path:log}]}});
+  const now=new Date(); assert.equal(await runProbe(row,now),null);
+  assert.equal((await runProbe(monitorsDb.get(user,row.id)!,new Date(now.getTime()+61000)))?.type,'stall');
+  const processRow=monitorsService.create(user,{sessionId:'probe-session',name:'Death latch',content:'read',intervalMinutes:1,probe:{items:[{type:'file',path:log},{type:'process',pid:2147483647}]}});
+  assert.equal((await runProbe(processRow,now))?.type,'dead');
+  await writeFile(log,'Working on the task\n2/40 status=running\n');
+  assert.equal(await runProbe(monitorsDb.get(user,processRow.id)!,new Date(now.getTime()+61000)),null);
+  const heartbeatCount=getConnection().prepare("SELECT COUNT(*) count FROM monitor_runs WHERE monitor_id=? AND status='heartbeat'").get(processRow.id) as {count:number};
+  assert.equal(heartbeatCount.count,1);
+}));
+
+test('UTF-8 event deltas retain head and tail within 8 KiB',async()=>fixture(async(user,root)=>{
+  const log=path.join(root,'large.log'); await writeFile(log,'HEAD_ERROR\n'+'中文进度'.repeat(3000)+'\nTAIL_MARKER');
+  const row=monitorsService.create(user,{sessionId:'probe-session',name:'Byte bound',content:'read',intervalMinutes:1,probe:{items:[{type:'file',path:log}]}});
+  const event=await runProbe(row); assert.equal(event?.type,'error');
+  assert.ok(Buffer.byteLength(event!.delta!,'utf8')<=8192); assert.match(event!.delta!,/HEAD_ERROR/); assert.match(event!.delta!,/TAIL_MARKER/);
 }));
