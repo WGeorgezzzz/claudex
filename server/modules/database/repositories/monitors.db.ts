@@ -4,7 +4,7 @@ import type Database from 'better-sqlite3';
 
 import { getConnection } from '@/modules/database/connection.js';
 import type { MonitorCalendarSchedule, MonitorProbeSpec, MonitorRecord, MonitorRunRecord } from '@/shared/types.js';
-import { nextMonitorCalendarRun, compactMonitorProbeState, summarizeMonitorProbeEvent } from '@/shared/index.js';
+import { nextMonitorCalendarRun, compactMonitorProbeState, summarizeMonitorProbeEvent, cleanMonitorReport } from '@/shared/index.js';
 
 /** Used by database migrations to add durable, non-destructive monitoring tables. */
 export function initializeMonitorTables(db: Database.Database): void {
@@ -94,7 +94,8 @@ export const monitorsDb = {
       .run(eventType, promptEvidence.slice(0, 12_000), runId, id);
   },
   reportMessages(sessionId:string) {
-    return getConnection().prepare(`SELECT r.id,r.report,r.session_id,COALESCE(r.finished_at,r.started_at) AS started_at,r.round_number,m.name,m.id AS monitor_id FROM monitor_runs r JOIN monitors m ON m.id=r.monitor_id JOIN sessions s ON s.session_id=m.session_id WHERE m.session_id=? AND (r.session_id<>m.session_id OR r.error LIKE '上下文维护：%') AND r.report IS NOT NULL AND s.owner_id=m.user_id ORDER BY r.started_at,r.rowid`).all(sessionId) as {id:string;report:string;session_id:string;started_at:string;name:string;monitor_id:string;round_number:number|null}[];
+    const rows = getConnection().prepare(`SELECT r.id,r.report,r.session_id,COALESCE(r.finished_at,r.started_at) AS started_at,r.round_number,m.name,m.id AS monitor_id FROM monitor_runs r JOIN monitors m ON m.id=r.monitor_id JOIN sessions s ON s.session_id=m.session_id WHERE m.session_id=? AND (r.session_id<>m.session_id OR r.error LIKE '上下文维护：%') AND r.report IS NOT NULL AND s.owner_id=m.user_id ORDER BY r.started_at,r.rowid`).all(sessionId) as {id:string;report:string;session_id:string;started_at:string;name:string;monitor_id:string;round_number:number|null}[];
+    return rows.map(row => ({ ...row, report: cleanMonitorReport(row.report) }));
   },
   lastModelRunAt(id:string): string|null {
     const row=getConnection().prepare("SELECT finished_at FROM monitor_runs WHERE monitor_id=? AND status IN ('succeeded','failed','interrupted') AND (error IS NULL OR (error<>'无变化，未调用模型。' AND error NOT LIKE '上下文维护：%')) ORDER BY finished_at DESC LIMIT 1").get(id) as {finished_at:string|null}|undefined;
@@ -261,8 +262,9 @@ export const monitorsDb = {
     getConnection().prepare("UPDATE monitors SET status='paused',pause_reason='session-unavailable' WHERE id=? AND status='active'").run(id);
   },
   history(userId: number,id: string): MonitorRunRecord[] {
-    return getConnection().prepare(`SELECT r.* FROM monitor_runs r JOIN monitors m ON m.id=r.monitor_id
+    const rows = getConnection().prepare(`SELECT r.* FROM monitor_runs r JOIN monitors m ON m.id=r.monitor_id
       WHERE m.id=? AND m.user_id=? ORDER BY r.started_at DESC LIMIT 50`).all(id,userId) as MonitorRunRecord[];
+    return rows.map(row => ({ ...row, report: row.report == null ? row.report : cleanMonitorReport(row.report) }));
   },
   update(userId: number,id: string,input: {name:string;content:string;intervalMinutes:number;schedule:MonitorCalendarSchedule|null}): void {
     const row=this.get(userId,id);if(!row)return;
