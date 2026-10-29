@@ -18,6 +18,7 @@ async function fixture(check:(user:number,root:string)=>Promise<void>|void) {
 test('normalizes all probe item settings and parses progress/status fields',()=>{
   assert.deepEqual(parseProbeFields('4418/16000 status: running',{ }),{progress:{current:4418,total:16000},status:'running'});
   assert.equal(normalizeProbe({items:[{type:'file',path:'STATUS.md'}],intervalMinutes:0})?.intervalMinutes,3);
+  assert.deepEqual(normalizeProbe({items:[{file:'STATUS.md'}]})?.items[0],{file:'STATUS.md',type:'file',path:'STATUS.md'});
   assert.equal(normalizeProbe({items:[]}),null);
 });
 
