@@ -5,7 +5,7 @@ import { Repeat, X, Settings2 } from 'lucide-react';
 import { api } from '@/shared/api';
 import { MonitorScheduleFields } from '@/shared/ui';
 import { useMonitorCapabilities } from '@/shared/hooks/useMonitorCapabilities';
-import { describeMonitorSchedule, formatMonitorNextRun, readMonitorSchedule } from '@/shared/utils';
+import { describeMonitorSchedule, formatMonitorNextRun, readMonitorSchedule, startVisiblePolling } from '@/shared/utils';
 import type { MonitorCalendarSchedule, MonitorTaskRecord as Task, MonitorRunReceipt as Run, MonitorListSummary } from '@/shared/types';
 
 async function result(response:Response){const body=await response.json();if(!response.ok)throw Error(body?.error?.message||body?.message||body?.error||`HTTP ${response.status}`);return body.data;}
@@ -43,7 +43,7 @@ export function MonitorDashboard(){
   const [contextThreshold,setContextThreshold]=useState(40);
   useEffect(()=>{if(open)void api.monitors.contextSettings().then(result).then(value=>setContextThreshold(value.percent??40)).catch(e=>setError(e.message));},[open]);
   const load=async()=>setTasks(await readTaskPages());
-  useEffect(()=>{let live=true;const poll=()=>void readTaskPages().then(data=>{if(live)setTasks(data);}).catch(e=>{if(live)setError(e.message);});poll();const timer=setInterval(poll,open?5000:15000);return()=>{live=false;clearInterval(timer);};},[open]);
+  useEffect(()=>{let live=true;const poll=()=>readTaskPages().then(data=>{if(live)setTasks(previous=>JSON.stringify(previous)===JSON.stringify(data)?previous:data);}).catch(e=>{if(live)setError(e.message);});const stop=startVisiblePolling(poll,open?5000:60000);return()=>{live=false;stop();};},[open]);
   useEffect(()=>{if(!open)return;const key=(e:KeyboardEvent)=>{if(e.key==='Escape')setOpen(false);};window.addEventListener('keydown',key);return()=>window.removeEventListener('keydown',key);},[open]);
   const act=async(action:()=>Promise<unknown>)=>{setBusy(true);setError('');try{await action();await load();}catch(e){setError(e instanceof Error?e.message:String(e));}finally{setBusy(false);}};
   const active=tasks.filter(t=>t.status==='active').length;
