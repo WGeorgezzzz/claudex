@@ -33,6 +33,12 @@ test('abrupt client death preserves independent worker, byte-exact stdout/stderr
   const controller = spawn(process.execPath, ['--input-type=module', '-e', script], { windowsHide: true, stdio: 'ignore' });
   await until(() => fs.existsSync(marker));
   const client = new DurableProvider(JSON.parse(fs.readFileSync(marker, 'utf8')).directory);
+  if (process.platform === 'win32') {
+    const registration = fs.readFileSync(path.join(client.directory, 'register.ps1'), 'utf8');
+    assert.match(registration, /New-ScheduledTaskAction -Execute '[^']*System32[\\/]conhost\.exe'/);
+    assert.match(registration, /--headless "[^"\r\n]*powershell\.exe" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File/);
+    assert.doesNotMatch(registration, /-WindowStyle/);
+  }
   const original = client.registry();
   await until(() => output(client).includes('3:中文'));
   controller.kill('SIGKILL'); await once(controller, 'exit');
