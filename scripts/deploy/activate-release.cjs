@@ -135,7 +135,13 @@ function releaseGuard(){
 async function running(c){const token=await login(c);const r=await fetch('http://127.0.0.1:3001/api/providers/sessions/running',{headers:{Authorization:'Bearer '+token},signal:AbortSignal.timeout(600000)});assert(r.ok);const ownership=partitionDeploymentSessions((await r.json()).data.sessions);write(path.join(root,'independent-sessions-before-activation.json'),ownership.independent);return ownership.managed;}
 async function waitIdle(c){const minutes=Number(arg('--idle-timeout-minutes')||120);assert(Number.isInteger(minutes)&&minutes>=1&&minutes<=120,'Idle timeout must be 1–120 minutes');const started=Date.now();for(;;){const rows=await running(c);write(path.join(root,'running-sessions-before-activation.json'),rows);const db=new DB(c.database,{readonly:true});let queue;try{queue=db.prepare("SELECT id,status FROM message_queue WHERE status IN ('running','processing','executing')").all();}finally{db.close();}write(path.join(root,'running-queue-before-activation.json'),queue);if(!rows.length&&!queue.length)return;if(Date.now()-started>=minutes*60*1000)throw Error('Idle timeout; no sessions interrupted');console.log('Waiting for idle:',rows.length);await pause(15000);}}
 async function interruptManaged(c){
- if(process.argv.includes('--force'))return forceInterruptManaged(c);
+ if(process.argv.includes('--force')){
+  // First upgrade from a release without handoff endpoints is safe only idle.
+  const rows=await running(c);
+  const db=new DB(c.database,{readonly:true});let queued;
+  try{queued=db.prepare("SELECT COUNT(*) n FROM message_queue WHERE status IN ('running','processing','executing')").get().n;}finally{db.close();}
+  return forceInterruptManaged(c,rows.length===0&&queued===0);
+ }
  // The caller may stop only an idle server. Never abort user/provider work.
  const rows=await running(c);assert.equal(rows.length,0,'Sessions became active; activation cancelled');
  const db=new DB(c.database,{readonly:true});try{assert.equal(db.prepare("SELECT COUNT(*) n FROM message_queue WHERE status IN ('running','processing','executing')").get().n,0,'Queue became active; activation cancelled');}finally{db.close();}
