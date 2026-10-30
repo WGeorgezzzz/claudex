@@ -8,7 +8,7 @@ import { closeConnection, initializeDatabase, messageQueueDb, sessionDraftsDb, s
 import { chatRunRegistry } from '@/modules/websocket/index.js';
 import type { ProviderRuntimeGateway } from '@/modules/websocket/index.js';
 import { createCompleteMessage } from '@/shared/utils.js';
-import { providerModelsService } from '@/modules/providers/index.js';
+import { providerModelsService, sessionsService } from '@/modules/providers/index.js';
 import { messageQueueService, registerMessageQueueWakeup } from '@/modules/message-queue/message-queue.service.js';
 import { closeMessageQueue, dispatchMessageQueue, importLegacyQueuedMessages, initializeMessageQueue } from '@/modules/message-queue/message-queue.dispatcher.js';
 import { createLiveInputService } from '@/modules/message-queue/live-input.service.js';
@@ -169,6 +169,33 @@ test('background work is untouched and claimed messages cannot be cancelled or e
   const claimed=messageQueueDb.claim(row.id)!;
   assert.throws(()=>messageQueueService.update(user,row.id,{revision:claimed.revision,action:'cancel'}),/changed/);
   assert.throws(()=>messageQueueService.update(user,row.id,{revision:claimed.revision,content:'overwrite'}),/changed/);
+}));
+
+test('a retained completed background runtime accepts the next ordinary turn without aborting its task',()=>fixture(async user=>{
+  const run=chatRunRegistry.startRun({appSessionId:'queue-session',provider:'claude',connection:null,userId:user,providerSessionId:null})!;
+  chatRunRegistry.completeRunIfCurrent(run,{exitCode:0});
+  const row=enqueue(user,'background-continuation');
+  const original=sessionsService.listRunningSessions;
+  // The held SDK process can also appear in the external CLI discovery feed.
+  sessionsService.listRunningSessions=async()=>[{sessionId:'queue-session',provider:'claude',startedAt:run.startedAt,lastSeq:0,canInterrupt:false}];
+  try {
+    assert.equal(await dispatchMessageQueue(runtime(undefined,true)),1);
+    assert.equal(messageQueueDb.get(user,row.id)?.status,'succeeded');
+    assert.equal(messageQueueDb.get(user,row.id)?.attempt_count,1);
+  } finally {sessionsService.listRunningSessions=original;}
+}));
+
+test('foreground and external CLI ownership still defer queued turns without claiming them',()=>fixture(async user=>{
+  const row=enqueue(user,'busy-foreground');
+  const run=chatRunRegistry.startRun({appSessionId:'queue-session',provider:'claude',connection:null,userId:user,providerSessionId:null})!;
+  assert.equal(await dispatchMessageQueue(runtime(undefined,true)),0);
+  chatRunRegistry.completeRunIfCurrent(run,{exitCode:0});
+  const original=sessionsService.listRunningSessions;
+  sessionsService.listRunningSessions=async()=>[{sessionId:'queue-session',provider:'claude',startedAt:run.startedAt,lastSeq:0,canInterrupt:false}];
+  try {
+    assert.equal(await dispatchMessageQueue(runtime()),0);
+    assert.equal(messageQueueDb.get(user,row.id)?.attempt_count,0);
+  } finally {sessionsService.listRunningSessions=original;}
 }));
 
 test('overlapping polls cannot duplicate a claim and independent sessions still progress',()=>fixture(async user=>{

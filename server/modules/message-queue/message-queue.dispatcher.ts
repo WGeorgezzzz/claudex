@@ -84,8 +84,13 @@ export async function dispatchMessageQueue(runtime: ProviderRuntimeGateway): Pro
   const externalBusy=new Set((await sessionsService.listRunningSessions(true)).map(session=>session.sessionId));
   const jobs: Promise<void>[]=[];
   for (const candidate of candidates) {
-    if (externalBusy.has(candidate.session_id) || chatRunRegistry.isProcessing(candidate.session_id)
-      || runtime.hasBackgroundWork(candidate.session_id)) continue;
+    const background = runtime.hasBackgroundWork(candidate.session_id);
+    // A completed local turn retains its SDK while background tasks run. New
+    // ordinary turns continue through that owner, even if CLI discovery also
+    // sees the held process. Foreground turns and unrelated CLI owners stay busy.
+    const retainedBackground = background && chatRunRegistry.getRun(candidate.session_id)?.status === 'completed';
+    if (chatRunRegistry.isProcessing(candidate.session_id)
+      || (!retainedBackground && (externalBusy.has(candidate.session_id) || background))) continue;
     const row=messageQueueDb.claim(candidate.id);
     if (row) jobs.push(executeClaim(row,runtime));
   }
