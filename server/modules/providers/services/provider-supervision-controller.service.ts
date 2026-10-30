@@ -10,6 +10,11 @@ import type { AnyRecord, LLMProvider, ProviderRuntimeWriter, QueuedTurnRecord } 
 import { DurableProvider } from './provider-supervisor.service.js';
 import { launchSupervisedTurn, inspectSupervisedTurns } from './provider-turn-supervision.service.js';
 import { supervisedRuntimeState as state } from './provider-supervision-state.service.js';
+import { createProviderRestartLease } from './provider-restart-lease.service.js';
+
+const restartLease = createProviderRestartLease(value => { state.draining = value; });
+export const cancelProviderRestart = (handoffId: string) => restartLease.cancel(handoffId);
+export const renewProviderRestart = (handoffId: string) => restartLease.renew(handoffId);
 
 const root = () => path.join(getCloudCliHomeDir(), 'supervised-turns');
 const queueRow = (spec: AnyRecord) => spec.options?.cloudcliQueueAttempt as QueuedTurnRecord | undefined;
@@ -27,17 +32,37 @@ function acknowledge(client: DurableProvider): void {
 async function consume(client: DurableProvider, writer: ProviderRuntimeWriter, spec: AnyRecord, ready?: () => void): Promise<void> {
   let terminal = false;
   let providerError = false;
+  let settlementFailed = false;
   const sessionId = spec.options.sessionId as string;
   const replayBytes = fs.statSync(path.join(client.directory, 'output.ndjson')).size;
   if (!replayBytes) ready?.();
   try {
     for await (const { event, offset } of client.events()) {
       const entry = state.entries.get(sessionId);
+      if (event.kind === 'turn-start') {
+        spec = event.data.spec;
+        terminal = false; providerError = false;
+        if (entry) {
+          entry.currentSpec = spec; entry.foregroundCompleted = false;
+          if (event.data.id !== 'initial') {
+            const continuation = entry.continuation;
+            if (continuation && continuation.id === event.data.id) writer = continuation.writer;
+            else {
+              const { chatRunRegistry } = await import('@/modules/websocket/index.js');
+              const run = chatRunRegistry.startRun({ appSessionId: sessionId, provider: spec.provider, providerSessionId: null,
+                connection: null, userId: spec.userId, initialSeq: spec.options.cloudcliSupervisorInitialSeq || 0 });
+              if (!run) throw new Error('Cannot restore continued foreground turn ' + sessionId);
+              writer = run.writer;
+            }
+          }
+        }
+      }
       if (event.kind === 'approvals' && entry) entry.pending = event.data;
       if (event.kind === 'background' && entry) entry.background = Boolean(event.data);
+      if (event.kind === 'settlement-error') settlementFailed = true;
       if (event.kind === 'session') writer.setSessionId?.(event.data);
-      if (event.kind === 'monitor-finalized' && spec.options.cloudcliMonitorReceipt?.isolated && event.data.report) {
-        const receipt = spec.options.cloudcliMonitorReceipt;
+      if (event.kind === 'monitor-finalized' && (event.data.receipt || spec.options.cloudcliMonitorReceipt)?.isolated && event.data.report) {
+        const receipt = event.data.receipt || spec.options.cloudcliMonitorReceipt;
         const { connectedClients, clientUserIds } = await import('@/modules/websocket/index.js');
         const report = createNormalizedMessage({ id: 'monitor-report:' + receipt.runId, kind: 'text', role: 'assistant',
           provider: spec.provider, sessionId: receipt.row.session_id, timestamp: event.data.finished_at,
@@ -48,19 +73,27 @@ async function consume(client: DurableProvider, writer: ProviderRuntimeWriter, s
         if (event.data.kind === 'error') providerError = true;
         if (entry && event.data.kind === 'permission_request') entry.pending = [...entry.pending.filter(row => row.requestId !== event.data.requestId), event.data];
         if (entry && ['permission_resolved', 'permission_cancelled'].includes(event.data.kind)) entry.pending = entry.pending.filter(row => row.requestId !== event.data.requestId);
-        if (event.data.kind === 'complete') { terminal = true; finishQueue(spec, providerError ? { ...event.data, success: false } : event.data); }
+        if (event.data.kind === 'complete') {
+          terminal = true; finishQueue(spec, providerError ? { ...event.data, success: false } : event.data);
+          if (entry) entry.foregroundCompleted = true;
+        }
         writer.send({ ...event.data, supervisorRunId: path.basename(client.directory), supervisorSeq: event.seq });
+        if (event.data.kind === 'complete' && entry?.continuation) {
+          entry.continuation.resolve(); entry.continuation = undefined;
+        }
       }
       if (event.kind === 'exit') {
         if (!terminal) {
           finishQueue(spec, { exitCode: 1 });
           writer.send({ kind: 'complete', sessionId, provider: spec.provider, exitCode: 1, success: false });
         }
-        acknowledge(client);
+        // Leave failed monitor settlement replayable on the next startup.
+        if (!settlementFailed) acknowledge(client);
       }
       if (offset >= replayBytes) { ready?.(); ready = undefined; }
     }
   } finally {
+    state.entries.get(sessionId)?.continuation?.reject(new Error('Supervisor ended before continued turn completed'));
     if (state.entries.get(sessionId)?.client === client) state.entries.delete(sessionId);
   }
 }
@@ -69,8 +102,27 @@ async function consume(client: DurableProvider, writer: ProviderRuntimeWriter, s
 export async function runSupervised(provider: LLMProvider, command: string, options: AnyRecord, writer: ProviderRuntimeWriter): Promise<void> {
   if (state.draining) throw new Error('Server is handing off providers for restart; retry after restart.');
   const sessionId = String(options.sessionId);
-  if (state.entries.has(sessionId)) throw new Error('A supervised turn is already running for this session');
   const { chatRunRegistry } = await import('@/modules/websocket/index.js');
+  const existing = state.entries.get(sessionId);
+  if (existing) {
+    if (existing.provider !== provider || !existing.foregroundCompleted || existing.continuation) throw new Error('A supervised foreground turn is already running for this session');
+    const client = existing.client || await existing.launching;
+    if (!client || Number(existing.currentSpec?.userId) !== Number(writer.userId)) throw new Error('Continuation ownership mismatch');
+    const id = crypto.randomUUID();
+    const spec = { mode: 'runtime', provider, command, options: { ...options, cloudcliSupervisorInitialSeq: chatRunRegistry.getRun(sessionId)?.lastSeq || 0 }, userId: writer.userId, isWebSocketWriter: writer.isWebSocketWriter };
+    const completion = new Promise<void>((resolve, reject) => { existing.continuation = { id, writer, resolve, reject }; });
+    // Observe rejection even if a transport failure occurs before awaiting it.
+    void completion.catch(() => {});
+    try { await client.control({ type: 'continue-turn', id, spec }); }
+    catch (error) {
+      // A lost HTTP ACK is not permission to send the prompt twice.
+      const accepted = fs.readFileSync(path.join(client.directory, 'output.ndjson'), 'utf8').split('\n').some(line => {
+        try { const event = JSON.parse(line); return event.kind === 'turn-start' && event.data.id === id; } catch { return false; }
+      });
+      if (!accepted) { state.entries.get(sessionId)?.continuation?.reject(error); existing.continuation = undefined; throw error; }
+    }
+    return completion;
+  }
   const entry: NonNullable<ReturnType<typeof state.entries.get>> = { provider, pending: [], background: false };
   state.entries.set(sessionId, entry);
   const initialSeq = chatRunRegistry.getRun(sessionId)?.lastSeq || 0;
@@ -93,36 +145,48 @@ export async function recoverProviderSupervision(): Promise<string[]> {
   const protectedSessions: string[] = [];
   for (const { client, record, adopted } of await inspectSupervisedTurns(root())) {
     if (fs.existsSync(path.join(client.directory, 'acknowledged.json'))) continue;
-    const spec = JSON.parse(fs.readFileSync(path.join(client.directory, 'launch.json'), 'utf8'));
-    if (spec.mode !== 'runtime') continue;
-    const sessionId = spec.options.sessionId as string;
-    if (getSessionOwnerId(sessionId) !== Number(spec.userId)) continue;
+    const initialSpec = JSON.parse(fs.readFileSync(path.join(client.directory, 'launch.json'), 'utf8'));
+    if (initialSpec.mode !== 'runtime') continue;
+    const sessionId = initialSpec.options.sessionId as string;
+    if (getSessionOwnerId(sessionId) !== Number(initialSpec.userId)) continue;
     const journal = fs.readFileSync(path.join(client.directory, 'output.ndjson'), 'utf8').split('\n').filter(Boolean).flatMap(line => { try { return [JSON.parse(line)]; } catch { return []; } });
-    const complete = journal.filter(row => row.kind === 'message' && row.data.kind === 'complete').at(-1);
-    if (complete) finishQueue(spec, journal.some(row => row.kind === 'message' && row.data.kind === 'error') ? { ...complete.data, success: false } : complete.data);
-    if (!adopted && complete && spec.options.cloudcliMonitorReceipt) {
-      const receipt = spec.options.cloudcliMonitorReceipt;
-      if (receipt.row.user_id !== Number(spec.userId) || receipt.sessionId !== sessionId) throw new Error('Monitor receipt ownership mismatch');
-      const outcome: AnyRecord = { finalText: '', providerError: null, completed: false };
-      for (const row of journal) if (row.kind === 'message') {
+    let spec = initialSpec;
+    let turnId = 'initial';
+    let complete: AnyRecord | undefined;
+    let outcome: AnyRecord = { finalText: '', providerError: null, completed: false };
+    for (const row of journal) {
+      if (row.kind === 'turn-start') {
+        spec = row.data.spec; turnId = row.data.id; complete = undefined;
+        if (spec.provider !== initialSpec.provider || spec.userId !== initialSpec.userId || spec.options.sessionId !== sessionId) throw new Error('Durable turn ownership mismatch');
+        outcome = { finalText: '', providerError: null, completed: false };
+      }
+      if (row.kind === 'message') {
         const event = row.data;
         if (event.text === 'monitor_usage') outcome.usage = event.monitorUsage;
         if (event.kind === 'text' && event.role === 'assistant') outcome.finalText = event.content;
         if (event.kind === 'error') outcome.providerError = String(event.content || 'Provider error');
-        if (event.kind === 'complete') { outcome.completed = true; if (event.aborted || event.success === false || (typeof event.exitCode === 'number' && event.exitCode !== 0)) outcome.providerError ||= 'Monitor turn failed or was interrupted'; }
+        if (event.kind === 'complete') {
+          complete = row; outcome.completed = true;
+          if (event.aborted || event.success === false || (typeof event.exitCode === 'number' && event.exitCode !== 0)) outcome.providerError ||= 'Turn failed or was interrupted';
+          finishQueue(spec, outcome.providerError ? { ...event, success: false } : event);
+          if (!adopted && spec.options.cloudcliMonitorReceipt) {
+            const receipt = spec.options.cloudcliMonitorReceipt;
+            if (receipt.row.user_id !== Number(spec.userId) || receipt.sessionId !== sessionId) throw new Error('Monitor receipt ownership mismatch');
+            const { finishSupervisedMonitorRound } = await import('@/modules/monitors/index.js');
+            await finishSupervisedMonitorRound(receipt, outcome);
+          }
+        }
       }
-      const { finishSupervisedMonitorRound } = await import('@/modules/monitors/index.js');
-      await finishSupervisedMonitorRound(receipt, outcome);
     }
     if (adopted || complete) {
       if (state.entries.has(sessionId)) throw new Error('Multiple supervised owners for session ' + sessionId);
-      const run = chatRunRegistry.startRun({ appSessionId: sessionId, provider: spec.provider, providerSessionId: null, connection: null, userId: spec.userId,
-        initialSeq: spec.options.cloudcliSupervisorInitialSeq || 0, startedAt: Date.parse(record.startedAt) });
+      const run = chatRunRegistry.startRun({ appSessionId: sessionId, provider: initialSpec.provider, providerSessionId: null, connection: null, userId: initialSpec.userId,
+        initialSeq: initialSpec.options.cloudcliSupervisorInitialSeq || 0, startedAt: Date.parse(record.startedAt) });
       if (!run) throw new Error('Cannot register recovered provider ' + sessionId);
-      state.entries.set(sessionId, { client, provider: spec.provider, pending: [], background: false });
+      state.entries.set(sessionId, { client, provider: spec.provider, pending: [], background: false, currentSpec: initialSpec });
       if (adopted) protectedSessions.push(sessionId);
       await new Promise<void>((resolve, reject) => {
-        void consume(client, run.writer, spec, resolve).catch(error => {
+        void consume(client, run.writer, initialSpec, resolve).catch(error => {
           chatRunRegistry.completeRunIfCurrent(run, { exitCode: 1 }); reject(error);
         });
       });
@@ -136,7 +200,7 @@ export async function recoverProviderSupervision(): Promise<string[]> {
     try { process.kill(record.pid, 0); alive = true; } catch { /* Confirmed gone. */ }
     if (alive) throw new Error('Supervisor identity could not be verified for live PID ' + record.pid);
     if (!record.metadata?.formerlyRunning || !record.metadata?.userTurn || record.metadata?.foregroundCompleted) { acknowledge(client); continue; }
-    const requestId = 'restart:' + record.id;
+    const requestId = 'restart:' + record.id + (turnId === 'initial' ? '' : ':' + turnId);
     const db = getConnection();
     db.transaction(() => {
       const row = queueRow(spec);
@@ -158,8 +222,8 @@ export async function recoverProviderSupervision(): Promise<string[]> {
 
 // Deployment asks the running service for authenticated adoption evidence and
 // freezes new launches; legacy in-process turns make handoff fail closed.
-export async function prepareProviderRestart(): Promise<AnyRecord> {
-  state.draining = true;
+export async function prepareProviderRestart(handoffId?: string): Promise<AnyRecord> {
+  const lease = restartLease.begin(handoffId);
   try {
     const { chatRunRegistry } = await import('@/modules/websocket/index.js');
     const rows = chatRunRegistry.listRunningRuns();
@@ -167,10 +231,17 @@ export async function prepareProviderRestart(): Promise<AnyRecord> {
     for (const row of rows) {
       const entry = state.entries.get(row.sessionId);
       if (!entry) throw new Error('Legacy turn cannot be handed off: ' + row.sessionId);
-      const client = entry.client || await entry.launching;
-      if (!client || !(await client.identity())) throw new Error('Supervisor not ready: ' + row.sessionId);
-      evidence.push({ sessionId: row.sessionId, ...client.registry() });
     }
-    return { ready: true, sessions: evidence };
-  } catch (error) { state.draining = false; throw error; }
+    // Include retained SDK owners whose foreground turn already completed.
+    for (const [sessionId, entry] of state.entries) {
+      const client = entry.client || await entry.launching;
+      if (!client || !(await client.identity())) throw new Error('Supervisor not ready: ' + sessionId);
+      evidence.push({ sessionId, ...client.registry() });
+    }
+    restartLease.assertCurrent(lease.handoffId);
+    return { ready: true, ...restartLease.renew(lease.handoffId), sessions: evidence };
+  } catch (error) {
+    try { restartLease.cancel(lease.handoffId); } catch { /* A newer lease owns ingress. */ }
+    throw error;
+  }
 }

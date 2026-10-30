@@ -1,7 +1,7 @@
 // Isolated real-process test. Build first; credentials are copied locally, never printed.
 // PROVIDER_SURVIVAL_BUILD points to dist-server; PROVIDER_SURVIVAL_RESULTS selects private output storage.
 import {fileURLToPath,pathToFileURL} from 'node:url';import os from 'node:os';
-const repository=fileURLToPath(new URL('../../',import.meta.url));
+const repository=path.dirname(fileURLToPath(new URL('../../package.json',import.meta.url)));
 const build=path.resolve(process.env.PROVIDER_SURVIVAL_BUILD||path.join(repository,'dist-server'));
 const moduleURL=relative=>pathToFileURL(path.join(build,relative)).href;
 const results=process.env.PROVIDER_SURVIVAL_RESULTS||fs.mkdtempSync(path.join(os.tmpdir(),'nexagent-survival-'));fs.mkdirSync(results,{recursive:true});process.chdir(results);

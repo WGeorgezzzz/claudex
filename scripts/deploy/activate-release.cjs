@@ -1,5 +1,7 @@
 'use strict';
 const {partitionDeploymentSessions}=require('./running-session-ownership.cjs');
+const {createProviderHandoff}=require('./provider-handoff.cjs');
+let providerHandoff;
 // Prepared only. No production mutation occurs without an explicit --activate or --rollback argument.
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict'),crypto=require('node:crypto'),{execFileSync}=require('node:child_process'),{createRequire}=require('node:module');
 const arg=name=>process.argv.includes(name)?process.argv[process.argv.indexOf(name)+1]:undefined,source=path.resolve(arg('--source')||process.cwd()),target=path.resolve(arg('--release')||path.join(source,'../release-1')),root=path.dirname(target),req=createRequire(path.join(target,'package.json')),DB=req('better-sqlite3');
@@ -44,6 +46,7 @@ async function stop(c){
  const captures=await Promise.all((Array.isArray(providerRoots)?providerRoots:[providerRoots]).map(async pid=>({pid,children:await tree.listDescendants(pid)})));
 
  assert.equal(captures.length,0,'Legacy provider descendants cannot survive a task stop; wait idle instead of killing them');
+ await providerHandoff?.confirm();
  ps(`Stop-ScheduledTask -TaskName ${quote(task)}`);
  ps(`$p=Get-CimInstance Win32_Process -Filter 'ProcessId = ${Number(c.pid)}'; if($p){ if(-not $p.CommandLine.Replace('\\','/').ToLowerInvariant().Contains(${quote(c.runtime.replaceAll('\\','/').toLowerCase())})){throw 'Unexpected production process'}; Stop-Process -Id ${Number(c.pid)}}`);
 
@@ -141,11 +144,14 @@ async function interruptManaged(c){
 
 async function forceInterruptManaged(c,allowIdleLegacy=false){
  const token=await login(c);
- const response=await fetch('http://127.0.0.1:3001/api/providers/restart/prepare',{method:'POST',headers:{Authorization:'Bearer '+token},signal:AbortSignal.timeout(60000)});
- if(response.status===404 && allowIdleLegacy)return;
- assert(response.ok,'Running service cannot hand off providers; wait idle. Legacy turns must not be aborted for deployment.');
- const result=await response.json();assert(result.data?.ready,'Provider handoff not confirmed');
- write(path.join(root,'provider-handoff.json'),result.data);
+ providerHandoff=createProviderHandoff(async(operation,body)=>{
+  const response=await fetch('http://127.0.0.1:3001/api/providers/restart/'+operation,{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.timeout(operation==='prepare'?60000:5000)});
+  if(response.status===404)return null;
+  assert(response.ok,'Provider '+operation+' handshake failed; legacy turns must not be aborted.');
+  return (await response.json()).data;
+ },{onError:error=>console.error('Provider handoff recovery/renewal:',error.message)});
+ const evidence=await providerHandoff.prepare(allowIdleLegacy);
+ if(evidence)write(path.join(root,'provider-handoff.json'),evidence);
 }
 async function main(){
  const lock=path.join(path.dirname(cfgPath),'nexagent-deploy.lock');
@@ -154,6 +160,6 @@ async function main(){
   if(process.argv.includes('--rollback')){await rollback(arg('--rollback'));return;}
   if(!process.argv.includes('--activate')){console.log(JSON.stringify(check(),null,2));return;}
   await activate();
- }finally{fs.closeSync(fd);fs.unlinkSync(lock);}
+ }finally{await providerHandoff?.cancel();fs.closeSync(fd);fs.unlinkSync(lock);}
 }
 main().catch(e=>{console.error(e.stack);process.exitCode=1;});

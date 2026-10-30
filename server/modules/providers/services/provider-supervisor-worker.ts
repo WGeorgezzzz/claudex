@@ -47,6 +47,13 @@ const emit = (kind: string, data: unknown) => {
   if (terminal) return;
   fs.writeSync(journal, JSON.stringify({ seq: ++sequence, kind, data }) + '\n');
   fs.fsyncSync(journal);
+  if (kind === 'turn-start') {
+    const turn = data as Record<string, any>;
+    record.currentTurn = turn;
+    record.metadata = { ...(record.metadata as object), formerlyRunning: false, foregroundCompleted: false,
+      userTurn: !turn.spec.options.cloudcliMonitorId && !turn.spec.options.bridgeCompact && !turn.spec.options.cloudcliBridgeSourceSessionId };
+    save();
+  }
   if (kind === 'message' && !(record.metadata as Record<string, unknown>).formerlyRunning && ['text', 'tool_use', 'tool_result', 'permission_request', 'thinking'].includes(String((data as Record<string, unknown>)?.kind))) {
     record.metadata = { ...(record.metadata as object), formerlyRunning: true }; save();
   }
