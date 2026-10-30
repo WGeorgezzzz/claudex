@@ -255,6 +255,10 @@ async function dispatchRun(
   let failure: string | null = null;
   try {
     const clientOptions = {...(data.options ?? {})} as AnyRecord;
+    // Queue attempt identities and replay offsets originate only on the server.
+    delete clientOptions.cloudcliQueueAttempt;
+    delete clientOptions.cloudcliSupervisorInitialSeq;
+    delete clientOptions.cloudcliMonitorReceipt;
     if(ws)delete clientOptions.cloudcliBridgeUserAuthorization;
     const command = typeof data.content === 'string' ? data.content : '';
     // This option is server-owned. The command is always the user's exact text.

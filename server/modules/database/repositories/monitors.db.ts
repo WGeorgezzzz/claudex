@@ -300,12 +300,12 @@ export const monitorsDb = {
       WHERE user_id=? AND id=? AND status<>'stopped'`)
       .run(input.name,input.content,input.intervalMinutes,changed?1:0,next.toISOString(),scheduleJson,userId,id);
   },
-  recover(now = new Date()): void {
+  recover(now = new Date(), protectedSessions: string[] = []): void {
     const db=getConnection();
     db.transaction(() => {
-      db.prepare("UPDATE monitor_runs SET status='interrupted',finished_at=?,error=? WHERE status='running'")
-        .run(now.toISOString(),'服务重启，上一轮结果未确认；保留中断记录，下一轮先核对实际状态。');
-      const rows=db.prepare('SELECT * FROM monitors WHERE running_id IS NOT NULL').all() as MonitorRecord[];
+      db.prepare("UPDATE monitor_runs SET status='interrupted',finished_at=?,error=? WHERE status='running' AND session_id NOT IN (SELECT value FROM json_each(?))")
+        .run(now.toISOString(),'服务重启，上一轮结果未确认；保留中断记录，下一轮先核对实际状态。',JSON.stringify(protectedSessions));
+      const rows=db.prepare('SELECT * FROM monitors WHERE running_id IS NOT NULL AND running_id NOT IN (SELECT id FROM monitor_runs WHERE status=\'running\')').all() as MonitorRecord[];
       for(const row of rows) db.prepare(`UPDATE monitors SET running_id=NULL,run_count=run_count+1,consecutive_failures=consecutive_failures+1,
         next_run_at=CASE WHEN status='active' THEN ? ELSE next_run_at END,last_error=? WHERE id=?`)
         .run(retryAt(row.consecutive_failures+1,now),'服务重启，上一轮结果未确认；启用中的监测将自动重试，先核对实际状态。',row.id);

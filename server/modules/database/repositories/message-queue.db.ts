@@ -24,6 +24,7 @@ export function initializeMessageQueueTables(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_queue_attempts_message ON message_queue_attempts(message_id,attempt);
   `);
   const columns=db.prepare('PRAGMA table_info(message_queue)').all() as Array<{name:string}>;
+  if (!columns.some(column=>column.name==='recovered_by')) db.exec('ALTER TABLE message_queue ADD COLUMN recovered_by TEXT');
   if (!columns.some(column=>column.name==='position')) {
     db.exec('ALTER TABLE message_queue ADD COLUMN position INTEGER NOT NULL DEFAULT 0');
     db.exec('UPDATE message_queue SET position=sequence');
@@ -74,7 +75,7 @@ export const messageQueueDb = {
     return getConnection().prepare(`SELECT q.* FROM message_queue q WHERE q.status='queued' AND q.delivery_mode='queued'
       AND NOT EXISTS(SELECT 1 FROM session_workspace w WHERE w.session_id=q.session_id AND w.user_id=q.user_id AND w.queue_paused=1)
       AND NOT EXISTS(SELECT 1 FROM message_queue previous WHERE previous.session_id=q.session_id
-        AND previous.delivery_mode='queued' AND previous.position<q.position AND previous.status IN ('queued','running','failed','interrupted'))
+          AND previous.delivery_mode='queued' AND previous.position<q.position AND previous.recovered_by IS NULL AND previous.status IN ('queued','running','failed','interrupted'))
       ORDER BY q.position,q.sequence LIMIT 8`).all() as QueuedTurnRecord[];
   },
   claim(id: string, delivery: 'queued'|'live'='queued'): QueuedTurnRecord|null {
@@ -85,7 +86,7 @@ export const messageQueueDb = {
         started_at=?,finished_at=NULL,error=NULL,revision=revision+1 WHERE id=? AND status='queued' AND delivery_mode=?
         AND (delivery_mode='live' OR (NOT EXISTS(SELECT 1 FROM session_workspace w WHERE w.session_id=message_queue.session_id AND w.user_id=message_queue.user_id AND w.queue_paused=1)
           AND NOT EXISTS(SELECT 1 FROM message_queue p WHERE p.session_id=message_queue.session_id
-          AND p.delivery_mode='queued' AND p.position<message_queue.position AND p.status IN ('queued','running','failed','interrupted'))))`)
+            AND p.delivery_mode='queued' AND p.position<message_queue.position AND p.recovered_by IS NULL AND p.status IN ('queued','running','failed','interrupted'))))`)
         .run(runId,now,id,delivery);
       if (!changed.changes) return null;
       const row=db.prepare('SELECT * FROM message_queue WHERE id=?').get(id) as QueuedTurnRecord;
@@ -143,12 +144,15 @@ export const messageQueueDb = {
     return getConnection().prepare(`SELECT a.* FROM message_queue_attempts a JOIN message_queue q ON q.id=a.message_id
       WHERE q.user_id=? AND q.id=? ORDER BY a.attempt`).all(userId,id) as QueuedTurnAttempt[];
   },
-  recover(): void {
+  recover(protectedSessions: string[] = []): void {
     const db=getConnection(), now=new Date().toISOString();
     db.transaction(() => {
       const error='Server restarted before completion was confirmed. Review this attempt before retrying.';
-      db.prepare("UPDATE message_queue_attempts SET status='interrupted',finished_at=?,error=? WHERE status='running'").run(now,error);
-      db.prepare("UPDATE message_queue SET status='interrupted',finished_at=?,error=?,revision=revision+1 WHERE status='running' OR (delivery_mode='live' AND status='queued')").run(now,error);
+      const protectedJson = JSON.stringify(protectedSessions);
+      db.prepare(`UPDATE message_queue_attempts SET status='interrupted',finished_at=?,error=? WHERE status='running'
+        AND message_id NOT IN (SELECT id FROM message_queue WHERE session_id IN (SELECT value FROM json_each(?)))`).run(now,error,protectedJson);
+      db.prepare(`UPDATE message_queue SET status='interrupted',finished_at=?,error=?,revision=revision+1
+        WHERE (status='running' OR (delivery_mode='live' AND status='queued')) AND session_id NOT IN (SELECT value FROM json_each(?))`).run(now,error,protectedJson);
     })();
   },
 };

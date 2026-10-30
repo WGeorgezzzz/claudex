@@ -1,6 +1,7 @@
 'use strict';
 const {partitionDeploymentSessions}=require('./running-session-ownership.cjs');
-const {drainManagedSessions}=require('./drain-managed-sessions.cjs');
+const {createProviderHandoff}=require('./provider-handoff.cjs');
+let providerHandoff;
 // Prepared only. No production mutation occurs without an explicit --activate or --rollback argument.
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict'),crypto=require('node:crypto'),{execFileSync}=require('node:child_process'),{createRequire}=require('node:module');
 const arg=name=>process.argv.includes(name)?process.argv[process.argv.indexOf(name)+1]:undefined,source=path.resolve(arg('--source')||process.cwd()),target=path.resolve(arg('--release')||path.join(source,'../release-1')),root=path.dirname(target),req=createRequire(path.join(target,'package.json')),DB=req('better-sqlite3');
@@ -44,9 +45,11 @@ async function stop(c){
  const providerRoots=JSON.parse(ps("@(Get-CimInstance Win32_Process | Where-Object { @("+descendants.join(',')+") -contains $_.ProcessId -and ($_.Name -match '^(claude|codex)(\\.exe)?$' -or ($_.Name -eq 'node.exe' -and $_.CommandLine -match 'codex[/\\\\]bin|codex\\.js')) } | Select-Object -ExpandProperty ProcessId) | ConvertTo-Json -Compress")||'[]');
  const captures=await Promise.all((Array.isArray(providerRoots)?providerRoots:[providerRoots]).map(async pid=>({pid,children:await tree.listDescendants(pid)})));
 
+ assert.equal(captures.length,0,'Legacy provider descendants cannot survive a task stop; wait idle instead of killing them');
+ await providerHandoff?.confirm();
  ps(`Stop-ScheduledTask -TaskName ${quote(task)}`);
  ps(`$p=Get-CimInstance Win32_Process -Filter 'ProcessId = ${Number(c.pid)}'; if($p){ if(-not $p.CommandLine.Replace('\\','/').ToLowerInvariant().Contains(${quote(c.runtime.replaceAll('\\','/').toLowerCase())})){throw 'Unexpected production process'}; Stop-Process -Id ${Number(c.pid)}}`);
- for(const capture of captures)assert(await tree.killProcessTree(capture.pid,capture.children),'Provider tree did not terminate: '+capture.pid);
+
  write(path.join(root,'provider-shutdown.json'),{at:new Date().toISOString(),serverPid:c.pid,captures});
  assert.equal(ps('@(Get-NetTCPConnection -State Listen -LocalPort 3001 -ErrorAction SilentlyContinue).Count').trim(),'0','Production port remains occupied');
 }
@@ -103,7 +106,7 @@ async function activate(){
  const linkBefore=fs.realpathSync(link);write(path.join(backup,'runtime.json'),{runtime:linkBefore,release:read(path.join(c.runtime,'release-manifest.json'))});
  await idle(c);let stopped=false,changed=false;
  try{
-  // Database backup happens with the service stopped, so it includes the last accepted writes.
+  // SQLite online backup includes supervised workers, which retain their DB connections.
   check();await interruptManaged(c);stopped=true;await stop(c);const db=new DB(c.database,{readonly:true});let ids;try{ids=recordIds(db);await db.backup(path.join(backup,'database.db'));}finally{db.close();}write(path.join(backup,'record-ids.json'),ids);
   replaceLink(target);changed=true;write(cfgPath,{...c,runtime:target});const current=await start(),checks=await verify(current,ids);desktopUpdate(backup);
   const result={commit:read(path.join(target,'release-manifest.json')).git,status:'active',runtime:target,pid:current.pid,previousRuntime:c.runtime,backup,checks,at:new Date().toISOString()};write(path.join(path.dirname(cfgPath),'active-release.json'),result);write(path.join(root,'deployment-status.json'),result);console.log(JSON.stringify(result));
@@ -136,21 +139,19 @@ async function interruptManaged(c){
  // The caller may stop only an idle server. Never abort user/provider work.
  const rows=await running(c);assert.equal(rows.length,0,'Sessions became active; activation cancelled');
  const db=new DB(c.database,{readonly:true});try{assert.equal(db.prepare("SELECT COUNT(*) n FROM message_queue WHERE status IN ('running','processing','executing')").get().n,0,'Queue became active; activation cancelled');}finally{db.close();}
+ await forceInterruptManaged(c,true);
 }
 
-async function forceInterruptManaged(c){
- const token=await login(c),WS=req('ws');
- // Only sessions reported by this production server are addressed; no host-wide process kill.
- await drainManagedSessions({list:()=>running(c),record:rows=>write(path.join(root,'evidence/force-drain-sessions.json'),{at:new Date().toISOString(),sessions:rows}),interrupt:row=>new Promise((resolve,reject)=>{
-  const ws=new WS('ws://127.0.0.1:3001/ws?token='+encodeURIComponent(token));
-  let poll;const finish=error=>{clearTimeout(timer);clearInterval(poll);ws.close();error?reject(error):resolve();};
-  const timer=setTimeout(()=>finish(Error('Session interruption timed out: '+row.sessionId)),600000);
-  ws.on('open',()=>{
-   ws.send(JSON.stringify({type:'chat.abort',sessionId:row.sessionId,force:true}));
-   let checking=false;poll=setInterval(()=>{if(checking)return;checking=true;void running(c).then(current=>{if(!current.some(item=>item.sessionId===row.sessionId))finish();},finish).finally(()=>{checking=false;});},1000);
-  });
-  ws.on('error',finish);
- })});
+async function forceInterruptManaged(c,allowIdleLegacy=false){
+ const token=await login(c);
+ providerHandoff=createProviderHandoff(async(operation,body)=>{
+  const response=await fetch('http://127.0.0.1:3001/api/providers/restart/'+operation,{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.timeout(operation==='prepare'?60000:5000)});
+  if(response.status===404)return null;
+  assert(response.ok,'Provider '+operation+' handshake failed; legacy turns must not be aborted.');
+  return (await response.json()).data;
+ },{onError:error=>console.error('Provider handoff recovery/renewal:',error.message)});
+ const evidence=await providerHandoff.prepare(allowIdleLegacy);
+ if(evidence)write(path.join(root,'provider-handoff.json'),evidence);
 }
 async function main(){
  const lock=path.join(path.dirname(cfgPath),'nexagent-deploy.lock');
@@ -159,6 +160,6 @@ async function main(){
   if(process.argv.includes('--rollback')){await rollback(arg('--rollback'));return;}
   if(!process.argv.includes('--activate')){console.log(JSON.stringify(check(),null,2));return;}
   await activate();
- }finally{fs.closeSync(fd);fs.unlinkSync(lock);}
+ }finally{await providerHandoff?.cancel();fs.closeSync(fd);fs.unlinkSync(lock);}
 }
 main().catch(e=>{console.error(e.stack);process.exitCode=1;});
