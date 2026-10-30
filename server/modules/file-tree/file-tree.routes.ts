@@ -193,9 +193,15 @@ export function createFileTreeRouter(
     response.json(await services.saveTextFile(readProjectId(request), filePath, body.content, body.expectedContent as string | undefined));
   }, logger));
 
+  router.get('/projects/:projectId/files/search', createRouteHandler(async (request, response) => {
+    response.json(await services.searchProjectFiles(readProjectId(request), readOptionalString(request.query.q) ?? '', {respectGitignore: request.query.respectGitignore !== 'false', ...(typeof request.query.workspacePath === 'string' ? {workspacePath: request.query.workspacePath} : {})}));
+  }, logger));
+
   router.get('/projects/:projectId/files', createRouteHandler(async (request, response) => {
     response.json(await services.listProjectFiles(readProjectId(request), {
       respectGitignore: request.query.respectGitignore === 'true',
+      ...(request.query.shallow === 'true' ? {shallow:true} : {}),
+      ...(typeof request.query.directory === 'string' ? {directory:request.query.directory} : {}),
       ...(typeof request.query.workspacePath==='string'&&request.query.workspacePath?{workspacePath:request.query.workspacePath}:{}),
     }));
   }, logger));

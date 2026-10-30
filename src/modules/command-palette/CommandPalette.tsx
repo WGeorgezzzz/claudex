@@ -123,7 +123,7 @@ function CommandPalette({
   const messageMatches = useSessionMessageSearch(sessionProjectId, search, sessionSearchEnabled);
   const organization = usePaletteSessionStatus(open && showSessions);
   const organizationById = React.useMemo(() => new Map(organization.map(row => [row.sessionId, row])), [organization]);
-  const files = useFilesSource(projectId, open && showFiles);
+  const files = useFilesSource(projectId, open && showFiles, search);
   const commits = useCommitsSource(projectId, open && showCommits);
   const branches = useBranchesSource(projectId, open && showBranches);
   const git = useGitActions(projectId);

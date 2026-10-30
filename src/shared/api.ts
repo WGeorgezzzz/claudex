@@ -423,6 +423,11 @@ export const api = {
   getFiles: (projectId: string, options: ApiRequestOptions = {}, workspacePath?:string) =>
     get(`/api/file-tree/projects/${projectId}/files${query({ respectGitignore: true,workspacePath })}`, options),
 
+  getFileChildren: (projectId: string, directory = '', options: ApiRequestOptions = {}) =>
+    get(`/api/file-tree/projects/${projectId}/files${query({respectGitignore:true,shallow:true,directory:directory || undefined})}`, options),
+  searchFiles: (projectId: string, q: string, options: ApiRequestOptions = {}, workspacePath?: string) =>
+    get(`/api/file-tree/projects/${projectId}/files/search${query({q,respectGitignore:true,workspacePath})}`, options),
+
   // File operations
   createFile: (
     projectId: string,

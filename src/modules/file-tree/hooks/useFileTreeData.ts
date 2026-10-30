@@ -8,6 +8,7 @@ type UseFileTreeDataResult = {
   loading: boolean;
   error: string | null;
   refreshFiles: () => void;
+  loadDirectory: (path: string) => Promise<void>;
 };
 
 const DEFAULT_LOAD_ERROR = 'Unable to load the file tree for this project.';
@@ -33,6 +34,7 @@ export function useFileTreeData(selectedProject: Project | null): UseFileTreeDat
   const [error, setError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const pendingDirectories = useRef(new Set<string>());
 
   const refreshFiles = useCallback(() => {
     setRefreshKey((prev) => prev + 1);
@@ -65,7 +67,7 @@ export function useFileTreeData(selectedProject: Project | null): UseFileTreeDat
         setError(null);
       }
       try {
-        const response = await api.getFiles(projectId, { signal: abortControllerRef.current!.signal });
+        const response = await api.getFileChildren(projectId, '', { signal: abortControllerRef.current!.signal });
 
         if (!response.ok) {
           const errorText = await response.text();
@@ -106,7 +108,25 @@ export function useFileTreeData(selectedProject: Project | null): UseFileTreeDat
     };
   }, [selectedProject?.projectId, refreshKey]);
 
+  const loadDirectory = useCallback(async (directory: string) => {
+    if (!selectedProject?.projectId) return;
+    const controller = abortControllerRef.current;
+    const key = selectedProject.projectId + '\0' + directory;
+    if (pendingDirectories.current.has(key)) return;
+    pendingDirectories.current.add(key);
+    try {
+      const response = await api.getFileChildren(selectedProject.projectId, directory, {signal:controller?.signal});
+      if (!response.ok) throw Error(readResponseErrorMessage(await response.text()) || DEFAULT_LOAD_ERROR);
+      const children = await response.json() as FileTreeNode[];
+      if (controller?.signal.aborted) return;
+      const merge = (nodes: FileTreeNode[]): FileTreeNode[] => nodes.map(node => node.path === directory ? {...node,children} : node.children ? {...node,children:merge(node.children)} : node);
+      setFiles(nodes => merge(nodes));
+    } catch (cause) { if (!controller?.signal.aborted) setError(cause instanceof Error ? cause.message : DEFAULT_LOAD_ERROR); }
+    finally { pendingDirectories.current.delete(key); }
+  }, [selectedProject?.projectId]);
+
   return {
+    loadDirectory,
     files,
     loading,
     error,

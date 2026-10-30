@@ -25,7 +25,7 @@ const tree = [
 
 vi.mock('@/shared/api', () => ({
   api: {
-    getFiles: async () => ({ ok: true, json: async () => tree }),
+    getFileChildren: async (_id:string,directory:string) => ({ ok: true, json: async () => directory === `${ROOT}/lazy` ? [{type:'directory',name:'nested',path:`${ROOT}/lazy/nested`}] : directory === `${ROOT}/lazy/nested` ? [{type:'file',name:'deep.md',path:`${ROOT}/lazy/nested/deep.md`}] : [...tree,{type:'directory',name:'lazy',path:`${ROOT}/lazy`}] }),
   },
 }));
 
@@ -46,4 +46,9 @@ test('a folder nobody asked for stays closed', async () => {
 
   await waitFor(() => assert.ok(screen.getByText('decisions')));
   assert.equal(screen.queryByText('0001-first.md'), null);
+});
+
+test('a nested reveal loads each missing ancestor before opening the target',async()=>{
+  render(<FileTree selectedProject={project} revealDirectory={{path:'lazy/nested/'}}/>);
+  await waitFor(()=>assert.ok(screen.getByText('deep.md')));
 });

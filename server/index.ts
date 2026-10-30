@@ -1,4 +1,7 @@
 #!/usr/bin/env node
+import { taskmasterSourcesService } from './modules/taskmaster/taskmaster-sources.service.js';
+import { infohubLifecycle, infohubRequest } from './modules/taskmaster/taskmaster-infohub.service.js';
+import { infohubStartupPage } from './modules/taskmaster/infohub-startup-page.js';
 import { requireSharedResourceAdministrator } from '@/modules/auth/index.js';
 import { initializeTaskIntelligence,closeTaskIntelligence,initializeInfohubTaskSync,closeInfohubTaskSync,taskmasterInboxService,infohubEmbedScript } from '@/modules/taskmaster/index.js';
 // Load environment variables before other imports execute.
@@ -261,6 +264,15 @@ app.use('/infohub', (req, res, next) => {
     if (!['GET', 'HEAD'].includes(req.method) && req.headers.origin && req.headers.origin !== `${req.headers['x-forwarded-proto'] || req.protocol}://${req.headers.host}`) return res.status(403).json({ error: 'Cross-origin write denied' });
     next();
 }, authenticateToken, requireSharedResourceAdministrator, async (req, res) => {
+    if(req.path==='/nexagent/start' && req.method==='POST') {
+      try { return res.json(taskmasterSourcesService.start()); }
+      catch(error) { return res.status(500).json({error:error instanceof Error ? error.message : String(error)}); }
+    }
+    if(req.path==='/nexagent/ready' && req.method==='GET') {
+      const state=infohubLifecycle.snapshot();
+      try { await infohubRequest('/api/health',undefined,1500);return res.json({ready:true}); }
+      catch {return res.json({ready:false,error:state.error,phase:state.phase});}
+    }
     if(req.path==='/nexagent/embed.js')return res.type('application/javascript').set('Cache-Control','no-store').send(infohubEmbedScript);
     const taskLink=req.path.match(/^\/nexagent\/task\/(\d+)$/);
     if(taskLink){
@@ -304,7 +316,7 @@ app.use('/infohub', (req, res, next) => {
     proxy.setTimeout(15000, () => proxy.destroy(new Error('info-hub timeout')));
     proxy.on('error', error => {
         if (!res.headersSent) {
-            if(req.accepts('html'))res.status(503).type('html').send('<!doctype html><html lang="zh-CN"><meta name="viewport" content="width=device-width,initial-scale=1"><title>信息看板暂不可用</title><body style="font:16px system-ui;margin:0;min-height:90vh;display:grid;place-content:center;padding:20px;color:#64748b"><h1 style="font-size:20px;color:#334155">信息看板暂时不可用</h1><p>请确认本机信息看板已启动，稍后重试。</p><button style="min-height:40px;padding:8px 20px" onclick="location.reload()">重新加载</button></body></html>');
+            if(req.accepts('html'))res.status(503).type('html').set('Cache-Control','no-store').send(infohubStartupPage);
             else res.status(503).json({ error: 'INFOHUB_UNAVAILABLE', message: '信息看板暂时不可用，请稍后重试。' });
         }
         else res.end();

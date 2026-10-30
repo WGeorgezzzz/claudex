@@ -52,17 +52,29 @@ export default function FileTree({ selectedProject, onFileOpen, revealDirectory 
     }
   }, [toast]);
 
-  const { files, loading, error, refreshFiles } = useFileTreeData(selectedProject);
+  const { files, loading, error, refreshFiles, loadDirectory } = useFileTreeData(selectedProject);
   const { viewMode, changeViewMode } = useFileTreeViewMode();
   const { expandedDirs, toggleDirectory, expandDirectories, collapseAll } = useExpandedDirectories();
-  const { searchQuery, setSearchQuery, filteredFiles } = useFileTreeSearch({
+  const { searchQuery, setSearchQuery, filteredFiles, searchError, truncated } = useFileTreeSearch({
     files,
+    projectId: selectedProject?.projectId,
     expandDirectories,
   });
 
   // The reveal request already served, so a later tree refresh does not fold
   // the folders open again over a collapse the user has since made.
   const revealedRef = useRef<DirectoryRevealRequest | null>(null);
+
+  // Refresh preserves expansion; reload the visible open folders as their
+  // ancestors arrive so file operations do not leave an expanded empty tree.
+  useEffect(() => {
+    const visit = (nodes: FileTreeNode[]) => nodes.forEach(node => {
+      if (node.type !== 'directory' || !expandedDirs.has(node.path)) return;
+      if (!node.children) void loadDirectory(node.path);
+      else visit(node.children);
+    });
+    if (!loading) visit(files);
+  }, [files, expandedDirs, loading, loadDirectory]);
 
   // Expand every ancestor between the project root and the requested folder.
   // A request that arrives before the tree finds nothing to expand and is
@@ -76,9 +88,15 @@ export default function FileTree({ selectedProject, onFileOpen, revealDirectory 
     if (paths.length === 0) {
       return;
     }
-    revealedRef.current = revealDirectory;
+    let pending = false;
+    const visit = (nodes: FileTreeNode[]) => nodes.forEach(node => {
+      if (paths.includes(node.path) && !node.children) {pending = true; void loadDirectory(node.path);}
+      if (node.children) visit(node.children);
+    });
+    visit(files);
+    if (!pending) revealedRef.current = revealDirectory;
     expandDirectories(paths);
-  }, [revealDirectory, selectedProject?.path, selectedProject?.fullPath, expandDirectories, files]);
+  }, [revealDirectory, selectedProject?.path, selectedProject?.fullPath, expandDirectories, files, loadDirectory]);
 
   // File operations
   const operations = useFileTreeOperations({
@@ -143,6 +161,7 @@ export default function FileTree({ selectedProject, onFileOpen, revealDirectory 
   const handleItemClick = useCallback(
     (item: FileTreeNode) => {
       if (item.type === 'directory') {
+        if (!expandedDirs.has(item.path)) void loadDirectory(item.path);
         toggleDirectory(item.path);
         return;
       }
@@ -161,7 +180,7 @@ export default function FileTree({ selectedProject, onFileOpen, revealDirectory 
 
       onFileOpen?.(item.path);
     },
-    [onFileOpen, selectedProject, toggleDirectory],
+    [onFileOpen, selectedProject, toggleDirectory, expandedDirs, loadDirectory],
   );
 
   const formatRelativeTimeLabel = useCallback(
@@ -225,6 +244,8 @@ export default function FileTree({ selectedProject, onFileOpen, revealDirectory 
         uploadProgress={upload.uploadProgress?.progress ?? null}
       />
 
+      {searchError&&<p role="alert" className="px-3 text-xs text-destructive">{searchError}</p>}
+      {truncated&&<p role="status" className="px-3 text-xs text-muted-foreground">显示部分结果，请输入更具体的路径。</p>}
       <FileTreeUploadProgress upload={upload.uploadProgress} />
 
       {viewMode === 'detailed' && filteredFiles.length > 0 && <FileTreeDetailedColumns />}

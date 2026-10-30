@@ -13,8 +13,19 @@ test('shows real observations, expands actionable failure and only starts on cli
   expect(mock.start).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole('button',{name:'飞书来源状态'}));
   expect(screen.getByText('token_missing: need_user_authorization')).toBeTruthy();
+  expect(screen.getByText('授权可能已恢复，点启动并同步刷新')).toBeTruthy();
   fireEvent.click(screen.getByRole('button',{name:'启动并同步'}));
   await waitFor(()=>expect(mock.start).toHaveBeenCalledTimes(1));
+});
+
+test('offline observations show the original source timestamp instead of the cache read time',async()=>{
+  const data=snapshot();data.sources[1].status='offline';
+  data.sources[1].lastSyncedAt='2026-10-30T00:18:00Z';
+  mock.sources.mockImplementation(async()=>new Response(JSON.stringify(data)));
+  render(<TaskSourcesBar onSynced={()=>{}}/>);
+  fireEvent.click(await screen.findByRole('button',{name:'飞书来源状态'}));
+  expect(screen.getByText('上次观测 '+new Date('2026-10-30T00:18:00Z').toLocaleString('zh-CN'))).toBeTruthy();
+  expect(screen.getByText('授权可能已恢复，点启动并同步刷新')).toBeTruthy();
 });
 test('refreshes task rows when sync completes and reports transport errors',async()=>{
   mock.sources.mockImplementation(async()=>new Response(JSON.stringify(snapshot('idle'))));

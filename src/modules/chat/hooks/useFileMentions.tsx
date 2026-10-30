@@ -5,13 +5,6 @@ import { api } from '@/shared/api';
 import { escapeRegExp } from '@/modules/chat/utils/chatFormatting';
 import type { Project } from '@/shared/types';
 
-type ProjectFileNode = {
-  name: string;
-  type: 'file' | 'directory';
-  path?: string;
-  children?: ProjectFileNode[];
-};
-
 export type MentionableFile = {
   name: string;
   path: string;
@@ -23,28 +16,6 @@ type UseFileMentionsOptions = {
   input: string;
   setInput: Dispatch<SetStateAction<string>>;
   textareaRef: RefObject<HTMLTextAreaElement>;
-};
-
-const flattenFileTree = (files: ProjectFileNode[], basePath = ''): MentionableFile[] => {
-  let flattened: MentionableFile[] = [];
-
-  files.forEach((file) => {
-    const fullPath = basePath ? `${basePath}/${file.name}` : file.name;
-    if (file.type === 'directory' && file.children) {
-      flattened = flattened.concat(flattenFileTree(file.children, fullPath));
-      return;
-    }
-
-    if (file.type === 'file') {
-      flattened.push({
-        name: file.name,
-        path: fullPath,
-        relativePath: file.path,
-      });
-    }
-  });
-
-  return flattened;
 };
 
 // True when both flattened lists hold the same files in the same order.
@@ -67,7 +38,7 @@ export function useFileMentions({ selectedProject, input, setInput, textareaRef 
   // older response can never overwrite a newer list.
   const fileListRequestRef = useRef<AbortController | null>(null);
 
-  const loadProjectFiles = useCallback(async (targetProjectId: string) => {
+  const loadProjectFiles = useCallback(async (targetProjectId: string, query: string) => {
     fileListRequestRef.current?.abort();
     const abortController = new AbortController();
     fileListRequestRef.current = abortController;
@@ -75,18 +46,19 @@ export function useFileMentions({ selectedProject, input, setInput, textareaRef 
     try {
       // File list is keyed by DB projectId now; the backend resolves it to
       // the project's path before reading.
-      const response = await api.getFiles(targetProjectId, {
+      const response = await api.searchFiles(targetProjectId, query, {
         signal: abortController.signal,
       }, selectedProject?.fullPath||selectedProject?.path);
       if (!response.ok) {
         return;
       }
 
-      const files = (await response.json()) as ProjectFileNode[];
+      const result = await response.json();
       if (abortController.signal.aborted) {
         return;
       }
-      const nextFileList = flattenFileTree(files);
+      const root = (selectedProject?.fullPath || selectedProject?.path || '').replace(/\\/g,'/').replace(/\/$/,'');
+      const nextFileList: MentionableFile[] = result.files.map((file: {name:string;path:string}) => ({name:file.name,path:file.path.replace(/\\/g,'/').replace(root+'/',''),relativePath:file.path}));
       // Keeping the same array when nothing changed stops the filter effect
       // below from re-running and resetting the highlighted row.
       setFileList((previousFileList) =>
@@ -101,39 +73,13 @@ export function useFileMentions({ selectedProject, input, setInput, textareaRef 
     }
   }, [selectedProject?.fullPath,selectedProject?.path]);
 
+  const mentionQuery = input.slice(0,cursorPosition).split('@').at(-1) || '';
   useEffect(() => {
-    const fetchProjectFiles = async () => {
-      setFileList([]);
-      setFilteredFiles([]);
-      if (!projectId) {
-        return;
-      }
-
-      await loadProjectFiles(projectId);
-    };
-
-    fetchProjectFiles();
-    return () => {
-      fileListRequestRef.current?.abort();
-    };
-  }, [projectId, loadProjectFiles]);
-
-  // Files keep appearing after the list above was loaded (uploads, agent edits,
-  // the terminal, git checkouts) and nothing tells the composer about them, so
-  // the list is refetched each time the `@` dropdown opens. The dropdown stays
-  // open while the query is typed, so this is one request per `@`, not one per
-  // keystroke, and the previous list stays visible until the response lands.
-  useEffect(() => {
-    const refreshProjectFiles = async () => {
-      if (!showFileDropdown || !projectId) {
-        return;
-      }
-
-      await loadProjectFiles(projectId);
-    };
-
-    refreshProjectFiles();
-  }, [showFileDropdown, projectId, loadProjectFiles]);
+    if (!showFileDropdown || !projectId) return;
+    setFileList([]); setFilteredFiles([]);
+    const timer = setTimeout(() => {void loadProjectFiles(projectId,mentionQuery);},150);
+    return () => {clearTimeout(timer);fileListRequestRef.current?.abort();};
+  },[showFileDropdown,projectId,mentionQuery,loadProjectFiles]);
 
   useEffect(() => {
     const textBeforeCursor = input.slice(0, cursorPosition);

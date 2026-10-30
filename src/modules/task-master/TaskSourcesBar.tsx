@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { AlertCircle, ChevronDown, Loader2, Play } from 'lucide-react';
 import { inboxTasksApi } from '@/shared/api';
 
-type Source = { id:string; name:string; status:string; count:number; taskCount:number; lastSyncedAt:string|null; error:string|null; note?:string };
+type Source = { id:string; name:string; status:string; count:number; taskCount:number; lastSyncedAt:string|null; error:string|null; note?:string; lastObservedAt?:string|null };
 type Sources = { sources:Source[]; infohub:{phase:string; running:boolean; online:boolean; error:string|null; idleMinutes:number; idleDeadline:string|null; progress:{completed:number;total:number}} };
 const phaseNames:Record<string,string>={starting:'正在启动',collecting:'增量读取消息',syncing:'同步到任务',idle:'运行中',error:'同步失败',stopped:'未运行'};
 async function read<T>(response:Response):Promise<T>{const result=await response.json();if(!response.ok)throw Error(result.message||result.error?.message||'来源请求失败');return result;}
@@ -38,6 +38,8 @@ export function TaskSourcesBar({onSynced,showSettings=false}:{onSynced:()=>void;
     {chosen&&<div className="mt-2 space-y-1 rounded-md border bg-background p-3 text-xs" role="region" aria-label={chosen.name+'来源详情'}>
       <p className="font-medium">{chosen.name} · {chosen.count} 条来源记录 · {chosen.taskCount} 条关联任务</p>
       <p>最后同步／更新：{chosen.lastSyncedAt?new Date(chosen.lastSyncedAt).toLocaleString('zh-CN'):'尚无记录'}</p>
+      {chosen.status==='offline'&&<p>上次观测 {chosen.lastSyncedAt?new Date(chosen.lastSyncedAt).toLocaleString('zh-CN'):chosen.lastObservedAt?new Date(chosen.lastObservedAt).toLocaleString('zh-CN'):'时间未知'}</p>}
+      {/authorization|token_missing|auth|login/i.test(chosen.error||'')&&<p>授权可能已恢复，点启动并同步刷新</p>}
       {chosen.error&&<p className="break-words text-destructive">{chosen.error}</p>}{chosen.note&&<p className="text-muted-foreground">{chosen.note}</p>}
       {['infohub','lark','wechat'].includes(chosen.id)&&<><p>飞书需完成用户授权；微信需先打开客户端并登录。<a className="text-primary underline" href="/infohub" target="_blank" rel="noreferrer">打开信息看板</a></p><label className="flex items-center gap-2">空闲退出（分钟）<input aria-label="信息看板空闲退出分钟" type="number" min="1" max="1440" key={data?.infohub.idleMinutes} defaultValue={data?.infohub.idleMinutes||10} className="w-20 rounded border bg-background p-1" onBlur={async event=>{const minutes=Number(event.target.value);if(!Number.isInteger(minutes)||minutes<1||minutes>1440){setError('空闲退出时间须为 1–1440 分钟');return;}try{await read(await inboxTasksApi.saveInfohubSettings(minutes));await load();}catch(cause){setError(String(cause));}}}/></label>{data?.infohub.idleDeadline&&<p>预计退出：{new Date(data.infohub.idleDeadline).toLocaleTimeString('zh-CN')}</p>}</>}
     </div>}

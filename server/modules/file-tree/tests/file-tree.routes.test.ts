@@ -22,6 +22,7 @@ function createFakeServices(overrides: Partial<FileTreeServices> = {}): FileTree
     resolveFilePattern: unexpectedOperation,
     saveTextFile: unexpectedOperation,
     listProjectFiles: unexpectedOperation,
+    searchProjectFiles: unexpectedOperation,
     createEntry: unexpectedOperation,
     renameEntry: unexpectedOperation,
     deleteEntry: unexpectedOperation,

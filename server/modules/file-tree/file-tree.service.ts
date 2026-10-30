@@ -1,5 +1,6 @@
 import { assertContextPath } from '@/modules/access-control/index.js';
 import path from 'node:path';
+import { searchFilePaths } from './file-search.js';
 
 import ignore from 'ignore';
 
@@ -14,7 +15,7 @@ import { AppError, FORBIDDEN_WORKSPACE_PATHS, normalizeProjectPath } from '@/sha
 import { matchesEllipsisPattern, splitEllipsisPattern } from '@/modules/file-tree/ellipsis-pattern.js';
 
 const HARD_EXCLUDED_DIRECTORY_NAMES = new Set([
-  'node_modules', '.git', '.svn', '.hg',
+  'node_modules', '.git', '.svn', '.hg', '.venv', 'venv', '__pycache__',
 ]);
 
 const IGNORED_DIRECTORY_NAMES = new Set([
@@ -224,7 +225,7 @@ export function createFileTreeService(dependencies: FileTreeServiceDependencies)
   async function collectVisibleEntries(
     directoryPath: string,
     includeEntry: FileTreeEntryFilter,
-    remainingEntries: { value: number },
+    remainingEntries: { value: number; truncated?: boolean },
   ): Promise<FileTreeDirectoryEntry[]> {
     const visibleEntries: FileTreeDirectoryEntry[] = [];
 
@@ -240,11 +241,8 @@ export function createFileTreeService(dependencies: FileTreeServiceDependencies)
         // the budget. Every recursive branch shares one counter, so the cap
         // applies to the whole tree rather than per directory.
         if (remainingEntries.value <= 0) {
-          throw createFileTreeError(
-            `Project file tree exceeds the ${MAXIMUM_FILE_TREE_ENTRIES.toLocaleString()} entry limit. Choose a narrower project directory or add ignore rules.`,
-            413,
-            'FILE_TREE_TOO_LARGE',
-          );
+          remainingEntries.truncated = true;
+          break;
         }
         remainingEntries.value -= 1;
         visibleEntries.push(entry);
@@ -267,75 +265,49 @@ export function createFileTreeService(dependencies: FileTreeServiceDependencies)
   }
 
   async function buildFileTree(
-    directoryPath: string,
-    maximumDepth: number,
-    currentDepth = 0,
+    directoryPath: string, maximumDepth: number, _currentDepth = 0,
     includeEntry: FileTreeEntryFilter = includeEntryByFallbackDirectoryNames,
-    remainingEntries = { value: MAXIMUM_FILE_TREE_ENTRIES },
+    respectGitignore = false,
   ): Promise<FileTreeNode[]> {
-    const visibleEntries = await collectVisibleEntries(directoryPath, includeEntry, remainingEntries);
-
-    const items = await Promise.all(visibleEntries.map(async (entry): Promise<FileTreeNode> => {
-      const itemPath = path.join(directoryPath, entry.name);
-      const item: FileTreeNode = {
-        name: entry.name,
-        path: itemPath,
-        type: entry.isDirectory() ? 'directory' : 'file',
-        size: 0,
-        modified: null,
-        permissions: '000',
-        permissionsRwx: '---------',
-      };
-
-      try {
-        await acquire();
-        try {
+    const budget = { value: MAXIMUM_FILE_TREE_ENTRIES, truncated: false };
+    const root: FileTreeNode[] = [];
+    const queue = [{ directoryPath, depth: 0, nodes: root, parent: undefined as FileTreeNode | undefined, filter: includeEntry }];
+    // Breadth first: shallow siblings are reserved before any descendants.
+    for (let cursor = 0; cursor < queue.length; cursor++) {
+      const current = queue[cursor];
+      if (budget.value <= 0) { if (current.parent) current.parent.truncated = true; continue; }
+      let filter = current.filter;
+      if (respectGitignore && current.depth > 0) try {
+        const local = createGitignoreEntryFilter(current.directoryPath, await fileSystem.readTextFile(path.join(current.directoryPath,'.gitignore')));
+        const inherited = filter;
+        filter = (entry,dir) => inherited(entry,dir) && local(entry,dir);
+      } catch { /* Missing local ignore file. */ }
+      const entries = await collectVisibleEntries(current.directoryPath, filter, budget);
+      if (current.parent) current.parent.children = current.nodes;
+      for (const entry of entries) {
+        const itemPath = path.join(current.directoryPath, entry.name);
+        const item: FileTreeNode = {name: entry.name, path: itemPath, type: entry.isDirectory() ? 'directory' : 'file', size: 0, modified: null, permissions: '000', permissionsRwx: '---------'};
+        // Shallow listings avoid metadata syscalls; previews read fresh metadata.
+        if (maximumDepth > 0) try {
           const stats = await fileSystem.lstat(itemPath);
-          const ownerPermissions = (stats.mode >> 6) & 7;
-          const groupPermissions = (stats.mode >> 3) & 7;
-          const otherPermissions = stats.mode & 7;
-
-          item.size = stats.size;
-          item.modified = stats.mtime.toISOString();
-          item.permissions = `${ownerPermissions}${groupPermissions}${otherPermissions}`;
-          item.permissionsRwx = permissionBitsToRwx(ownerPermissions)
-            + permissionBitsToRwx(groupPermissions)
-            + permissionBitsToRwx(otherPermissions);
-          if (stats.isSymbolicLink()) {
-            item.isSymlink = true;
+          item.size = stats.size; item.modified = stats.mtime.toISOString();
+          item.permissions = ((stats.mode >> 6) & 7).toString() + ((stats.mode >> 3) & 7).toString() + (stats.mode & 7).toString();
+          item.permissionsRwx = [...item.permissions].map(n => permissionBitsToRwx(Number(n))).join('');
+          item.isSymlink = stats.isSymbolicLink();
+        } catch { /* Metadata never hides readable entries. */ }
+        if (entry.isDirectory()) {
+          item.truncated = true;
+          if (current.depth < maximumDepth && !item.isSymlink && !FORBIDDEN_WORKSPACE_PATHS.includes(normalizeProjectPath(itemPath))) {
+            queue.push({directoryPath: itemPath, depth: current.depth + 1, nodes: [], parent: item, filter});
           }
-        } finally {
-          release();
         }
-      } catch {
-        // Metadata failures should not hide an otherwise readable tree entry.
+        current.nodes.push(item);
       }
-
-      // Skip recursing into pseudo-filesystems and other system-critical
-      // directories (e.g. /proc, /sys) — they're never valid project roots,
-      // and /proc in particular can contain thousands of virtual entries
-      // that make traversal from a broad root (e.g. "/") pathologically slow.
-      const isForbiddenSystemDir = FORBIDDEN_WORKSPACE_PATHS.includes(normalizeProjectPath(itemPath));
-
-      if (entry.isDirectory() && currentDepth < maximumDepth && !isForbiddenSystemDir) {
-        item.children = await buildFileTree(
-          itemPath,
-          maximumDepth,
-          currentDepth + 1,
-          includeEntry,
-          remainingEntries,
-        );
-      }
-
-      return item;
-    }));
-
-    return items.sort((left, right) => {
-      if (left.type !== right.type) {
-        return left.type === 'directory' ? -1 : 1;
-      }
-      return left.name.localeCompare(right.name);
-    });
+      current.nodes.sort((a,b) => a.type !== b.type ? (a.type === 'directory' ? -1 : 1) : a.name.localeCompare(b.name));
+      if (current.parent) current.parent.truncated = budget.truncated;
+    }
+    if (budget.truncated && root.length) root[root.length - 1].truncated = true;
+    return root;
   }
 
   /**
@@ -611,7 +583,29 @@ export function createFileTreeService(dependencies: FileTreeServiceDependencies)
         }
       }
 
-      return buildFileTree(projectRoot, 10, 0, includeEntry);
+      const directory = options?.directory ? resolvePathInsideProject(projectRoot, options.directory) : projectRoot;
+      if (options?.respectGitignore && directory !== projectRoot) {
+        let ancestor = projectRoot;
+        for (const segment of path.relative(projectRoot,directory).split(path.sep)) {
+          ancestor = path.join(ancestor,segment);
+          try {
+            const local = createGitignoreEntryFilter(ancestor, await fileSystem.readTextFile(path.join(ancestor,'.gitignore')));
+            const inherited = includeEntry || includeEntryByFallbackDirectoryNames;
+            includeEntry = (entry,dir) => inherited(entry,dir) && local(entry,dir);
+          } catch { /* Missing local ignore file. */ }
+        }
+      }
+      return buildFileTree(directory, options?.shallow ? 0 : 10, 0, includeEntry, options?.respectGitignore);
+    },
+
+    async searchProjectFiles(projectId, query, options) {
+      const registered = await resolveProjectRoot(projectId);
+      const root = options?.workspacePath ? path.resolve(options.workspacePath) : registered;
+      if (options?.workspacePath) {
+        if (!path.isAbsolute(options.workspacePath)) throw createFileTreeError('Workspace path must be absolute',400,'INVALID_WORKSPACE_PATH');
+        assertContextPath(root);
+      }
+      return searchFilePaths(root, query, options?.respectGitignore ?? true);
     },
 
     async createEntry(input) {

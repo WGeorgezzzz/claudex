@@ -1338,6 +1338,7 @@ export type FileTreeNode = {
   permissions: string;
   permissionsRwx: string;
   isSymlink?: boolean;
+  truncated?: boolean;
   children?: FileTreeNode[];
 };
 
@@ -1492,8 +1493,9 @@ export type FileTreeServices = {
   }>;
   listProjectFiles(
     projectId: string,
-    options?: { respectGitignore: boolean; workspacePath?:string },
+    options?: { respectGitignore: boolean; workspacePath?:string; directory?:string; shallow?:boolean },
   ): Promise<FileTreeNode[]>;
+  searchProjectFiles(projectId: string, query: string, options?: {respectGitignore?: boolean; workspacePath?: string}): Promise<{files: FileTreeNode[]; truncated: boolean}>;
   createEntry(input: {
     projectId: string;
     parentPath: string;

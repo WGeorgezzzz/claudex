@@ -18,7 +18,7 @@ import type { Project } from '@/shared/types';
 const getFiles = vi.fn();
 
 vi.mock('@/shared/api', () => ({
-  api: { getFiles: (...args: unknown[]) => getFiles(...args) },
+  api: { searchFiles: (...args: unknown[]) => getFiles(...args) },
 }));
 
 const { useFileOpenResolver } = await import('@/modules/project-workspace/hooks/useFileOpenResolver');
@@ -38,7 +38,7 @@ const tree = [
 
 const setup = () => {
   getFiles.mockReset();
-  getFiles.mockResolvedValue({ ok: true, json: async () => tree });
+  getFiles.mockResolvedValue({ ok: true, json: async () => ({files:tree.flatMap((n:any)=>n.children || [n])}) });
   const onFileOpen = vi.fn();
   const { result } = renderHook(() => useFileOpenResolver(project, onFileOpen));
   return { resolve: result.current, onFileOpen };
