@@ -3,7 +3,7 @@ import { Star, X } from 'lucide-react';
 import { useGitHubStars } from '@/modules/sidebar/hooks/useGitHubStars';
 import { IS_PLATFORM } from '@/shared/utils';
 
-const GITHUB_REPO_URL = 'https://github.com/WGeorgezzzz/nexagent';
+const GITHUB_REPO_URL = 'https://github.com/WGeorgezzzz/drover';
 
 function GitHubIcon({ className }: { className?: string }) {
   return (

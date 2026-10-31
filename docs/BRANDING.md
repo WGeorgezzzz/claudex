@@ -27,4 +27,4 @@ namespaces, and persisted storage keys. Compatibility artwork URLs
 
 Current pages and installers display Drover. Preserve LICENSE and NOTICE,
 including their historical upstream names. The GitHub repository is
-`WGeorgezzzz/nexagent`.
+`WGeorgezzzz/drover`.

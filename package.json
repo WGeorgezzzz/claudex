@@ -28,13 +28,13 @@
     "LICENSE",
     "NOTICE"
   ],
-  "homepage": "https://github.com/WGeorgezzzz/nexagent",
+  "homepage": "https://github.com/WGeorgezzzz/drover",
   "repository": {
     "type": "git",
-    "url": "https://github.com/WGeorgezzzz/nexagent.git"
+    "url": "https://github.com/WGeorgezzzz/drover.git"
   },
   "bugs": {
-    "url": "https://github.com/WGeorgezzzz/nexagent/issues"
+    "url": "https://github.com/WGeorgezzzz/drover/issues"
   },
   "scripts": {
     "dev": "concurrently --kill-others \"npm run server:dev\" \"npm run client\"",

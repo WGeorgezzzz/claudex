@@ -5,6 +5,6 @@
   "protocol": "cloudcli-workbench",
   "storageFolder": "CloudCLI Workbench",
   "defaultPort": 3016,
-  "releaseRepository": "WGeorgezzzz/nexagent",
+  "releaseRepository": "WGeorgezzzz/drover",
   "upstreamBaseVersion": "1.37.5"
 }

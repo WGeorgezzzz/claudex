@@ -5,7 +5,7 @@ Drive every agent from one place.
 One backend for Claude Code, Codex, Cursor, OpenCode, and WorkBuddy, on your
 desktop, phone, or remote device.
 
-[简体中文](README.zh-CN.md) · [Releases](https://github.com/WGeorgezzzz/nexagent/releases)
+[简体中文](README.zh-CN.md) · [Releases](https://github.com/WGeorgezzzz/drover/releases)
 · [Changelog](CHANGELOG.md) · [Contributing](CONTRIBUTING.md)
 
 <img src="public/drover-mark.svg" width="80" alt="Drover guiding arc and leading arrow" />
@@ -30,7 +30,7 @@ desktop, phone, or remote device.
 
 ### Desktop installers
 
-Get **Drover 1.0.0** from [Releases](https://github.com/WGeorgezzzz/nexagent/releases).
+Get **Drover 1.0.0** from [Releases](https://github.com/WGeorgezzzz/drover/releases).
 The release is prepared as a **draft** until maintainer review; draft assets are
 visible only to repository maintainers. Compare the download with `SHA256SUMS`.
 
@@ -75,7 +75,7 @@ in to your chosen agent locally; detection never automatically installs agents.
 ### From source
 
 ```bash
-git clone https://github.com/WGeorgezzzz/nexagent.git
+git clone https://github.com/WGeorgezzzz/drover.git
 cd nexagent
 npm ci
 npm run build

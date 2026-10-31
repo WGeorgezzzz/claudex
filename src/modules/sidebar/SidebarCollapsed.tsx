@@ -1,7 +1,7 @@
 import { Settings, Sparkles, Bug, AlertTriangle } from 'lucide-react';
 import type { TFunction } from 'i18next';
 
-const GITHUB_ISSUES_URL = 'https://github.com/WGeorgezzzz/nexagent/issues/new';
+const GITHUB_ISSUES_URL = 'https://github.com/WGeorgezzzz/drover/issues/new';
 
 type SidebarCollapsedProps = {
   onExpand: () => void;

@@ -3,7 +3,7 @@
 
 # Sandboxed coding agents with a web & mobile IDE (Drover)
 
-[Docker Sandbox](https://docs.docker.com/ai/sandboxes/) templates that add [Drover](https://github.com/WGeorgezzzz/nexagent) on top of Claude Code and Codex. You get a full web and mobile IDE accessible from any browser on any device.
+[Docker Sandbox](https://docs.docker.com/ai/sandboxes/) templates that add [Drover](https://github.com/WGeorgezzzz/drover) on top of Claude Code and Codex. You get a full web and mobile IDE accessible from any browser on any device.
 
 ## Get started
 
